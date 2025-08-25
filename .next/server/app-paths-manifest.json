@@ -1,0 +1,11 @@
+{
+  "/not-found": "app/not-found.js",
+  "/auth/signup/page": "app/auth/signup/page.js",
+  "/contact/page": "app/contact/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/company/invite-employee/page": "app/dashboard/company/invite-employee/page.js",
+  "/dashboard/company/page": "app/dashboard/company/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/companies/[id]/employees/route": "app/api/companies/[id]/employees/route.js",
+  "/courses/page": "app/courses/page.js"
+}

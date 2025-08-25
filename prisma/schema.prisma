@@ -1,0 +1,252 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String
+  personalNumber String?
+  role          String    @default("EMPLOYEE") // UserRole as string
+  companyId     String?
+  
+  // BankID verification (required for ID06)
+  bankIdVerified Boolean  @default(false)
+  bankIdVerifiedAt DateTime?
+  
+  // ID06 eligibility
+  id06Eligible Boolean @default(false)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  company       Company?  @relation(fields: [companyId], references: [id])
+  enrollments   Enrollment[]
+  progress      Progress[]
+  certificates  Certificate[]
+  answers       Answer[]
+}
+
+model Course {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  price       Float
+  image       String?
+  duration    Int       // in minutes
+  category    String
+  isPublished Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  lessons     Lesson[]
+  enrollments Enrollment[]
+  certificates Certificate[]
+  coursePurchases CoursePurchase[]
+  invoiceItems InvoiceItem[]
+}
+
+model Lesson {
+  id          String    @id @default(cuid())
+  title       String
+  content     String    // Markdown content
+  videoUrl    String?
+  order       Int
+  courseId    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questions   Question[]
+  progress    Progress[]
+}
+
+model Question {
+  id          String    @id @default(cuid())
+  question    String
+  type        String    // QuestionType as string
+  options     String    // JSON string for multiple choice questions
+  correctAnswer String
+  explanation String?
+  image       String?
+  lessonId    String
+  order       Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Relations
+  lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  answers     Answer[]
+}
+
+model Answer {
+  id         String   @id @default(cuid())
+  userId     String
+  questionId String
+  answer     String
+  isCorrect  Boolean
+  answeredAt DateTime @default(now())
+  
+  // Relations
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, questionId])
+}
+
+model Enrollment {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String
+  coursePurchaseId String?
+  enrolledAt DateTime @default(now())
+  completedAt DateTime?
+  
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  coursePurchase CoursePurchase? @relation(fields: [coursePurchaseId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, courseId])
+}
+
+model Progress {
+  id        String   @id @default(cuid())
+  userId    String
+  lessonId  String
+  completed Boolean  @default(false)
+  completedAt DateTime?
+  
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, lessonId])
+}
+
+model Company {
+  id                String    @id @default(cuid())
+  organizationNumber String   @unique
+  name              String
+  contactPerson     String
+  email             String
+  phone             String
+  address           String
+  
+  // Company verification (no BankID needed)
+  verified          Boolean   @default(false)
+  verifiedAt        DateTime?
+  verificationMethod String @default("BUSINESS_REGISTRATION") // VerificationMethod as string
+  
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  employees         User[]
+  coursePurchases   CoursePurchase[]
+  invoices          Invoice[]
+  invitations       Invitation[]
+}
+
+model CoursePurchase {
+  id           String   @id @default(cuid())
+  companyId    String
+  courseId     String
+  quantity     Int
+  pricePerUnit Float
+  totalAmount  Float
+  purchasedAt  DateTime @default(now())
+  
+  // Relations
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  enrollments  Enrollment[]
+}
+
+model Certificate {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String
+  certificateNumber String @unique
+  
+  // ID06 integration
+  id06Verified Boolean @default(false)
+  id06CertificateId String?
+  id06RegisteredAt DateTime?
+  
+  issuedAt  DateTime @default(now())
+  
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, courseId])
+}
+
+model Invoice {
+  id           String        @id @default(cuid())
+  companyId    String
+  invoiceNumber String       @unique
+  amount       Float
+  currency     String        @default("SEK")
+  dueDate      DateTime
+  status       String        @default("PENDING") // InvoiceStatus as string
+  paidAt       DateTime?
+  createdAt    DateTime      @default(now())
+  
+  // Relations
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  items        InvoiceItem[]
+}
+
+model InvoiceItem {
+  id        String   @id @default(cuid())
+  invoiceId String
+  courseId  String
+  quantity  Int
+  price     Float
+  total     Float
+  
+  // Relations
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model Invitation {
+  id               String   @id @default(cuid())
+  email            String
+  token            String   @unique
+  companyId        String
+  expiresAt        DateTime
+  isExistingUser   Boolean  @default(false)
+  temporaryPassword String?
+  used             Boolean  @default(false)
+  usedAt           DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([email])
+  @@index([companyId])
+}
+
+// Enums converted to strings for SQLite compatibility
+// UserRole: "ADMIN", "COMPANY_ADMIN", "EMPLOYEE", "INDIVIDUAL"
+// VerificationMethod: "BUSINESS_REGISTRATION", "CREDIT_CHECK", "MANUAL_APPROVAL"
+// InvoiceStatus: "PENDING", "PAID", "OVERDUE", "CANCELLED"
+// QuestionType: "MULTIPLE_CHOICE", "TRUE_FALSE", "TEXT"
