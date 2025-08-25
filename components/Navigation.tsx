@@ -74,6 +74,20 @@ export function Navigation() {
                             </Link>
                           )}
                         </Menu.Item>
+                        {(session?.user as any)?.role === 'ADMIN' && (
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                href="/admin"
+                                className={`${
+                                  active ? 'bg-gray-100' : ''
+                                } block px-4 py-2 text-sm text-gray-700`}
+                              >
+                                Admin Panel
+                              </Link>
+                            )}
+                          </Menu.Item>
+                        )}
                         <Menu.Item>
                           {({ active }) => (
                             <Link
@@ -168,6 +182,15 @@ export function Navigation() {
                   >
                     {(session?.user as any)?.role === 'COMPANY_ADMIN' ? 'Företagsdashboard' : 'Mina Kurser'}
                   </Disclosure.Button>
+                  {(session?.user as any)?.role === 'ADMIN' && (
+                    <Disclosure.Button
+                      as={Link}
+                      href="/admin"
+                      className="text-gray-900 hover:text-primary-600 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200"
+                    >
+                      Admin Panel
+                    </Disclosure.Button>
+                  )}
                   <Disclosure.Button
                     as={Link}
                     href="/profile"

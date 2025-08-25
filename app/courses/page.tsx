@@ -38,17 +38,17 @@ export default function CoursesPage() {
         const mockCourses: Course[] = [
           {
             id: '1',
-            title: 'Arbete på Väg - Grundkurs',
-            description: 'Grundläggande säkerhet och regler för arbete i trafikmiljö. Denna kurs ger dig den kunskap du behöver för att arbeta säkert på vägar.',
-            price: 1495,
+            title: 'APV Grundkurs - Säkerhet på byggarbetsplatsen',
+            description: 'En grundläggande kurs om säkerhet på byggarbetsplatser enligt APV-regelverket. Kursen täcker de viktigaste säkerhetsaspekterna och ger dig kunskap om hur du arbetar säkert i byggbranschen.',
+            price: 995,
             duration: 120,
-            category: 'arbete-pa-vag',
+            category: 'sakerhet-miljo',
             image: 'https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=400&h=300&fit=crop'
           },
           {
             id: '2',
             title: 'Säkerhet i Byggbranschen',
-            description: 'Komplett kurs om säkerhet och arbetsmiljö inom byggbranschen. Lär dig identifiera och hantera risker.',
+            description: 'Komplett kurs om säkerhet och arbetsmiljö inom byggbranschen. Lär dig identifiera och hantera risker, förstå säkerhetsregler och skapa en säker arbetsmiljö.',
             price: 1995,
             duration: 180,
             category: 'sakerhet-miljo',
@@ -57,7 +57,7 @@ export default function CoursesPage() {
           {
             id: '3',
             title: 'Projektledning för Byggprojekt',
-            description: 'Avancerad kurs i projektledning specifikt anpassad för byggprojekt. Perfekt för dig som vill utveckla din karriär.',
+            description: 'Avancerad kurs i projektledning specifikt anpassad för byggprojekt. Perfekt för dig som vill utveckla din karriär och lära dig leda komplexa byggprojekt effektivt.',
             price: 2995,
             duration: 240,
             category: 'kompetensutveckling',
@@ -66,7 +66,7 @@ export default function CoursesPage() {
           {
             id: '4',
             title: 'ADR - Farligt Gods Transport',
-            description: 'Specialiserad kurs för transport av farligt gods enligt ADR-reglementet. Krävs för många transportjobb.',
+            description: 'Specialiserad kurs för transport av farligt gods enligt ADR-reglementet. Krävs för många transportjobb och ger dig kunskap om säker hantering av farliga ämnen.',
             price: 1795,
             duration: 150,
             category: 'sakerhet-miljo',
@@ -75,7 +75,7 @@ export default function CoursesPage() {
           {
             id: '5',
             title: 'Vinterväghållning',
-            description: 'Kurs i vinterväghållning och snöröjning. Lär dig säkra metoder för vinterarbete på vägar.',
+            description: 'Kurs i vinterväghållning och snöröjning. Lär dig säkra metoder för vinterarbete på vägar och hur du hanterar snö, is och kalla förhållanden.',
             price: 1295,
             duration: 90,
             category: 'arbete-pa-vag',
@@ -84,7 +84,7 @@ export default function CoursesPage() {
           {
             id: '6',
             title: 'Ledarskap i Byggbranschen',
-            description: 'Utveckla dina ledarskapsförmågor för byggbranschen. Praktiska verktyg och metoder för effektiv ledning.',
+            description: 'Utveckla dina ledarskapsförmågor för byggbranschen. Praktiska verktyg och metoder för effektiv ledning av byggteam och projekt.',
             price: 3495,
             duration: 300,
             category: 'kompetensutveckling',
