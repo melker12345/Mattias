@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
+import { ShoppingCartIcon } from '@heroicons/react/24/outline'
 
 interface CourseCardProps {
   course: {
@@ -11,9 +12,10 @@ interface CourseCardProps {
     duration: number
     category: string
   }
+  onAddToCart?: (course: any) => void
 }
 
-export function CourseCard({ course }: CourseCardProps) {
+export function CourseCard({ course, onAddToCart }: CourseCardProps) {
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60)
     const mins = minutes % 60
@@ -59,12 +61,23 @@ export function CourseCard({ course }: CourseCardProps) {
         <div className="text-2xl font-bold text-primary-600">
           {course.price === 0 ? 'Gratis' : `${course.price} kr`}
         </div>
-        <Link
-          href={`/courses/${course.id}`}
-          className="btn-primary"
-        >
-          Läs Mer
-        </Link>
+        <div className="flex space-x-2">
+          {onAddToCart && (
+            <button
+              onClick={() => onAddToCart(course)}
+              className="bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center text-sm"
+            >
+              <ShoppingCartIcon className="w-4 h-4 mr-1" />
+              Lägg till
+            </button>
+          )}
+          <Link
+            href={`/courses/${course.id}`}
+            className="btn-primary"
+          >
+            Läs Mer
+          </Link>
+        </div>
       </div>
     </div>
   )

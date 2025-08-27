@@ -2,42 +2,42 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { useCart } from '@/contexts/CartContext';
 import { motion } from 'framer-motion';
 import { 
   ClockIcon, 
-  UserGroupIcon, 
-  BookOpenIcon,
-  CheckCircleIcon,
+  UserIcon, 
   PlayIcon,
-  DocumentTextIcon,
-  PhotoIcon,
-  VideoCameraIcon
+  CheckCircleIcon,
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import Image from 'next/image';
 
 interface Course {
   id: string;
   title: string;
   description: string;
-  duration: number;
   price: number;
-  imageUrl: string;
-  lessons: Lesson[];
+  duration: number;
+  category: string;
+  image?: string;
+  isPublished: boolean;
   enrolledUsers: number;
-  completedUsers: number;
+  lessons: Lesson[];
 }
 
 interface Lesson {
   id: string;
   title: string;
-  description: string;
-  duration: number;
-  type: 'video' | 'text' | 'quiz' | 'image';
+  content: string;
+  videoUrl?: string;
   order: number;
-  completed?: boolean;
 }
 
 export default function CourseDetailPage({ params }: { params: { id: string } }) {
   const { data: session } = useSession();
+  const { addItem } = useCart();
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
   const [enrolled, setEnrolled] = useState(false);
@@ -49,442 +49,74 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
 
   const fetchCourseDetails = async () => {
     try {
-      // Mock data based on course ID - replace with actual API call
-      const courseData: { [key: string]: Course } = {
-        '1': {
-          id: '1',
-          title: 'APV Grundkurs - Säkerhet på byggarbetsplatsen',
-          description: 'En grundläggande kurs om säkerhet på byggarbetsplatser enligt APV-regelverket. Kursen täcker de viktigaste säkerhetsaspekterna och ger dig kunskap om hur du arbetar säkert i byggbranschen.',
-          duration: 120,
-          price: 995,
-          imageUrl: '/images/course-apv.jpg',
-          enrolledUsers: 1247,
-          completedUsers: 1189,
-          lessons: [
-            {
-              id: '1',
-              title: 'Introduktion till APV',
-              description: 'Grundläggande information om APV-regelverket och dess betydelse',
-              duration: 15,
-              type: 'video',
-              order: 1
-            },
-            {
-              id: '2',
-              title: 'Säkerhetsutrustning',
-              description: 'Vilken säkerhetsutrustning som krävs och hur den används korrekt',
-              duration: 20,
-              type: 'video',
-              order: 2
-            },
-            {
-              id: '3',
-              title: 'Riskbedömning',
-              description: 'Hur man identifierar och bedömer risker på byggarbetsplatsen',
-              duration: 25,
-              type: 'text',
-              order: 3
-            },
-            {
-              id: '4',
-              title: 'Kunskapstest',
-              description: 'Testa din förståelse för kursmaterialet',
-              duration: 10,
-              type: 'quiz',
-              order: 4
-            }
-          ]
-        },
-        '2': {
-          id: '2',
-          title: 'Säkerhet i Byggbranschen',
-          description: 'Komplett kurs om säkerhet och arbetsmiljö inom byggbranschen. Lär dig identifiera och hantera risker, förstå säkerhetsregler och skapa en säker arbetsmiljö för dig och dina kollegor.',
-          duration: 180,
-          price: 1995,
-          imageUrl: '/images/course-safety.jpg',
-          enrolledUsers: 892,
-          completedUsers: 845,
-          lessons: [
-            {
-              id: '1',
-              title: 'Byggbranschens säkerhetskrav',
-              description: 'Översikt över säkerhetskrav och regelverk inom byggbranschen',
-              duration: 20,
-              type: 'video',
-              order: 1
-            },
-            {
-              id: '2',
-              title: 'Personlig skyddsutrustning (PSU)',
-              description: 'Vilken skyddsutrustning som krävs för olika arbetsuppgifter',
-              duration: 25,
-              type: 'video',
-              order: 2
-            },
-            {
-              id: '3',
-              title: 'Arbetsmiljö och ergonomi',
-              description: 'Skapa en ergonomisk och säker arbetsmiljö',
-              duration: 30,
-              type: 'text',
-              order: 3
-            },
-            {
-              id: '4',
-              title: 'Skyddsronder och säkerhetskontroller',
-              description: 'Hur man utför säkerhetskontroller och skyddsronder',
-              duration: 20,
-              type: 'video',
-              order: 4
-            },
-            {
-              id: '5',
-              title: 'Olycksfall och första hjälpen',
-              description: 'Hantering av olycksfall och grundläggande första hjälpen',
-              duration: 25,
-              type: 'text',
-              order: 5
-            },
-            {
-              id: '6',
-              title: 'Sluttest',
-              description: 'Avslutande kunskapstest för kursen',
-              duration: 15,
-              type: 'quiz',
-              order: 6
-            }
-          ]
-        },
-        '3': {
-          id: '3',
-          title: 'Projektledning för Byggprojekt',
-          description: 'Avancerad kurs i projektledning specifikt anpassad för byggprojekt. Perfekt för dig som vill utveckla din karriär och lära dig leda komplexa byggprojekt effektivt.',
-          duration: 240,
-          price: 2995,
-          imageUrl: '/images/course-project.jpg',
-          enrolledUsers: 456,
-          completedUsers: 423,
-          lessons: [
-            {
-              id: '1',
-              title: 'Projektplanering och struktur',
-              description: 'Grundläggande projektplanering och strukturer för byggprojekt',
-              duration: 30,
-              type: 'video',
-              order: 1
-            },
-            {
-              id: '2',
-              title: 'Resurshantering',
-              description: 'Hantering av personal, material och utrustning',
-              duration: 25,
-              type: 'video',
-              order: 2
-            },
-            {
-              id: '3',
-              title: 'Tidsplanering och schemaläggning',
-              description: 'Skapa och hantera projektets tidsplan',
-              duration: 35,
-              type: 'text',
-              order: 3
-            },
-            {
-              id: '4',
-              title: 'Kvalitetskontroll',
-              description: 'Säkerställa kvalitet genom hela projektet',
-              duration: 20,
-              type: 'video',
-              order: 4
-            },
-            {
-              id: '5',
-              title: 'Kommunikation och samarbete',
-              description: 'Effektiv kommunikation med team och intressenter',
-              duration: 25,
-              type: 'text',
-              order: 5
-            },
-            {
-              id: '6',
-              title: 'Riskhantering i projekt',
-              description: 'Identifiera och hantera projektrisker',
-              duration: 30,
-              type: 'video',
-              order: 6
-            },
-            {
-              id: '7',
-              title: 'Projektavslutning',
-              description: 'Avsluta projekt och dokumentera lärdomar',
-              duration: 20,
-              type: 'text',
-              order: 7
-            },
-            {
-              id: '8',
-              title: 'Certifieringstest',
-              description: 'Avslutande test för projektledarcertifiering',
-              duration: 20,
-              type: 'quiz',
-              order: 8
-            }
-          ]
-        },
-        '4': {
-          id: '4',
-          title: 'ADR - Farligt Gods Transport',
-          description: 'Specialiserad kurs för transport av farligt gods enligt ADR-reglementet. Krävs för många transportjobb och ger dig kunskap om säker hantering av farliga ämnen.',
-          duration: 150,
-          price: 1795,
-          imageUrl: '/images/course-adr.jpg',
-          enrolledUsers: 678,
-          completedUsers: 645,
-          lessons: [
-            {
-              id: '1',
-              title: 'ADR-reglementet grunderna',
-              description: 'Introduktion till ADR och dess betydelse för transport',
-              duration: 20,
-              type: 'video',
-              order: 1
-            },
-            {
-              id: '2',
-              title: 'Klassificering av farligt gods',
-              description: 'Olika klasser av farligt gods och deras egenskaper',
-              duration: 25,
-              type: 'video',
-              order: 2
-            },
-            {
-              id: '3',
-              title: 'Förpackning och märkning',
-              description: 'Korrekt förpackning och märkning av farligt gods',
-              duration: 20,
-              type: 'text',
-              order: 3
-            },
-            {
-              id: '4',
-              title: 'Transportdokumentation',
-              description: 'Nödvändig dokumentation för transport av farligt gods',
-              duration: 15,
-              type: 'text',
-              order: 4
-            },
-            {
-              id: '5',
-              title: 'Säkerhet vid transport',
-              description: 'Säkerhetsåtgärder under transport',
-              duration: 25,
-              type: 'video',
-              order: 5
-            },
-            {
-              id: '6',
-              title: 'Nödsituationer och olycksfall',
-              description: 'Hantering av nödsituationer och olycksfall',
-              duration: 20,
-              type: 'text',
-              order: 6
-            },
-            {
-              id: '7',
-              title: 'ADR-certifieringstest',
-              description: 'Test för ADR-certifiering',
-              duration: 15,
-              type: 'quiz',
-              order: 7
-            }
-          ]
-        },
-        '5': {
-          id: '5',
-          title: 'Vinterväghållning',
-          description: 'Kurs i vinterväghållning och snöröjning. Lär dig säkra metoder för vinterarbete på vägar och hur du hanterar snö, is och kalla förhållanden.',
-          duration: 90,
-          price: 1295,
-          imageUrl: '/images/course-winter.jpg',
-          enrolledUsers: 345,
-          completedUsers: 312,
-          lessons: [
-            {
-              id: '1',
-              title: 'Vinterväglag och förhållanden',
-              description: 'Förstå olika vinterväglag och deras påverkan',
-              duration: 15,
-              type: 'video',
-              order: 1
-            },
-            {
-              id: '2',
-              title: 'Snöröjningstekniker',
-              description: 'Effektiva metoder för snöröjning',
-              duration: 20,
-              type: 'video',
-              order: 2
-            },
-            {
-              id: '3',
-              title: 'Saltning och sandning',
-              description: 'Korrekt användning av salt och sand',
-              duration: 15,
-              type: 'text',
-              order: 3
-            },
-            {
-              id: '4',
-              title: 'Säkerhet vid vinterarbete',
-              description: 'Säkerhetsåtgärder för vinterarbete',
-              duration: 20,
-              type: 'video',
-              order: 4
-            },
-            {
-              id: '5',
-              title: 'Vinterväghållningstest',
-              description: 'Test av vinterväghållningskunskaper',
-              duration: 10,
-              type: 'quiz',
-              order: 5
-            }
-          ]
-        },
-        '6': {
-          id: '6',
-          title: 'Ledarskap i Byggbranschen',
-          description: 'Utveckla dina ledarskapsförmågor för byggbranschen. Praktiska verktyg och metoder för effektiv ledning av byggteam och projekt.',
-          duration: 300,
-          price: 3495,
-          imageUrl: '/images/course-leadership.jpg',
-          enrolledUsers: 234,
-          completedUsers: 198,
-          lessons: [
-            {
-              id: '1',
-              title: 'Ledarskapsteorier och stilar',
-              description: 'Olika ledarskapsteorier och hur de appliceras',
-              duration: 25,
-              type: 'video',
-              order: 1
-            },
-            {
-              id: '2',
-              title: 'Teambyggande och motivation',
-              description: 'Bygga starka team och motivera medarbetare',
-              duration: 30,
-              type: 'video',
-              order: 2
-            },
-            {
-              id: '3',
-              title: 'Konflikthantering',
-              description: 'Hantera och lösa konflikter på arbetsplatsen',
-              duration: 25,
-              type: 'text',
-              order: 3
-            },
-            {
-              id: '4',
-              title: 'Kommunikation som ledare',
-              description: 'Effektiv kommunikation med team och intressenter',
-              duration: 20,
-              type: 'video',
-              order: 4
-            },
-            {
-              id: '5',
-              title: 'Beslutsfattande och problemlösning',
-              description: 'Strategier för beslutsfattande och problemlösning',
-              duration: 30,
-              type: 'text',
-              order: 5
-            },
-            {
-              id: '6',
-              title: 'Förändringsledning',
-              description: 'Leda förändringar i organisationen',
-              duration: 25,
-              type: 'video',
-              order: 6
-            },
-            {
-              id: '7',
-              title: 'Ledarskap i kris',
-              description: 'Leda under kritiska situationer',
-              duration: 20,
-              type: 'text',
-              order: 7
-            },
-            {
-              id: '8',
-              title: 'Personlig utveckling som ledare',
-              description: 'Strategier för kontinuerlig utveckling',
-              duration: 15,
-              type: 'video',
-              order: 8
-            },
-            {
-              id: '9',
-              title: 'Ledarskapscertifieringstest',
-              description: 'Avslutande test för ledarskapscertifiering',
-              duration: 20,
-              type: 'quiz',
-              order: 9
-            }
-          ]
-        }
-      };
-
-      const mockCourse = courseData[params.id];
+      setLoading(true);
+      const response = await fetch(`/api/courses/${params.id}`);
       
-      if (!mockCourse) {
-        setCourse(null);
-        setLoading(false);
-        return;
+      if (response.ok) {
+        const courseData = await response.json();
+        setCourse(courseData);
+      } else {
+        console.error('Failed to fetch course details');
       }
-      
-      setCourse(mockCourse);
-      setLoading(false);
     } catch (error) {
-      console.error('Error fetching course:', error);
+      console.error('Error fetching course details:', error);
+    } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddToCart = () => {
+    if (course) {
+      addItem({
+        id: course.id,
+        title: course.title,
+        price: course.price,
+        type: 'course',
+        description: course.description,
+        image: course.image
+      });
     }
   };
 
   const handleEnroll = async () => {
     if (!session) {
-      // Redirect to sign in
+      // Redirect to login
       window.location.href = '/auth/signin';
       return;
     }
 
     setEnrolling(true);
     try {
-      // TODO: Implement actual enrollment API call
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      setEnrolled(true);
+      const response = await fetch(`/api/courses/${params.id}/enroll`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        setEnrolled(true);
+      } else {
+        console.error('Failed to enroll in course');
+      }
     } catch (error) {
-      console.error('Error enrolling:', error);
+      console.error('Error enrolling in course:', error);
     } finally {
       setEnrolling(false);
     }
   };
 
-  const getLessonIcon = (type: string) => {
-    switch (type) {
-      case 'video':
-        return <VideoCameraIcon className="w-5 h-5" />;
-      case 'text':
-        return <DocumentTextIcon className="w-5 h-5" />;
-      case 'quiz':
-        return <CheckCircleIcon className="w-5 h-5" />;
-      case 'image':
-        return <PhotoIcon className="w-5 h-5" />;
-      default:
-        return <BookOpenIcon className="w-5 h-5" />;
-    }
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('sv-SE', {
+      style: 'currency',
+      currency: 'SEK'
+    }).format(price);
   };
 
   if (loading) {
@@ -499,11 +131,11 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Kursen hittades inte</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Kurs hittades inte</h1>
           <p className="text-gray-600 mb-8">Kursen du letar efter finns inte eller har tagits bort.</p>
-          <a href="/courses" className="bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors">
+          <Link href="/courses" className="btn-primary">
             Tillbaka till kurser
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -512,99 +144,173 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Course Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-lg shadow-sm overflow-hidden mb-8"
-        >
-          <div className="md:flex">
-            <div className="md:w-1/3">
-              <div className="h-64 md:h-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
-                <BookOpenIcon className="w-24 h-24 text-white" />
-              </div>
-            </div>
-            <div className="md:w-2/3 p-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">{course.title}</h1>
-              <p className="text-gray-600 mb-6 leading-relaxed">{course.description}</p>
-              
-              <div className="flex flex-wrap gap-6 mb-6">
-                <div className="flex items-center text-gray-600">
-                  <ClockIcon className="w-5 h-5 mr-2" />
-                  <span>{course.duration} minuter</span>
-                </div>
-                <div className="flex items-center text-gray-600">
-                  <UserGroupIcon className="w-5 h-5 mr-2" />
-                  <span>{course.enrolledUsers} anmälda</span>
-                </div>
-                <div className="flex items-center text-gray-600">
-                  <CheckCircleIcon className="w-5 h-5 mr-2" />
-                  <span>{course.completedUsers} slutförda</span>
-                </div>
+        {/* Back Button */}
+        <div className="mb-6">
+          <Link
+            href="/courses"
+            className="inline-flex items-center text-primary-600 hover:text-primary-700 transition-colors"
+          >
+            <ArrowLeftIcon className="w-5 h-5 mr-2" />
+            Tillbaka till kurser
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-lg shadow-sm overflow-hidden"
+            >
+              {/* Course Image */}
+              <div className="relative h-64 md:h-80">
+                <Image
+                  src={course.image || '/images/course-placeholder.jpg'}
+                  alt={course.title}
+                  fill
+                  className="object-cover"
+                />
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="text-3xl font-bold text-primary-600">
-                  {course.price} kr
+              {/* Course Info */}
+              <div className="p-6">
+                <h1 className="text-3xl font-bold text-gray-900 mb-4">
+                  {course.title}
+                </h1>
+                
+                <div className="flex items-center space-x-6 mb-6 text-sm text-gray-600">
+                  <div className="flex items-center">
+                    <ClockIcon className="w-5 h-5 mr-2" />
+                    {formatDuration(course.duration)}
+                  </div>
+                  <div className="flex items-center">
+                    <UserIcon className="w-5 h-5 mr-2" />
+                    {course.enrolledUsers} registrerade
+                  </div>
+                  <div className="px-3 py-1 bg-primary-100 text-primary-800 rounded-full text-xs font-medium">
+                    {course.category}
+                  </div>
                 </div>
-                {!enrolled ? (
-                  <button
-                    onClick={handleEnroll}
-                    disabled={enrolling}
-                    className="bg-primary-600 text-white px-8 py-3 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                  >
-                    {enrolling ? (
-                      <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                        Registrerar...
-                      </>
-                    ) : (
-                      <>
-                        <PlayIcon className="w-5 h-5 mr-2" />
-                        Registrera dig
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <div className="bg-green-100 text-green-800 px-4 py-2 rounded-lg flex items-center">
-                    <CheckCircleIcon className="w-5 h-5 mr-2" />
-                    Registrerad
+
+                <div className="prose max-w-none mb-8">
+                  <p className="text-gray-700 leading-relaxed">
+                    {course.description}
+                  </p>
+                </div>
+
+                {/* Course Content */}
+                {course.lessons && course.lessons.length > 0 && (
+                  <div className="mb-8">
+                    <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                      Kursinnehåll
+                    </h2>
+                    <div className="space-y-3">
+                      {course.lessons.map((lesson, index) => (
+                        <div
+                          key={lesson.id}
+                          className="flex items-center p-4 bg-gray-50 rounded-lg"
+                        >
+                          <div className="flex-shrink-0 w-8 h-8 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center text-sm font-medium mr-4">
+                            {index + 1}
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-medium text-gray-900">
+                              {lesson.title}
+                            </h3>
+                            {lesson.videoUrl && (
+                              <div className="flex items-center text-sm text-gray-500 mt-1">
+                                <PlayIcon className="w-4 h-4 mr-1" />
+                                Video
+                              </div>
+                            )}
+                          </div>
+                          <CheckCircleIcon className="w-5 h-5 text-gray-400" />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
-            </div>
+            </motion.div>
           </div>
-        </motion.div>
 
-        {/* Course Content */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white rounded-lg shadow-sm p-6"
-        >
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Kursinnehåll</h2>
-          
-          <div className="space-y-4">
-            {course.lessons.map((lesson, index) => (
-              <div key={lesson.id} className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                <div className="flex items-center justify-center w-10 h-10 bg-primary-100 text-primary-600 rounded-full mr-4">
-                  {getLessonIcon(lesson.type)}
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="bg-white rounded-lg shadow-sm p-6 sticky top-8"
+            >
+              <div className="text-center mb-6">
+                <div className="text-3xl font-bold text-primary-600 mb-2">
+                  {formatPrice(course.price)}
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900">
-                    {index + 1}. {lesson.title}
-                  </h3>
-                  <p className="text-gray-600 text-sm">{lesson.description}</p>
-                </div>
-                <div className="flex items-center text-gray-500 text-sm">
-                  <ClockIcon className="w-4 h-4 mr-1" />
-                  {lesson.duration} min
-                </div>
+                <p className="text-gray-600">
+                  {course.price === 0 ? 'Gratis kurs' : 'Engångsbetalning'}
+                </p>
               </div>
-            ))}
+
+              <div className="space-y-4">
+                {enrolled ? (
+                  <button
+                    disabled
+                    className="w-full bg-green-100 text-green-800 py-3 px-4 rounded-lg font-medium cursor-not-allowed"
+                  >
+                    Du är redan registrerad
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleEnroll}
+                      disabled={enrolling}
+                      className="w-full btn-primary py-3"
+                    >
+                      {enrolling ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          Registrerar...
+                        </>
+                      ) : (
+                        'Registrera dig för kursen'
+                      )}
+                    </button>
+                    
+                    <button
+                      onClick={handleAddToCart}
+                      className="w-full btn-secondary py-3"
+                    >
+                      Lägg till i kundvagn
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Course Features */}
+              <div className="mt-8 pt-6 border-t border-gray-200">
+                <h3 className="font-semibold text-gray-900 mb-4">Vad du får</h3>
+                <ul className="space-y-3">
+                  <li className="flex items-center text-sm text-gray-600">
+                    <CheckCircleIcon className="w-5 h-5 text-green-500 mr-3" />
+                    Tillgång till alla kurslektioner
+                  </li>
+                  <li className="flex items-center text-sm text-gray-600">
+                    <CheckCircleIcon className="w-5 h-5 text-green-500 mr-3" />
+                    Certifikat vid slutförande
+                  </li>
+                  <li className="flex items-center text-sm text-gray-600">
+                    <CheckCircleIcon className="w-5 h-5 text-green-500 mr-3" />
+                    Livstidsåtkomst
+                  </li>
+                  <li className="flex items-center text-sm text-gray-600">
+                    <CheckCircleIcon className="w-5 h-5 text-green-500 mr-3" />
+                    Mobilkompatibel
+                  </li>
+                </ul>
+              </div>
+            </motion.div>
           </div>
-        </motion.div>
+        </div>
       </div>
     </div>
   );

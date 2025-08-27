@@ -36,10 +36,10 @@ export function HeroSection() {
             transition={{ duration: 0.8, delay: 0.4 }}
           >
             <Link 
-              href="/register/company" 
+              href="/company-account" 
               className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-8 rounded-lg transition-colors duration-200"
             >
-              Registrera Företag
+              Företagskonto
             </Link>
             <Link 
               href="/courses" 

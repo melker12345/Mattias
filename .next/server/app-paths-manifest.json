@@ -1,11 +1,13 @@
 {
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/page": "app/page.js",
   "/auth/signin/page": "app/auth/signin/page.js",
-  "/dashboard/company/page": "app/dashboard/company/page.js",
-  "/api/companies/[id]/employees/route": "app/api/companies/[id]/employees/route.js",
-  "/auth/signup/page": "app/auth/signup/page.js",
-  "/contact/page": "app/contact/page.js",
-  "/about/page": "app/about/page.js",
+  "/admin/page": "app/admin/page.js",
   "/courses/page": "app/courses/page.js",
-  "/courses/[id]/page": "app/courses/[id]/page.js"
+  "/dashboard/page": "app/dashboard/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/admin/courses/route": "app/api/admin/courses/route.js",
+  "/api/admin/companies/route": "app/api/admin/companies/route.js",
+  "/api/admin/users/route": "app/api/admin/users/route.js",
+  "/api/admin/courses/[id]/route": "app/api/admin/courses/[id]/route.js",
+  "/api/courses/route": "app/api/courses/route.js"
 }

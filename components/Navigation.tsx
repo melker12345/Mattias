@@ -4,21 +4,24 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
 import { Disclosure, Menu, Transition } from '@headlessui/react'
-import { Bars3Icon, XMarkIcon, UserCircleIcon } from '@heroicons/react/24/outline'
+import { Bars3Icon, XMarkIcon, UserCircleIcon, ShoppingCartIcon } from '@heroicons/react/24/outline'
+import { useCart } from '@/contexts/CartContext'
 
 export function Navigation() {
   const { data: session } = useSession()
+  const { toggleCart, getItemCount } = useCart()
   const [isOpen, setIsOpen] = useState(false)
 
   const navigation = [
     { name: 'Hem', href: '/' },
     { name: 'Kurser', href: '/courses' },
+    { name: 'Företagskonto', href: '/company-account' },
     { name: 'Om Oss', href: '/about' },
     { name: 'Kontakt', href: '/contact' },
   ]
 
   return (
-    <Disclosure as="nav" className="bg-white shadow-lg">
+    <Disclosure as="nav" className="bg-white shadow-lg sticky top-0 z-50">
       {({ open }) => (
         <>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -43,8 +46,21 @@ export function Navigation() {
                 ))}
               </div>
               
-              {/* Right Side - User Menu */}
-              <div className="hidden sm:flex sm:items-center">
+              {/* Right Side - Cart and User Menu */}
+              <div className="hidden sm:flex sm:items-center space-x-4">
+                {/* Cart Button */}
+                <button
+                  onClick={toggleCart}
+                  className="relative p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <ShoppingCartIcon className="h-6 w-6" />
+                  {getItemCount() > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {getItemCount()}
+                    </span>
+                  )}
+                </button>
+                
                 {session ? (
                   <Menu as="div" className="ml-3 relative">
                     <div>
@@ -146,7 +162,20 @@ export function Navigation() {
                 )}
               </div>
               
-              <div className="-mr-2 flex items-center sm:hidden">
+              <div className="-mr-2 flex items-center sm:hidden space-x-2">
+                {/* Mobile Cart Button */}
+                <button
+                  onClick={toggleCart}
+                  className="relative p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <ShoppingCartIcon className="h-6 w-6" />
+                  {getItemCount() > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {getItemCount()}
+                    </span>
+                  )}
+                </button>
+                
                 <Disclosure.Button className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500">
                   <span className="sr-only">Öppna huvudmeny</span>
                   {open ? (

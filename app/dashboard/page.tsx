@@ -35,33 +35,9 @@ export default function UserDashboard() {
 
   const fetchUserCourses = async () => {
     try {
-      // Mock data - replace with actual API call
-      const mockCourses: EnrolledCourse[] = [
-        {
-          id: '1',
-          title: 'APV Grundkurs - Säkerhet på byggarbetsplatsen',
-          description: 'Grundläggande kurs om säkerhet på byggarbetsplatser enligt APV-regelverket',
-          progress: 75,
-          totalLessons: 4,
-          completedLessons: 3,
-          enrolledAt: '2025-01-20',
-          lastAccessed: '2025-01-27',
-          status: 'in-progress'
-        },
-        {
-          id: '2',
-          title: 'Arbete på Väg - Grundkurs',
-          description: 'Grundläggande säkerhet och regler för arbete i trafikmiljö',
-          progress: 100,
-          totalLessons: 5,
-          completedLessons: 5,
-          enrolledAt: '2025-01-15',
-          lastAccessed: '2025-01-25',
-          status: 'completed'
-        }
-      ];
-
-      setEnrolledCourses(mockCourses);
+      // TODO: Replace with actual API call to fetch user's enrolled courses
+      // For now, we'll show an empty state since we don't have real data
+      setEnrolledCourses([]);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching user courses:', error);

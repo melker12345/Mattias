@@ -11,8 +11,11 @@ import {
   PlusIcon,
   PencilIcon,
   TrashIcon,
-  EyeIcon
+  EyeIcon,
+  CurrencyDollarIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline';
+import CourseModal from '@/components/CourseModal';
 
 interface Course {
   id: string;
@@ -20,9 +23,14 @@ interface Course {
   description: string;
   price: number;
   duration: number;
+  category: string;
+  image?: string;
+  isPublished: boolean;
   enrolledUsers: number;
   completedUsers: number;
-  status: 'active' | 'draft' | 'archived';
+  status: 'active' | 'draft';
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface User {
@@ -30,82 +38,149 @@ interface User {
   name: string;
   email: string;
   role: string;
-  company?: string;
+  company: string | null;
+  personalNumber: string | null;
+  bankIdVerified: boolean;
+  id06Eligible: boolean;
+  enrolledCourses: number;
+  completedCourses: number;
+  certificates: number;
   lastActive: string;
+  createdAt: string;
+}
+
+interface Company {
+  id: string;
+  name: string;
+  organizationNumber: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  address: string;
+  verified: boolean;
+  isActive: boolean;
+  adminName: string;
+  adminEmail: string;
+  employeeCount: number;
+  invitationCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export default function AdminDashboard() {
   const { data: session } = useSession();
   const [courses, setCourses] = useState<Course[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'users' | 'companies'>('overview');
+  
+  // Course modal state
+  const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [isSavingCourse, setIsSavingCourse] = useState(false);
 
   useEffect(() => {
-    fetchAdminData();
-  }, []);
+    if (session) {
+      fetchAdminData();
+    }
+  }, [session]);
 
   const fetchAdminData = async () => {
     try {
-      // Mock data - replace with actual API calls
-      const mockCourses: Course[] = [
-        {
-          id: '1',
-          title: 'APV Grundkurs - Säkerhet på byggarbetsplatsen',
-          description: 'Grundläggande kurs om säkerhet på byggarbetsplatser',
-          price: 995,
-          duration: 120,
-          enrolledUsers: 1247,
-          completedUsers: 1189,
-          status: 'active'
-        },
-        {
-          id: '2',
-          title: 'Arbete på Väg - Grundkurs',
-          description: 'Grundläggande säkerhet och regler för arbete i trafikmiljö',
-          price: 1495,
-          duration: 120,
-          enrolledUsers: 892,
-          completedUsers: 845,
-          status: 'active'
-        },
-        {
-          id: '3',
-          title: 'ADR - Farligt Gods Transport',
-          description: 'Specialiserad kurs för transport av farligt gods',
-          price: 1795,
-          duration: 150,
-          enrolledUsers: 456,
-          completedUsers: 423,
-          status: 'draft'
-        }
-      ];
+      setLoading(true);
+      
+      // Fetch all data in parallel
+      const [coursesRes, usersRes, companiesRes] = await Promise.all([
+        fetch('/api/admin/courses'),
+        fetch('/api/admin/users'),
+        fetch('/api/admin/companies')
+      ]);
 
-      const mockUsers: User[] = [
-        {
-          id: '1',
-          name: 'Melker Berg',
-          email: 'memleoberg@gmail.com',
-          role: 'COMPANY_ADMIN',
-          company: 'Test AB',
-          lastActive: '2025-01-27'
-        },
-        {
-          id: '2',
-          name: 'Test User',
-          email: 'memleobergg@gmail.com',
-          role: 'EMPLOYEE',
-          company: 'Test AB',
-          lastActive: '2025-01-26'
-        }
-      ];
+      if (coursesRes.ok) {
+        const coursesData = await coursesRes.json();
+        setCourses(coursesData);
+      }
 
-      setCourses(mockCourses);
-      setUsers(mockUsers);
-      setLoading(false);
+      if (usersRes.ok) {
+        const usersData = await usersRes.json();
+        setUsers(usersData);
+      }
+
+      if (companiesRes.ok) {
+        const companiesData = await companiesRes.json();
+        setCompanies(companiesData);
+      }
     } catch (error) {
       console.error('Error fetching admin data:', error);
+    } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateCourse = () => {
+    setEditingCourse(null);
+    setIsCourseModalOpen(true);
+  };
+
+  const handleEditCourse = (course: Course) => {
+    setEditingCourse(course);
+    setIsCourseModalOpen(true);
+  };
+
+  const handleSaveCourse = async (courseData: any) => {
+    try {
+      setIsSavingCourse(true);
+      
+      const url = editingCourse 
+        ? `/api/admin/courses/${editingCourse.id}`
+        : '/api/admin/courses';
+      
+      const method = editingCourse ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(courseData),
+      });
+
+      if (response.ok) {
+        setIsCourseModalOpen(false);
+        setEditingCourse(null);
+        fetchAdminData(); // Refresh data
+      } else {
+        const error = await response.json();
+        alert(error.message || 'Ett fel uppstod');
+      }
+    } catch (error) {
+      console.error('Error saving course:', error);
+      alert('Ett fel uppstod vid sparande av kurs');
+    } finally {
+      setIsSavingCourse(false);
+    }
+  };
+
+  const handleDeleteCourse = async (courseId: string) => {
+    if (!confirm('Är du säker på att du vill ta bort denna kurs?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/courses/${courseId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        fetchAdminData(); // Refresh data
+      } else {
+        const error = await response.json();
+        alert(error.message || 'Ett fel uppstod');
+      }
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      alert('Ett fel uppstod vid borttagning av kurs');
     }
   };
 
@@ -115,8 +190,6 @@ export default function AdminDashboard() {
         return 'bg-green-100 text-green-800';
       case 'draft':
         return 'bg-yellow-100 text-yellow-800';
-      case 'archived':
-        return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -135,6 +208,17 @@ export default function AdminDashboard() {
       default:
         return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('sv-SE', {
+      style: 'currency',
+      currency: 'SEK'
+    }).format(price);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('sv-SE');
   };
 
   if (loading) {
@@ -159,6 +243,14 @@ export default function AdminDashboard() {
       </div>
     );
   }
+
+  // Calculate overview statistics
+  const totalCourses = courses.length;
+  const publishedCourses = courses.filter(c => c.isPublished).length;
+  const totalUsers = users.length;
+  const totalCompanies = companies.length;
+  const totalEnrollments = courses.reduce((sum, course) => sum + course.enrolledUsers, 0);
+  const totalRevenue = courses.reduce((sum, course) => sum + (course.price * course.enrolledUsers), 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -198,147 +290,218 @@ export default function AdminDashboard() {
 
         {/* Content */}
         <div className="bg-white rounded-lg shadow-sm p-6">
+          {/* Overview Tab */}
           {activeTab === 'overview' && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+              className="space-y-6"
             >
-              <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
-                <div className="flex items-center">
-                  <BookOpenIcon className="w-8 h-8 mr-3" />
-                  <div>
-                    <p className="text-sm opacity-90">Totalt kurser</p>
-                    <p className="text-2xl font-bold">{courses.length}</p>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Plattform Översikt</h2>
+              
+              {/* Statistics Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="bg-blue-50 rounded-lg p-6">
+                  <div className="flex items-center">
+                    <BookOpenIcon className="h-8 w-8 text-blue-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-blue-600">Totalt Kurser</p>
+                      <p className="text-2xl font-bold text-blue-900">{totalCourses}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-green-50 rounded-lg p-6">
+                  <div className="flex items-center">
+                    <UsersIcon className="h-8 w-8 text-green-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-green-600">Totalt Användare</p>
+                      <p className="text-2xl font-bold text-green-900">{totalUsers}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-purple-50 rounded-lg p-6">
+                  <div className="flex items-center">
+                    <BuildingOfficeIcon className="h-8 w-8 text-purple-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-purple-600">Företag</p>
+                      <p className="text-2xl font-bold text-purple-900">{totalCompanies}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 rounded-lg p-6">
+                  <div className="flex items-center">
+                    <CurrencyDollarIcon className="h-8 w-8 text-yellow-600" />
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-yellow-600">Total Intäkt</p>
+                      <p className="text-2xl font-bold text-yellow-900">{formatPrice(totalRevenue)}</p>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white">
-                <div className="flex items-center">
-                  <UsersIcon className="w-8 h-8 mr-3" />
-                  <div>
-                    <p className="text-sm opacity-90">Aktiva användare</p>
-                    <p className="text-2xl font-bold">{users.length}</p>
+              {/* Recent Activity */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Senaste Kurser</h3>
+                  <div className="space-y-3">
+                    {courses.slice(0, 5).map((course) => (
+                      <div key={course.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-gray-900">{course.title}</p>
+                          <p className="text-sm text-gray-600">{formatDate(course.createdAt)}</p>
+                        </div>
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(course.status)}`}>
+                          {course.isPublished ? 'Publicerad' : 'Utkast'}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
 
-              <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-6 text-white">
-                <div className="flex items-center">
-                  <BuildingOfficeIcon className="w-8 h-8 mr-3" />
-                  <div>
-                    <p className="text-sm opacity-90">Företag</p>
-                    <p className="text-2xl font-bold">12</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg p-6 text-white">
-                <div className="flex items-center">
-                  <ChartBarIcon className="w-8 h-8 mr-3" />
-                  <div>
-                    <p className="text-sm opacity-90">Slutförda kurser</p>
-                    <p className="text-2xl font-bold">2,457</p>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Senaste Användare</h3>
+                  <div className="space-y-3">
+                    {users.slice(0, 5).map((user) => (
+                      <div key={user.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-gray-900">{user.name}</p>
+                          <p className="text-sm text-gray-600">{user.email}</p>
+                        </div>
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
+                          {user.role}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
             </motion.div>
           )}
 
+          {/* Courses Tab */}
           {activeTab === 'courses' && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
             >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Kurser</h2>
-                <button className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center">
+              <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900">Kurser</h2>
+                <button
+                  onClick={handleCreateCourse}
+                  className="btn-primary inline-flex items-center"
+                >
                   <PlusIcon className="w-5 h-5 mr-2" />
-                  Lägg till kurs
+                  Skapa Ny Kurs
                 </button>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Kurs
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Pris
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Anmälda
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Åtgärder
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {courses.map((course) => (
-                      <tr key={course.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{course.title}</div>
-                            <div className="text-sm text-gray-500">{course.description.substring(0, 60)}...</div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {course.price} kr
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {course.enrolledUsers}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(course.status)}`}>
-                            {course.status === 'active' ? 'Aktiv' : course.status === 'draft' ? 'Utkast' : 'Arkiverad'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex space-x-2">
-                            <button className="text-primary-600 hover:text-primary-900">
-                              <EyeIcon className="w-4 h-4" />
-                            </button>
-                            <button className="text-blue-600 hover:text-blue-900">
-                              <PencilIcon className="w-4 h-4" />
-                            </button>
-                            <button className="text-red-600 hover:text-red-900">
-                              <TrashIcon className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
+              {courses.length === 0 ? (
+                <div className="text-center py-12">
+                  <BookOpenIcon className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">Inga kurser</h3>
+                  <p className="mt-1 text-sm text-gray-500">Börja med att skapa din första kurs.</p>
+                  <div className="mt-6">
+                    <button
+                      onClick={handleCreateCourse}
+                      className="btn-primary inline-flex items-center"
+                    >
+                      <PlusIcon className="w-5 h-5 mr-2" />
+                      Skapa Kurs
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Kurs
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Pris
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Registrerade
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Skapad
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Åtgärder
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {courses.map((course) => (
+                        <tr key={course.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{course.title}</div>
+                              <div className="text-sm text-gray-500">{course.description.substring(0, 60)}...</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatPrice(course.price)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {course.enrolledUsers}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(course.status)}`}>
+                              {course.isPublished ? 'Publicerad' : 'Utkast'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(course.createdAt)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div className="flex justify-end space-x-2">
+                              <button
+                                onClick={() => handleEditCourse(course)}
+                                className="text-primary-600 hover:text-primary-900"
+                              >
+                                <PencilIcon className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCourse(course.id)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </motion.div>
           )}
 
+          {/* Users Tab */}
           {activeTab === 'users' && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
             >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">Användare</h2>
-              </div>
+              <h2 className="text-2xl font-bold text-gray-900">Användare</h2>
 
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Namn
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        E-post
+                        Användare
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Roll
@@ -347,31 +510,45 @@ export default function AdminDashboard() {
                         Företag
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Senast aktiv
+                        Kurser
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        BankID
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Registrerad
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {users.map((user) => (
                       <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {user.name}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {user.email}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                            <div className="text-sm text-gray-500">{user.email}</div>
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
-                            {user.role === 'COMPANY_ADMIN' ? 'Företagsadmin' : 
-                             user.role === 'EMPLOYEE' ? 'Anställd' : 
-                             user.role === 'ADMIN' ? 'Admin' : 'Individuell'}
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {user.company || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {user.enrolledCourses} / {user.completedCourses}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            user.bankIdVerified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {user.bankIdVerified ? 'Verifierad' : 'Ej verifierad'}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {user.company || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {user.lastActive}
+                          {formatDate(user.createdAt)}
                         </td>
                       </tr>
                     ))}
@@ -381,24 +558,85 @@ export default function AdminDashboard() {
             </motion.div>
           )}
 
+          {/* Companies Tab */}
           {activeTab === 'companies' && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
             >
-              <div className="text-center py-12">
-                <BuildingOfficeIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Företagshantering
-                </h3>
-                <p className="text-gray-600">
-                  Företagshantering kommer snart att vara tillgänglig.
-                </p>
+              <h2 className="text-2xl font-bold text-gray-900">Företag</h2>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Företag
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Admin
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Anställda
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Registrerat
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {companies.map((company) => (
+                      <tr key={company.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{company.name}</div>
+                            <div className="text-sm text-gray-500">{company.organizationNumber}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{company.adminName}</div>
+                            <div className="text-sm text-gray-500">{company.adminEmail}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {company.employeeCount}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            company.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {company.isActive ? 'Aktivt' : 'Inaktivt'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(company.createdAt)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </motion.div>
           )}
         </div>
       </div>
+
+      {/* Course Modal */}
+      <CourseModal
+        isOpen={isCourseModalOpen}
+        onClose={() => {
+          setIsCourseModalOpen(false);
+          setEditingCourse(null);
+        }}
+        course={editingCourse}
+        onSave={handleSaveCourse}
+        isSaving={isSavingCourse}
+      />
     </div>
   );
 }
