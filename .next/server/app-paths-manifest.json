@@ -1,15 +1,18 @@
 {
   "/not-found": "app/not-found.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/page": "app/page.js",
+  "/auth/signin/page": "app/auth/signin/page.js",
   "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/company/page": "app/dashboard/company/page.js",
+  "/api/companies/[id]/employees/route": "app/api/companies/[id]/employees/route.js",
+  "/dashboard/company/invite-employee/page": "app/dashboard/company/invite-employee/page.js",
+  "/auth/invite/[token]/page": "app/auth/invite/[token]/page.js",
+  "/api/user/courses/route": "app/api/user/courses/route.js",
+  "/page": "app/page.js",
   "/courses/page": "app/courses/page.js",
-  "/admin/page": "app/admin/page.js",
   "/api/courses/route": "app/api/courses/route.js",
-  "/api/courses/[id]/route": "app/api/courses/[id]/route.js",
-  "/api/courses/[id]/progress/route": "app/api/courses/[id]/progress/route.js",
-  "/courses/[id]/learn/page": "app/courses/[id]/learn/page.js",
+  "/admin/page": "app/admin/page.js",
   "/api/admin/courses/route": "app/api/admin/courses/route.js",
-  "/api/admin/companies/route": "app/api/admin/companies/route.js",
-  "/api/admin/users/route": "app/api/admin/users/route.js"
+  "/api/admin/users/route": "app/api/admin/users/route.js",
+  "/api/admin/companies/route": "app/api/admin/companies/route.js"
 }

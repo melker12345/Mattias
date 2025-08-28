@@ -13,6 +13,7 @@ interface Course {
   category: string;
   image?: string;
   isPublished?: boolean;
+  passingScore?: number;
 }
 
 interface CourseModalProps {
@@ -37,7 +38,8 @@ export default function CourseModal({ isOpen, onClose, course, onSave, isSaving 
     duration: 0,
     category: '',
     image: '',
-    isPublished: false
+    isPublished: false,
+    passingScore: 80
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -53,7 +55,8 @@ export default function CourseModal({ isOpen, onClose, course, onSave, isSaving 
         duration: 0,
         category: '',
         image: '',
-        isPublished: false
+        isPublished: false,
+        passingScore: 80
       });
     }
     setErrors({});
@@ -124,7 +127,7 @@ export default function CourseModal({ isOpen, onClose, course, onSave, isSaving 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+              className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto"
             >
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -140,7 +143,7 @@ export default function CourseModal({ isOpen, onClose, course, onSave, isSaving 
               </div>
 
               {/* Form */}
-              <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                 {/* Title */}
                 <div>
                   <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
@@ -180,7 +183,7 @@ export default function CourseModal({ isOpen, onClose, course, onSave, isSaving 
                 </div>
 
                 {/* Price and Duration */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
                       Pris (SEK) *
@@ -219,6 +222,33 @@ export default function CourseModal({ isOpen, onClose, course, onSave, isSaving 
                       <p className="mt-1 text-sm text-red-600">{errors.duration}</p>
                     )}
                   </div>
+                </div>
+
+                {/* Passing Score */}
+                <div>
+                  <label htmlFor="passingScore" className="block text-sm font-medium text-gray-700 mb-2">
+                    Godkänd poäng (%) *
+                  </label>
+                  <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                    <input
+                      type="number"
+                      id="passingScore"
+                      name="passingScore"
+                      value={formData.passingScore}
+                      onChange={handleInputChange}
+                      min="0"
+                      max="100"
+                      className={`input-field w-full sm:w-24 ${errors.passingScore ? 'border-red-500' : ''}`}
+                      placeholder="80"
+                    />
+                    <span className="text-sm text-gray-500">% av totala frågor</span>
+                  </div>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Användaren måste få minst denna procent av frågorna rätt för att godkänna kursen
+                  </p>
+                  {errors.passingScore && (
+                    <p className="mt-1 text-sm text-red-600">{errors.passingScore}</p>
+                  )}
                 </div>
 
                 {/* Category */}
@@ -277,7 +307,7 @@ export default function CourseModal({ isOpen, onClose, course, onSave, isSaving 
                 </div>
 
                 {/* Actions */}
-                <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+                <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 pt-6 border-t border-gray-200">
                   <button
                     type="button"
                     onClick={onClose}

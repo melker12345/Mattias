@@ -3,6 +3,63 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+async function updateCourseProgress(userId: string, courseId: string) {
+  try {
+    // Get all questions in the course
+    const questions = await prisma.question.findMany({
+      where: {
+        lesson: {
+          courseId: courseId
+        }
+      }
+    });
+
+    // Get all user answers for this course
+    const userAnswers = await prisma.answer.findMany({
+      where: {
+        userId: userId,
+        question: {
+          lesson: {
+            courseId: courseId
+          }
+        }
+      }
+    });
+
+    const totalQuestions = questions.length;
+    const correctAnswers = userAnswers.filter(answer => answer.isCorrect).length;
+    const finalScore = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+
+    // Get course passing score
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { passingScore: true }
+    });
+
+    const passed = finalScore >= (course?.passingScore || 80);
+
+    // Update enrollment with course progress
+    await prisma.enrollment.update({
+      where: {
+        userId_courseId: {
+          userId: userId,
+          courseId: courseId
+        }
+      },
+      data: {
+        totalQuestions: totalQuestions,
+        correctAnswers: correctAnswers,
+        finalScore: finalScore,
+        passed: passed,
+        completedAt: passed ? new Date() : null
+      }
+    });
+
+  } catch (error) {
+    console.error('Error updating course progress:', error);
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -132,7 +189,7 @@ export async function POST(
     const courseId = params.id;
     const userEmail = session.user.email;
     const body = await request.json();
-    const { lessonId, completed } = body;
+    const { lessonId, completed, score } = body;
 
     if (!lessonId) {
       return NextResponse.json(
@@ -195,15 +252,26 @@ export async function POST(
       },
       update: {
         completed: completed,
-        completedAt: completed ? new Date() : null
+        completedAt: completed ? new Date() : null,
+        score: score || null,
+        attempts: {
+          increment: 1
+        }
       },
       create: {
         userId: user.id,
         lessonId: lessonId,
         completed: completed,
-        completedAt: completed ? new Date() : null
+        completedAt: completed ? new Date() : null,
+        score: score || null,
+        attempts: 1
       }
     });
+
+    // If this is a question lesson and we have a score, update course-level progress
+    if (lesson.type === 'question' && score !== undefined) {
+      await updateCourseProgress(user.id, courseId);
+    }
 
     return NextResponse.json({
       message: 'Framsteg sparades framgångsrikt',

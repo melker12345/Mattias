@@ -261,17 +261,17 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-          <p className="text-gray-600">Hantera kurser, användare och företag</p>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+          <p className="text-sm sm:text-base text-gray-600">Hantera kurser, användare och företag</p>
         </div>
 
         {/* Navigation Tabs */}
         <div className="bg-white rounded-lg shadow-sm mb-8">
           <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 px-6">
+            <nav className="-mb-px flex flex-wrap space-x-2 sm:space-x-8 px-4 sm:px-6">
               {[
                 { id: 'overview', name: 'Översikt', icon: ChartBarIcon },
                 { id: 'courses', name: 'Kurser', icon: BookOpenIcon },
@@ -281,14 +281,15 @@ export default function AdminDashboard() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
+                  className={`py-3 sm:py-4 px-2 sm:px-1 border-b-2 font-medium text-xs sm:text-sm flex items-center whitespace-nowrap ${
                     activeTab === tab.id
                       ? 'border-primary-500 text-primary-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
-                  <tab.icon className="w-5 h-5 mr-2" />
-                  {tab.name}
+                  <tab.icon className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">{tab.name}</span>
+                  <span className="sm:hidden">{tab.name}</span>
                 </button>
               ))}
             </nav>
@@ -296,7 +297,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Content */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <motion.div
@@ -307,43 +308,43 @@ export default function AdminDashboard() {
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Plattform Översikt</h2>
               
               {/* Statistics Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-blue-50 rounded-lg p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                <div className="bg-blue-50 rounded-lg p-4 sm:p-6">
                   <div className="flex items-center">
-                    <BookOpenIcon className="h-8 w-8 text-blue-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-blue-600">Totalt Kurser</p>
-                      <p className="text-2xl font-bold text-blue-900">{totalCourses}</p>
+                    <BookOpenIcon className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
+                    <div className="ml-3 sm:ml-4">
+                      <p className="text-xs sm:text-sm font-medium text-blue-600">Totalt Kurser</p>
+                      <p className="text-xl sm:text-2xl font-bold text-blue-900">{totalCourses}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-green-50 rounded-lg p-6">
+                <div className="bg-green-50 rounded-lg p-4 sm:p-6">
                   <div className="flex items-center">
-                    <UsersIcon className="h-8 w-8 text-green-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-green-600">Totalt Användare</p>
-                      <p className="text-2xl font-bold text-green-900">{totalUsers}</p>
+                    <UsersIcon className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
+                    <div className="ml-3 sm:ml-4">
+                      <p className="text-xs sm:text-sm font-medium text-green-600">Totalt Användare</p>
+                      <p className="text-xl sm:text-2xl font-bold text-green-900">{totalUsers}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-purple-50 rounded-lg p-6">
+                <div className="bg-purple-50 rounded-lg p-4 sm:p-6">
                   <div className="flex items-center">
-                    <BuildingOfficeIcon className="h-8 w-8 text-purple-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-purple-600">Företag</p>
-                      <p className="text-2xl font-bold text-purple-900">{totalCompanies}</p>
+                    <BuildingOfficeIcon className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
+                    <div className="ml-3 sm:ml-4">
+                      <p className="text-xs sm:text-sm font-medium text-purple-600">Företag</p>
+                      <p className="text-xl sm:text-2xl font-bold text-purple-900">{totalCompanies}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-yellow-50 rounded-lg p-6">
+                <div className="bg-yellow-50 rounded-lg p-4 sm:p-6">
                   <div className="flex items-center">
-                    <CurrencyDollarIcon className="h-8 w-8 text-yellow-600" />
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-yellow-600">Total Intäkt</p>
-                      <p className="text-2xl font-bold text-yellow-900">{formatPrice(totalRevenue)}</p>
+                    <CurrencyDollarIcon className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-600" />
+                    <div className="ml-3 sm:ml-4">
+                      <p className="text-xs sm:text-sm font-medium text-yellow-600">Total Intäkt</p>
+                      <p className="text-xl sm:text-2xl font-bold text-yellow-900">{formatPrice(totalRevenue)}</p>
                     </div>
                   </div>
                 </div>
@@ -396,10 +397,10 @@ export default function AdminDashboard() {
               className="space-y-6"
             >
               <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-900">Kurser</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Kurser</h2>
                 <button
                   onClick={handleCreateCourse}
-                  className="btn-primary inline-flex items-center"
+                  className="btn-primary inline-flex items-center w-full sm:w-auto justify-center"
                 >
                   <PlusIcon className="w-5 h-5 mr-2" />
                   Skapa Ny Kurs
@@ -469,8 +470,8 @@ export default function AdminDashboard() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {formatDate(course.createdAt)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex justify-end space-x-2">
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div className="flex justify-end space-x-1 sm:space-x-2">
                               <button
                                 onClick={() => handleEditCourse(course)}
                                 className="text-primary-600 hover:text-primary-900"

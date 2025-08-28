@@ -67,6 +67,7 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
+  const [showLessonList, setShowLessonList] = useState(false);
 
   useEffect(() => {
     if (session) {
@@ -140,15 +141,16 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
         }]);
         setAnswerSubmitted(true);
         
-        // Mark lesson as complete after answering
-        await markLessonComplete(currentLesson.id);
+        // Mark lesson as complete after answering with score
+        const score = isCorrect ? 100 : 0;
+        await markLessonComplete(currentLesson.id, score);
       }
     } catch (error) {
       console.error('Error submitting answer:', error);
     }
   };
 
-  const markLessonComplete = async (lessonId: string) => {
+  const markLessonComplete = async (lessonId: string, score?: number) => {
     try {
       setSavingProgress(true);
       
@@ -159,7 +161,8 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
         },
         body: JSON.stringify({
           lessonId,
-          completed: true
+          completed: true,
+          score: score
         }),
       });
 
@@ -205,6 +208,18 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
     setVideoError(null);
   };
 
+  const getCurrentQuestionAnswer = () => {
+    const currentQuestion = currentLesson?.questions?.[0];
+    if (!currentQuestion) return null;
+    
+    return userAnswers.find(a => a.questionId === currentQuestion.id);
+  };
+
+  const canRetakeQuestion = () => {
+    const currentAnswer = getCurrentQuestionAnswer();
+    return currentAnswer && !currentAnswer.isCorrect;
+  };
+
   const isLessonCompleted = (lessonId: string) => {
     return progress.some(p => p.lessonId === lessonId && p.completed);
   };
@@ -245,27 +260,34 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0">
+            <div className="flex items-center space-x-3 sm:space-x-4">
               <button 
                 onClick={() => router.push('/dashboard')}
                 className="text-gray-600 hover:text-gray-900 transition-colors"
               >
-                <ArrowLeftIcon className="w-6 h-6" />
+                <ArrowLeftIcon className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">{course.title}</h1>
-                <p className="text-sm text-gray-600">Lektion {currentLessonIndex + 1} av {course.lessons.length}</p>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">{course.title}</h1>
+                <p className="text-xs sm:text-sm text-gray-600">Lektion {currentLessonIndex + 1} av {course.lessons.length}</p>
               </div>
+              {/* Mobile lesson list toggle */}
+              <button
+                onClick={() => setShowLessonList(!showLessonList)}
+                className="lg:hidden text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <BookOpenIcon className="w-5 h-5" />
+              </button>
             </div>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3 sm:space-x-4">
               <div className="text-right">
-                <p className="text-sm text-gray-600">Framsteg</p>
-                <p className="text-lg font-semibold text-primary-600">{getProgressPercentage()}%</p>
+                <p className="text-xs sm:text-sm text-gray-600">Framsteg</p>
+                <p className="text-base sm:text-lg font-semibold text-primary-600">{getProgressPercentage()}%</p>
               </div>
-              <div className="w-32 bg-gray-200 rounded-full h-2">
+              <div className="w-24 sm:w-32 bg-gray-200 rounded-full h-2">
                 <div 
                   className="bg-primary-600 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${getProgressPercentage()}%` }}
@@ -276,34 +298,37 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-8">
           {/* Sidebar - Lesson List */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm p-6 sticky top-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Lektioner</h2>
+          <div className={`lg:col-span-1 order-2 lg:order-1 ${showLessonList ? 'block' : 'hidden lg:block'}`}>
+            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 lg:sticky lg:top-8">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Lektioner</h2>
               <div className="space-y-2">
                 {course.lessons.map((lesson, index) => (
                   <button
                     key={lesson.id}
-                    onClick={() => setCurrentLessonIndex(index)}
-                    className={`w-full text-left p-3 rounded-lg transition-colors ${
+                    onClick={() => {
+                      setCurrentLessonIndex(index);
+                      setShowLessonList(false); // Close lesson list on mobile when lesson is selected
+                    }}
+                    className={`w-full text-left p-2 sm:p-3 rounded-lg transition-colors ${
                       index === currentLessonIndex
                         ? 'bg-primary-100 text-primary-900 border border-primary-200'
                         : 'hover:bg-gray-50'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
                         {isLessonCompleted(lesson.id) ? (
-                          <CheckCircleIcon className="w-5 h-5 text-green-600" />
+                          <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
                         ) : (
-                          <div className="w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center">
+                          <div className="w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 border-gray-300 flex items-center justify-center flex-shrink-0">
                             <span className="text-xs text-gray-500">{index + 1}</span>
                           </div>
                         )}
-                        <div>
-                          <p className="font-medium text-sm">{lesson.title}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-xs sm:text-sm truncate">{lesson.title}</p>
                           <p className="text-xs text-gray-500">{lesson.type}</p>
                         </div>
                       </div>
@@ -315,20 +340,20 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-3">
-            <div className="bg-white rounded-lg shadow-sm p-8">
+          <div className="lg:col-span-3 order-1 lg:order-2">
+            <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 lg:p-8">
               {currentLesson && (
                 <motion.div
                   key={currentLesson.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="space-y-6"
+                  className="space-y-4 sm:space-y-6"
                 >
-                  <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold text-gray-900">{currentLesson.title}</h1>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-2 sm:space-y-0">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{currentLesson.title}</h1>
                     {isLessonCompleted(currentLesson.id) && (
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                        <CheckCircleIcon className="w-4 h-4 mr-1" />
+                      <span className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium bg-green-100 text-green-800">
+                        <CheckCircleIcon className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                         Slutförd
                       </span>
                     )}
@@ -391,23 +416,23 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
                     )}
 
                     {currentLesson.type === 'question' && currentLesson.questions?.[0] && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-blue-900 mb-4">Fråga</h3>
-                        <p className="text-blue-800 mb-4">{currentLesson.questions[0]?.question}</p>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-6">
+                        <h3 className="text-base sm:text-lg font-semibold text-blue-900 mb-3 sm:mb-4">Fråga</h3>
+                        <p className="text-blue-800 mb-3 sm:mb-4 text-sm sm:text-base">{currentLesson.questions[0]?.question}</p>
                         
                         {!answerSubmitted ? (
                           <div className="space-y-3">
                             {JSON.parse(currentLesson.questions[0]?.options || '[]').map((option: string, index: number) => (
-                              <label key={index} className="flex items-center space-x-3 cursor-pointer">
+                              <label key={index} className="flex items-start space-x-3 cursor-pointer p-2 rounded-lg hover:bg-blue-100 transition-colors">
                                 <input
                                   type="radio"
                                   name="answer"
                                   value={index.toString()}
                                   checked={selectedAnswer === index}
                                   onChange={(e) => setSelectedAnswer(Number(e.target.value))}
-                                  className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                                  className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500 mt-0.5 flex-shrink-0"
                                 />
-                                <span className="text-blue-800">{option}</span>
+                                <span className="text-blue-800 text-sm sm:text-base leading-relaxed">{option}</span>
                               </label>
                             ))}
                             
@@ -419,7 +444,7 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
                                 }
                               }}
                               disabled={selectedAnswer === null}
-                              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              className="mt-4 w-full sm:w-auto bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm sm:text-base font-medium"
                             >
                               Svara
                             </button>
@@ -439,26 +464,37 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
                               
                               return userAnswer.isCorrect ? (
                                 <div className="bg-green-100 border border-green-200 rounded-lg p-4">
-                                  <p className="text-green-800 font-medium">✓ Rätt svar!</p>
-                                  <p className="text-green-700 text-sm mt-1">
+                                  <p className="text-green-800 font-medium text-sm sm:text-base">✓ Rätt svar!</p>
+                                  <p className="text-green-700 text-xs sm:text-sm mt-1">
                                     Ditt svar: {selectedAnswerText}
                                   </p>
-                                  <p className="text-green-700 text-sm">
+                                  <p className="text-green-700 text-xs sm:text-sm">
                                     Alternativ: Du valde alternativ {(userAnswer.selectedIndex || 0) + 1}
                                   </p>
                                 </div>
                               ) : (
                                 <div className="bg-red-100 border border-red-200 rounded-lg p-4">
-                                  <p className="text-red-800 font-medium">✗ Fel svar</p>
-                                  <p className="text-red-700 text-sm mt-1">
+                                  <p className="text-red-800 font-medium text-sm sm:text-base">✗ Fel svar</p>
+                                  <p className="text-red-700 text-xs sm:text-sm mt-1">
                                     Ditt svar: {selectedAnswerText}
                                   </p>
-                                  <p className="text-red-700 text-sm">
+                                  <p className="text-red-700 text-xs sm:text-sm">
                                     Du valde alternativ: {(userAnswer.selectedIndex || 0) + 1}
                                   </p>
-                                  <p className="text-red-700 text-sm">
+                                  <p className="text-red-700 text-xs sm:text-sm">
                                     Rätt svar: {correctAnswerText}
                                   </p>
+                                  <button
+                                    onClick={() => {
+                                      // Remove the incorrect answer and allow retry
+                                      setUserAnswers(prev => prev.filter(a => a.questionId !== currentQuestion.id));
+                                      setAnswerSubmitted(false);
+                                      setSelectedAnswer(null);
+                                    }}
+                                    className="mt-3 w-full sm:w-auto bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                                  >
+                                    Försök igen
+                                  </button>
                                 </div>
                               );
                             })()}
@@ -469,22 +505,22 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
                   </div>
 
                   {/* Navigation */}
-                  <div className="flex items-center justify-between pt-6 border-t">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-6 border-t space-y-3 sm:space-y-0">
                     <button
                       onClick={goToPreviousLesson}
                       disabled={currentLessonIndex === 0}
-                      className="flex items-center px-4 py-2 text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className="flex items-center justify-center px-4 py-3 text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                     >
                       <ArrowLeftIcon className="w-4 h-4 mr-2" />
                       Föregående
                     </button>
 
-                    <div className="flex items-center space-x-4">
+                    <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
                       {!isLessonCompleted(currentLesson.id) && (
                         <button
                           onClick={() => markLessonComplete(currentLesson.id)}
                           disabled={savingProgress}
-                          className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center"
+                          className="w-full sm:w-auto bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center justify-center text-sm font-medium"
                         >
                           {savingProgress ? (
                             <>
@@ -503,7 +539,7 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
                       <button
                         onClick={goToNextLesson}
                         disabled={currentLessonIndex === course.lessons.length - 1}
-                        className="flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
                       >
                         Nästa
                         <ArrowRightIcon className="w-4 h-4 ml-2" />

@@ -46,6 +46,7 @@ model Course {
   duration    Int       // in minutes
   category    String
   isPublished Boolean   @default(false)
+  passingScore Int      @default(80) // Minimum percentage to pass (0-100)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   
@@ -115,6 +116,10 @@ model Enrollment {
   coursePurchaseId String?
   enrolledAt DateTime @default(now())
   completedAt DateTime?
+  passed    Boolean  @default(false) // Whether user passed the course
+  finalScore Int?    // Final score percentage (0-100)
+  totalQuestions Int @default(0) // Total questions in course
+  correctAnswers Int @default(0) // Total correct answers
   
   // Relations
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -130,6 +135,8 @@ model Progress {
   lessonId  String
   completed Boolean  @default(false)
   completedAt DateTime?
+  score     Int?     // Score for this lesson (0-100)
+  attempts  Int      @default(0) // Number of attempts
   
   // Relations
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)

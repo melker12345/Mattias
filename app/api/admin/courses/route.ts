@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { title, description, price, duration, category, image } = body;
+    const { title, description, price, duration, category, image, passingScore } = body;
 
     // Validate required fields
     if (!title || !description || !price || !duration || !category) {
@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
         duration: parseInt(duration),
         category,
         image: image || null,
+        passingScore: parseInt(passingScore) || 80, // Default to 80%
         isPublished: false // Default to draft
       }
     });
