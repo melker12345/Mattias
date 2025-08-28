@@ -10,6 +10,11 @@ export async function GET(
       where: { id: params.id },
       include: {
         lessons: {
+          include: {
+            questions: {
+              orderBy: { order: 'asc' }
+            }
+          },
           orderBy: { order: 'asc' }
         },
         _count: {
@@ -43,7 +48,10 @@ export async function GET(
         title: lesson.title,
         content: lesson.content,
         videoUrl: lesson.videoUrl,
-        order: lesson.order
+        imageUrl: lesson.imageUrl,
+        type: lesson.type,
+        order: lesson.order,
+        questions: lesson.questions
       }))
     };
 

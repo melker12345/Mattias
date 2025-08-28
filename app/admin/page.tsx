@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
   BookOpenIcon, 
@@ -13,7 +14,8 @@ import {
   TrashIcon,
   EyeIcon,
   CurrencyDollarIcon,
-  ClockIcon
+  ClockIcon,
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import CourseModal from '@/components/CourseModal';
 
@@ -69,6 +71,7 @@ interface Company {
 
 export default function AdminDashboard() {
   const { data: session } = useSession();
+  const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -182,6 +185,10 @@ export default function AdminDashboard() {
       console.error('Error deleting course:', error);
       alert('Ett fel uppstod vid borttagning av kurs');
     }
+  };
+
+  const handleEditCourseContent = (courseId: string) => {
+    router.push(`/admin/courses/${courseId}/edit`);
   };
 
   const getStatusColor = (status: string) => {
@@ -467,12 +474,21 @@ export default function AdminDashboard() {
                               <button
                                 onClick={() => handleEditCourse(course)}
                                 className="text-primary-600 hover:text-primary-900"
+                                title="Redigera kursinfo"
                               >
                                 <PencilIcon className="h-4 w-4" />
                               </button>
                               <button
+                                onClick={() => handleEditCourseContent(course.id)}
+                                className="text-blue-600 hover:text-blue-900"
+                                title="Redigera innehåll"
+                              >
+                                <DocumentTextIcon className="h-4 w-4" />
+                              </button>
+                              <button
                                 onClick={() => handleDeleteCourse(course.id)}
                                 className="text-red-600 hover:text-red-900"
+                                title="Ta bort kurs"
                               >
                                 <TrashIcon className="h-4 w-4" />
                               </button>

@@ -60,8 +60,10 @@ model Course {
 model Lesson {
   id          String    @id @default(cuid())
   title       String
-  content     String    // Markdown content
-  videoUrl    String?
+  type        String    // 'video', 'image', 'text', 'question'
+  content     String?   // For text content (markdown)
+  videoUrl    String?   // For video files
+  imageUrl    String?   // For images
   order       Int
   courseId    String
   createdAt   DateTime  @default(now())
@@ -69,26 +71,26 @@ model Lesson {
   
   // Relations
   course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  questions   Question[]
+  questions   Question[] // For question type lessons
   progress    Progress[]
 }
 
 model Question {
-  id          String    @id @default(cuid())
-  question    String
-  type        String    // QuestionType as string
-  options     String    // JSON string for multiple choice questions
-  correctAnswer String
-  explanation String?
-  image       String?
-  lessonId    String
-  order       Int
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  question        String
+  type            String    // 'multiple_choice', 'true_false', 'text'
+  options         String    // JSON string for multiple choice questions
+  correctAnswer   String
+  explanation     String?
+  image           String?
+  lessonId        String
+  order           Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
   
   // Relations
-  lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  answers     Answer[]
+  lesson          Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  answers         Answer[]
 }
 
 model Answer {

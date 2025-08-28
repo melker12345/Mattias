@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { useCart } from '@/contexts/CartContext';
 import { motion } from 'framer-motion';
 import { 
@@ -37,6 +38,7 @@ interface Lesson {
 
 export default function CourseDetailPage({ params }: { params: { id: string } }) {
   const { data: session } = useSession();
+  const router = useRouter();
   const { addItem } = useCart();
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,7 +47,10 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
 
   useEffect(() => {
     fetchCourseDetails();
-  }, [params.id]);
+    if (session?.user?.email) {
+      checkEnrollmentStatus();
+    }
+  }, [params.id, session]);
 
   const fetchCourseDetails = async () => {
     try {
@@ -78,6 +83,21 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
     }
   };
 
+  const checkEnrollmentStatus = async () => {
+    try {
+      const response = await fetch(`/api/courses/${params.id}/enroll`, {
+        method: 'GET',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setEnrolled(data.enrolled);
+      }
+    } catch (error) {
+      console.error('Error checking enrollment status:', error);
+    }
+  };
+
   const handleEnroll = async () => {
     if (!session) {
       // Redirect to login
@@ -96,11 +116,16 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
 
       if (response.ok) {
         setEnrolled(true);
+        // Redirect to learning page after successful enrollment
+        router.push(`/courses/${params.id}/learn`);
       } else {
-        console.error('Failed to enroll in course');
+        const errorData = await response.json();
+        console.error('Failed to enroll in course:', errorData.message);
+        alert(errorData.message || 'Ett fel uppstod vid registrering');
       }
     } catch (error) {
       console.error('Error enrolling in course:', error);
+      alert('Ett fel uppstod vid registrering');
     } finally {
       setEnrolling(false);
     }

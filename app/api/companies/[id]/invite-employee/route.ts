@@ -78,7 +78,7 @@ export async function POST(
       const invitationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/invite/${invitationToken}`
       
       const emailData = generateInvitationEmail(
-        updatedUser.name,
+        updatedUser.name || 'Användare',
         updatedUser.email,
         company.name,
         'Ditt befintliga lösenord', // They use their existing password
@@ -155,7 +155,7 @@ export async function POST(
     const invitationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/invite/${invitationToken}`
     
     const emailData = generateInvitationEmail(
-      employee.name,
+      employee.name || 'Användare',
       employee.email,
       company.name,
       tempPassword,

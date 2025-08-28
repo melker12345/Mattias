@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
   BookOpenIcon, 
@@ -14,6 +15,7 @@ import {
 
 interface EnrolledCourse {
   id: string;
+  courseId: string;
   title: string;
   description: string;
   progress: number;
@@ -26,6 +28,7 @@ interface EnrolledCourse {
 
 export default function UserDashboard() {
   const { data: session } = useSession();
+  const router = useRouter();
   const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,12 +38,19 @@ export default function UserDashboard() {
 
   const fetchUserCourses = async () => {
     try {
-      // TODO: Replace with actual API call to fetch user's enrolled courses
-      // For now, we'll show an empty state since we don't have real data
-      setEnrolledCourses([]);
-      setLoading(false);
+      const response = await fetch('/api/user/courses');
+      
+      if (response.ok) {
+        const courses = await response.json();
+        setEnrolledCourses(courses);
+      } else {
+        console.error('Failed to fetch user courses');
+        setEnrolledCourses([]);
+      }
     } catch (error) {
       console.error('Error fetching user courses:', error);
+      setEnrolledCourses([]);
+    } finally {
       setLoading(false);
     }
   };
@@ -226,7 +236,10 @@ export default function UserDashboard() {
                         {getStatusText(course.status)}
                       </span>
                       
-                      <button className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center">
+                      <button 
+                        onClick={() => router.push(`/courses/${course.courseId}/learn`)}
+                        className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors flex items-center"
+                      >
                         <PlayIcon className="w-4 h-4 mr-2" />
                         {course.status === 'completed' ? 'Granska' : 'Fortsätt'}
                       </button>
