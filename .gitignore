@@ -9,6 +9,7 @@ yarn-error.log*
 out/
 build/
 dist/
+requirements/
 
 # Environment variables
 .env
