@@ -5,7 +5,9 @@ import { motion } from 'framer-motion'
 
 export function HeroSection() {
   return (
-    <section className="bg-gradient-to-br from-mn-dark-blue-green to-mn-dark-blue-green/90 text-mn-white">
+    <section className="relative bg-cover bg-center bg-no-repeat text-mn-white" style={{ backgroundImage: 'url(/13107746_5134336.jpg)' }}>
+      <div className="absolute inset-0 bg-mn-dark-blue-green/60"></div>
+      <div className="relative z-10">
       <div className="mn-container py-24">
         <div className="text-center">
           <motion.h1 
@@ -20,7 +22,7 @@ export function HeroSection() {
           </motion.h1>
           
           <motion.p 
-            className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto text-mn-light-gray-blue font-open-sans"
+            className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto text-white font-open-sans"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
@@ -75,6 +77,7 @@ export function HeroSection() {
             </div>
           </motion.div>
         </div>
+      </div>
       </div>
     </section>
   )

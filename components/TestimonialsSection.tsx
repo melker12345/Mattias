@@ -14,7 +14,7 @@ export function TestimonialsSection() {
       role: "Projektledare",
       content: "Perfekt för vårt team. Vi kunde alla gå kursen samtidigt och få certifikaten vi behövde för projektet.",
       rating: 5,
-      image: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face"
+      image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face"
     },
     {
       name: "Erik Svensson",
@@ -52,28 +52,41 @@ export function TestimonialsSection() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {testimonials.map((testimonial, index) => (
-            <div key={index} className="card">
-              <div className="flex items-center mb-4">
-                <Image
-                  src={testimonial.image}
-                  alt={testimonial.name}
-                  width={48}
-                  height={48}
-                  className="w-12 h-12 rounded-full mr-4"
-                />
-                <div>
-                  <h4 className="font-semibold text-mn-dark-blue-green font-montserrat">{testimonial.name}</h4>
-                  <p className="text-sm text-mn-dark-blue-green/70 font-open-sans">{testimonial.role}</p>
+            <div key={index} className="group">
+              <div className="card hover:shadow-lg transition-shadow duration-300">
+                <div className="flex items-center mb-4">
+                  <div className="relative">
+                    <Image
+                      src={testimonial.image}
+                      alt={testimonial.name}
+                      width={60}
+                      height={60}
+                      className="w-15 h-15 rounded-full object-cover border-4 border-mn-light-gray-blue group-hover:border-mn-dark-blue-green/30 transition-colors"
+                    />
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-mn-dark-blue-green rounded-full flex items-center justify-center">
+                      <svg className="w-3 h-3 text-mn-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="ml-4">
+                    <h4 className="font-semibold text-mn-dark-blue-green font-montserrat group-hover:text-mn-dark-blue-green/80 transition-colors">
+                      {testimonial.name}
+                    </h4>
+                    <p className="text-sm text-mn-dark-blue-green/70 font-open-sans">
+                      {testimonial.role}
+                    </p>
+                  </div>
                 </div>
+                
+                <div className="flex mb-4">
+                  {renderStars(testimonial.rating)}
+                </div>
+                
+                <p className="text-mn-dark-blue-green/80 italic font-open-sans leading-relaxed">
+                  &quot;{testimonial.content}&quot;
+                </p>
               </div>
-              
-              <div className="flex mb-4">
-                {renderStars(testimonial.rating)}
-              </div>
-              
-              <p className="text-mn-dark-blue-green/80 italic font-open-sans">
-                &quot;{testimonial.content}&quot;
-              </p>
             </div>
           ))}
         </div>

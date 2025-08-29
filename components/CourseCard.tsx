@@ -8,7 +8,7 @@ interface CourseCardProps {
     title: string
     description: string
     price: number
-    image?: string
+    image?: string | null
     duration: number
     category: string
   }
@@ -23,8 +23,8 @@ export function CourseCard({ course, onAddToCart }: CourseCardProps) {
   }
 
   return (
-    <div className="card hover:shadow-lg transition-shadow duration-300">
-      <div className="relative h-48 mb-4 rounded-lg overflow-hidden">
+    <div className="card hover:shadow-lg transition-shadow duration-300 h-full flex flex-col">
+      <div className="relative h-48 mb-4 rounded-lg overflow-hidden flex-shrink-0">
         <Image
           src={course.image || '/images/course-placeholder.jpg'}
           alt={course.title}
@@ -33,47 +33,49 @@ export function CourseCard({ course, onAddToCart }: CourseCardProps) {
         />
       </div>
       
-      <div className="mb-4">
-        <h3 className="text-xl font-semibold text-mn-dark-blue-green mb-2 line-clamp-2 font-montserrat">
-          {course.title}
-        </h3>
-        <p className="text-mn-dark-blue-green/80 text-sm line-clamp-3 font-open-sans">
-          {course.description}
-        </p>
-      </div>
-      
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center text-sm text-mn-dark-blue-green/70 font-open-sans">
-          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          {formatDuration(course.duration)}
+      <div className="flex-1 flex flex-col">
+        <div className="mb-4 flex-1">
+          <h3 className="text-xl font-semibold text-mn-dark-blue-green mb-2 line-clamp-2 font-montserrat">
+            {course.title}
+          </h3>
+          <p className="text-mn-dark-blue-green/80 text-sm line-clamp-3 font-open-sans">
+            {course.description}
+          </p>
         </div>
-        <div className="text-sm text-mn-dark-blue-green/70 font-open-sans">
-          {course.category}
+        
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center text-sm text-mn-dark-blue-green/70 font-open-sans">
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {formatDuration(course.duration)}
+          </div>
+          <div className="text-sm text-mn-dark-blue-green/70 font-open-sans">
+            {course.category}
+          </div>
         </div>
-      </div>
-      
-      <div className="flex items-center justify-between">
-        <div className="text-2xl font-bold text-mn-dark-blue-green font-montserrat">
-          {course.price === 0 ? 'Gratis' : `${course.price} kr`}
-        </div>
-        <div className="flex space-x-2">
-          {onAddToCart && (
-            <button
-              onClick={() => onAddToCart(course)}
-              className="bg-mn-light-gray-blue text-mn-dark-blue-green px-3 py-2 rounded-lg hover:bg-mn-light-gray-blue/80 transition-colors flex items-center text-sm font-open-sans"
+        
+        <div className="flex items-center justify-between mt-auto">
+          <div className="text-2xl font-bold text-mn-dark-blue-green font-montserrat">
+            {course.price === 0 ? 'Gratis' : `${course.price} kr`}
+          </div>
+          <div className="flex space-x-2">
+            {onAddToCart && (
+              <button
+                onClick={() => onAddToCart(course)}
+                className="bg-mn-light-gray-blue text-mn-dark-blue-green px-3 py-2 rounded-lg hover:bg-mn-light-gray-blue/80 transition-colors flex items-center text-sm font-open-sans"
+              >
+                <ShoppingCartIcon className="w-4 h-4 mr-1" />
+                Lägg till
+              </button>
+            )}
+            <Link
+              href={`/courses/${course.id}`}
+              className="btn-primary"
             >
-              <ShoppingCartIcon className="w-4 h-4 mr-1" />
-              Lägg till
-            </button>
-          )}
-          <Link
-            href={`/courses/${course.id}`}
-            className="btn-primary"
-          >
-            Läs Mer
-          </Link>
+              Läs Mer
+            </Link>
+          </div>
         </div>
       </div>
     </div>

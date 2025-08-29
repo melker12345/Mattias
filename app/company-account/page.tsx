@@ -61,43 +61,45 @@ const CompanyAccountPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-mn-very-light-gray">
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-blue-600 to-blue-800 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <BuildingOfficeIcon className="h-16 w-16 mx-auto mb-6" />
-              <h1 className="text-4xl md:text-5xl font-bold mb-6">
-                Företagskonto
-              </h1>
-              <p className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto">
-                Komplett lösning för företag som vill hantera sina anställdas utbildning och certifiering
-              </p>
-              <div className="text-3xl font-bold mb-8">
-                {new Intl.NumberFormat('sv-SE', {
-                  style: 'currency',
-                  currency: 'SEK'
-                }).format(companyAccount.price)}
-                <span className="text-lg font-normal ml-2">engångsbetalning</span>
-              </div>
-            </motion.div>
+      <div className="relative bg-cover bg-center bg-no-repeat text-mn-white" style={{ backgroundImage: 'url(/13107746_5134336.jpg)' }}>
+        <div className="absolute inset-0 bg-mn-dark-blue-green/60"></div>
+        <div className="relative z-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <div className="text-center">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+              >
+                <BuildingOfficeIcon className="h-16 w-16 mx-auto mb-6 text-mn-light-gray-blue" />
+                <h1 className="text-4xl md:text-5xl font-bold mb-6 font-montserrat">
+                  Företagskonto
+                </h1>
+                <p className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto font-open-sans">
+                  Komplett lösning för företag som vill hantera sina anställdas utbildning och certifiering
+                </p>
+                <div className="text-3xl font-bold mb-8 font-montserrat">
+                  {new Intl.NumberFormat('sv-SE', {
+                    style: 'currency',
+                    currency: 'SEK'
+                  }).format(companyAccount.price)}
+                </div>
+              </motion.div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Features Section */}
-      <div className="py-16 bg-white">
+      <div className="py-16 bg-mn-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl font-bold text-mn-dark-blue-green mb-4 font-montserrat">
               Allt du behöver för att hantera företagsutbildning
             </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-mn-dark-blue-green max-w-2xl mx-auto font-open-sans">
               Vårt företagskonto ger dig alla verktyg du behöver för att säkerställa att dina anställda har rätt kompetens och certifieringar.
             </p>
           </div>
@@ -111,13 +113,13 @@ const CompanyAccountPage: React.FC = () => {
                 transition={{ duration: 0.6, delay: index * 0.1 }}
                 className="text-center"
               >
-                <div className="bg-blue-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                  <feature.icon className="h-8 w-8 text-blue-600" />
+                <div className="bg-mn-light-gray-blue rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                  <feature.icon className="h-8 w-8 text-mn-dark-blue-green" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                <h3 className="text-lg font-semibold text-mn-dark-blue-green mb-2 font-montserrat">
                   {feature.title}
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-mn-dark-blue-green font-open-sans">
                   {feature.description}
                 </p>
               </motion.div>
@@ -127,10 +129,10 @@ const CompanyAccountPage: React.FC = () => {
       </div>
 
       {/* Benefits Section */}
-      <div className="py-16 bg-gray-50">
+      <div className="py-16 bg-mn-very-light-gray">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl font-bold text-mn-dark-blue-green mb-4 font-montserrat">
               Fördelar med företagskonto
             </h2>
           </div>
@@ -144,8 +146,8 @@ const CompanyAccountPage: React.FC = () => {
                 transition={{ duration: 0.6, delay: index * 0.1 }}
                 className="flex items-start space-x-3"
               >
-                <CheckCircleIcon className="h-6 w-6 text-green-500 mt-0.5 flex-shrink-0" />
-                <span className="text-gray-700">{benefit}</span>
+                <CheckCircleIcon className="h-6 w-6 text-mn-dark-blue-green mt-0.5 flex-shrink-0" />
+                <span className="text-mn-dark-blue-green font-open-sans">{benefit}</span>
               </motion.div>
             ))}
           </div>
@@ -153,30 +155,30 @@ const CompanyAccountPage: React.FC = () => {
       </div>
 
       {/* CTA Section */}
-      <div className="py-16 bg-white">
+      <div className="py-16 bg-mn-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl font-bold text-mn-dark-blue-green mb-4 font-montserrat">
               Redo att komma igång?
             </h2>
-            <p className="text-lg text-gray-600 mb-8">
+            <p className="text-lg text-mn-dark-blue-green mb-8 font-open-sans">
               Börja hantera dina anställdas utbildning redan idag
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={handleAddToCart}
-                className="bg-blue-600 text-white px-8 py-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+                className="bg-mn-dark-blue-green text-mn-white px-8 py-4 rounded-lg font-semibold hover:bg-mn-dark-blue-green/90 transition-colors flex items-center justify-center space-x-2 font-open-sans"
               >
                 <span>Lägg till i kundvagn</span>
                 <ArrowRightIcon className="h-5 w-5" />
               </button>
               
-              <button className="bg-gray-100 text-gray-700 px-8 py-4 rounded-lg font-semibold hover:bg-gray-200 transition-colors">
+              <button className="bg-mn-light-gray-blue text-mn-dark-blue-green px-8 py-4 rounded-lg font-semibold hover:bg-mn-light-gray-blue/80 transition-colors font-open-sans">
                 Kontakta oss
               </button>
             </div>

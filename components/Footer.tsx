@@ -10,7 +10,7 @@ import {
 
 export function Footer() {
   return (
-    <footer className="bg-mn-dark-blue-green text-mn-white">
+    <footer className="bg-[#000] text-mn-white">
       <div className="mn-container py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Company Info */}

@@ -37,17 +37,38 @@ export function Navigation() {
                 </Link>
               </div>
               
-              {/* Center Navigation Links */}
+              {/* Center Navigation Links and Registrera Button */}
               <div className="hidden sm:flex sm:items-center sm:space-x-8">
                 {navigation.map((item) => (
                   <Link
                     key={item.name}
                     href={item.href}
-                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 font-open-sans"
+                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 px-4 py-3 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
                   >
                     {item.name}
                   </Link>
                 ))}
+                {!session && (
+                  <div className="relative group">
+                    <button className="btn-primary">
+                      Registrera
+                    </button>
+                    <div className="absolute right-0 mt-2 w-48 bg-mn-white rounded-md shadow-lg py-1 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-mn-light-gray-blue">
+                      <Link
+                        href="/auth/signup"
+                        className="block px-4 py-2 text-sm text-mn-dark-blue-green hover:bg-mn-very-light-gray font-open-sans"
+                      >
+                        Privatperson
+                      </Link>
+                      <Link
+                        href="/register/company"
+                        className="block px-4 py-2 text-sm text-mn-dark-blue-green hover:bg-mn-very-light-gray font-open-sans"
+                      >
+                        Företag
+                      </Link>
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* Right Side - Cart and User Menu */}
@@ -139,29 +160,10 @@ export function Navigation() {
                   <div className="flex space-x-4">
                     <Link
                       href="/auth/signin"
-                      className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 font-open-sans"
+                      className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 px-4 py-3 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
                     >
                       Logga in
                     </Link>
-                    <div className="relative group">
-                      <button className="btn-primary">
-                        Registrera
-                      </button>
-                      <div className="absolute right-0 mt-2 w-48 bg-mn-white rounded-md shadow-lg py-1 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-mn-light-gray-blue">
-                        <Link
-                          href="/auth/signup"
-                          className="block px-4 py-2 text-sm text-mn-dark-blue-green hover:bg-mn-very-light-gray font-open-sans"
-                        >
-                          Privatperson
-                        </Link>
-                        <Link
-                          href="/register/company"
-                          className="block px-4 py-2 text-sm text-mn-dark-blue-green hover:bg-mn-very-light-gray font-open-sans"
-                        >
-                          Företag
-                        </Link>
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
