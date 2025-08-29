@@ -22,8 +22,6 @@ export function CourseCard({ course, onAddToCart }: CourseCardProps) {
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
   }
 
-
-
   return (
     <div className="card hover:shadow-lg transition-shadow duration-300">
       <div className="relative h-48 mb-4 rounded-lg overflow-hidden">
@@ -33,39 +31,38 @@ export function CourseCard({ course, onAddToCart }: CourseCardProps) {
           fill
           className="object-cover"
         />
-
       </div>
       
       <div className="mb-4">
-        <h3 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2">
+        <h3 className="text-xl font-semibold text-mn-dark-blue-green mb-2 line-clamp-2 font-montserrat">
           {course.title}
         </h3>
-        <p className="text-gray-600 text-sm line-clamp-3">
+        <p className="text-mn-dark-blue-green/80 text-sm line-clamp-3 font-open-sans">
           {course.description}
         </p>
       </div>
       
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center text-sm text-gray-500">
+        <div className="flex items-center text-sm text-mn-dark-blue-green/70 font-open-sans">
           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           {formatDuration(course.duration)}
         </div>
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-mn-dark-blue-green/70 font-open-sans">
           {course.category}
         </div>
       </div>
       
       <div className="flex items-center justify-between">
-        <div className="text-2xl font-bold text-primary-600">
+        <div className="text-2xl font-bold text-mn-dark-blue-green font-montserrat">
           {course.price === 0 ? 'Gratis' : `${course.price} kr`}
         </div>
         <div className="flex space-x-2">
           {onAddToCart && (
             <button
               onClick={() => onAddToCart(course)}
-              className="bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center text-sm"
+              className="bg-mn-light-gray-blue text-mn-dark-blue-green px-3 py-2 rounded-lg hover:bg-mn-light-gray-blue/80 transition-colors flex items-center text-sm font-open-sans"
             >
               <ShoppingCartIcon className="w-4 h-4 mr-1" />
               Lägg till

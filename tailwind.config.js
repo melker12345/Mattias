@@ -8,6 +8,15 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // MN Group Color Palette
+        'mn-white': '#FFFFFF',
+        'mn-nearly-white': '#FEFEFE',
+        'mn-light-gray-blue': '#CDD7DB',
+        'mn-very-light-gray': '#F9FAFA',
+        'mn-dark-blue-green': '#355E71',
+        'mn-extra-light': '#FBFCFC',
+        
+        // Legacy colors for backward compatibility
         primary: {
           50: '#eff6ff',
           100: '#dbeafe',
@@ -34,7 +43,11 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        // MN Group Typography
+        'montserrat': ['Montserrat', 'system-ui', 'sans-serif'],
+        'open-sans': ['Open Sans', 'system-ui', 'sans-serif'],
+        // Legacy font for backward compatibility
+        sans: ['Open Sans', 'system-ui', 'sans-serif'],
       },
     },
   },

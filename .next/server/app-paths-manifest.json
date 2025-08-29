@@ -1,14 +1,7 @@
 {
-  "/courses/page": "app/courses/page.js",
-  "/api/courses/route": "app/api/courses/route.js",
-  "/api/courses/[id]/enroll/route": "app/api/courses/[id]/enroll/route.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/courses/[id]/route": "app/api/courses/[id]/route.js",
-  "/auth/signin/page": "app/auth/signin/page.js",
   "/courses/[id]/page": "app/courses/[id]/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/api/user/courses/route": "app/api/user/courses/route.js",
-  "/api/courses/[id]/progress/route": "app/api/courses/[id]/progress/route.js",
-  "/courses/[id]/learn/page": "app/courses/[id]/learn/page.js",
-  "/api/courses/[id]/questions/[questionId]/answer/route": "app/api/courses/[id]/questions/[questionId]/answer/route.js"
+  "/admin/page": "app/admin/page.js",
+  "/company-account/page": "app/company-account/page.js",
+  "/about/page": "app/about/page.js",
+  "/page": "app/page.js"
 }

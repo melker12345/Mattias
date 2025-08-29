@@ -29,7 +29,7 @@ export function TestimonialsSection() {
     return Array.from({ length: 5 }, (_, i) => (
       <svg
         key={i}
-        className={`w-5 h-5 ${i < rating ? 'text-yellow-400' : 'text-gray-300'}`}
+        className={`w-5 h-5 ${i < rating ? 'text-yellow-400' : 'text-mn-light-gray-blue'}`}
         fill="currentColor"
         viewBox="0 0 20 20"
       >
@@ -39,13 +39,13 @@ export function TestimonialsSection() {
   }
 
   return (
-    <section className="py-16 bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-16 bg-mn-very-light-gray">
+      <div className="mn-container">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl font-bold text-mn-dark-blue-green mb-4 font-montserrat">
             Vad Våra Kunder Säger
           </h2>
-          <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+          <p className="text-lg text-mn-dark-blue-green/80 max-w-3xl mx-auto font-open-sans">
             Läs vad andra har att säga om sina erfarenheter med våra kurser
           </p>
         </div>
@@ -62,8 +62,8 @@ export function TestimonialsSection() {
                   className="w-12 h-12 rounded-full mr-4"
                 />
                 <div>
-                  <h4 className="font-semibold text-gray-900">{testimonial.name}</h4>
-                  <p className="text-sm text-gray-600">{testimonial.role}</p>
+                  <h4 className="font-semibold text-mn-dark-blue-green font-montserrat">{testimonial.name}</h4>
+                  <p className="text-sm text-mn-dark-blue-green/70 font-open-sans">{testimonial.role}</p>
                 </div>
               </div>
               
@@ -71,19 +71,19 @@ export function TestimonialsSection() {
                 {renderStars(testimonial.rating)}
               </div>
               
-                             <p className="text-gray-700 italic">
-                 &quot;{testimonial.content}&quot;
-               </p>
+              <p className="text-mn-dark-blue-green/80 italic font-open-sans">
+                &quot;{testimonial.content}&quot;
+              </p>
             </div>
           ))}
         </div>
         
         <div className="text-center mt-12">
-          <div className="inline-flex items-center bg-white rounded-full px-6 py-3 shadow-md">
+          <div className="inline-flex items-center bg-mn-white rounded-full px-6 py-3 shadow-md border border-mn-light-gray-blue">
             <div className="flex items-center mr-4">
               {renderStars(5)}
             </div>
-            <span className="text-lg font-semibold text-gray-900">
+            <span className="text-lg font-semibold text-mn-dark-blue-green font-montserrat">
               4.9/5 från över 1000+ recensioner
             </span>
           </div>

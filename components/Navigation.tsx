@@ -21,15 +21,19 @@ export function Navigation() {
   ]
 
   return (
-    <Disclosure as="nav" className="bg-white shadow-lg sticky top-0 z-50">
+    <Disclosure as="nav" className="bg-mn-white shadow-lg sticky top-0 z-50 border-b border-mn-light-gray-blue">
       {({ open }) => (
         <>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mn-container">
             <div className="flex justify-between items-center h-16">
               {/* Logo */}
               <div className="flex-shrink-0 flex items-center">
-                <Link href="/" className="text-2xl font-bold text-primary-600">
-                  Utbildningsplattform
+                <Link href="/" className="flex items-center">
+                  <img 
+                    src="/logos/MN_Utbildning.png" 
+                    alt="MN Utbildning Logo" 
+                    className="h-16 w-auto"
+                  />
                 </Link>
               </div>
               
@@ -39,7 +43,7 @@ export function Navigation() {
                   <Link
                     key={item.name}
                     href={item.href}
-                    className="text-gray-900 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 font-open-sans"
                   >
                     {item.name}
                   </Link>
@@ -51,11 +55,11 @@ export function Navigation() {
                 {/* Cart Button */}
                 <button
                   onClick={toggleCart}
-                  className="relative p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="relative p-2 text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 transition-colors"
                 >
                   <ShoppingCartIcon className="h-6 w-6" />
                   {getItemCount() > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-mn-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-open-sans">
                       {getItemCount()}
                     </span>
                   )}
@@ -64,9 +68,9 @@ export function Navigation() {
                 {session ? (
                   <Menu as="div" className="ml-3 relative">
                     <div>
-                      <Menu.Button className="bg-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                      <Menu.Button className="bg-mn-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-mn-dark-blue-green">
                         <span className="sr-only">Öppna användarmenyn</span>
-                        <UserCircleIcon className="h-8 w-8 text-gray-400" />
+                        <UserCircleIcon className="h-8 w-8 text-mn-dark-blue-green" />
                       </Menu.Button>
                     </div>
                     <Transition
@@ -77,14 +81,14 @@ export function Navigation() {
                       leaveFrom="transform opacity-100 scale-100"
                       leaveTo="transform opacity-0 scale-95"
                     >
-                      <Menu.Items className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
+                      <Menu.Items className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-mn-white ring-1 ring-mn-light-gray-blue focus:outline-none">
                         <Menu.Item>
                           {({ active }) => (
                             <Link
                               href={(session?.user as any)?.role === 'COMPANY_ADMIN' ? '/dashboard/company' : '/dashboard'}
                               className={`${
-                                active ? 'bg-gray-100' : ''
-                              } block px-4 py-2 text-sm text-gray-700`}
+                                active ? 'bg-mn-very-light-gray' : ''
+                              } block px-4 py-2 text-sm text-mn-dark-blue-green font-open-sans`}
                             >
                               {(session?.user as any)?.role === 'COMPANY_ADMIN' ? 'Företagsdashboard' : 'Mina Kurser'}
                             </Link>
@@ -96,8 +100,8 @@ export function Navigation() {
                               <Link
                                 href="/admin"
                                 className={`${
-                                  active ? 'bg-gray-100' : ''
-                                } block px-4 py-2 text-sm text-gray-700`}
+                                  active ? 'bg-mn-very-light-gray' : ''
+                                } block px-4 py-2 text-sm text-mn-dark-blue-green font-open-sans`}
                               >
                                 Admin Panel
                               </Link>
@@ -109,8 +113,8 @@ export function Navigation() {
                             <Link
                               href="/profile"
                               className={`${
-                                active ? 'bg-gray-100' : ''
-                              } block px-4 py-2 text-sm text-gray-700`}
+                                active ? 'bg-mn-very-light-gray' : ''
+                              } block px-4 py-2 text-sm text-mn-dark-blue-green font-open-sans`}
                             >
                               Profil
                             </Link>
@@ -121,8 +125,8 @@ export function Navigation() {
                             <button
                               onClick={() => signOut()}
                               className={`${
-                                active ? 'bg-gray-100' : ''
-                              } block w-full text-left px-4 py-2 text-sm text-gray-700`}
+                                active ? 'bg-mn-very-light-gray' : ''
+                              } block w-full text-left px-4 py-2 text-sm text-mn-dark-blue-green font-open-sans`}
                             >
                               Logga ut
                             </button>
@@ -135,7 +139,7 @@ export function Navigation() {
                   <div className="flex space-x-4">
                     <Link
                       href="/auth/signin"
-                      className="text-gray-900 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+                      className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 font-open-sans"
                     >
                       Logga in
                     </Link>
@@ -143,16 +147,16 @@ export function Navigation() {
                       <button className="btn-primary">
                         Registrera
                       </button>
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                      <div className="absolute right-0 mt-2 w-48 bg-mn-white rounded-md shadow-lg py-1 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-mn-light-gray-blue">
                         <Link
                           href="/auth/signup"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          className="block px-4 py-2 text-sm text-mn-dark-blue-green hover:bg-mn-very-light-gray font-open-sans"
                         >
                           Privatperson
                         </Link>
                         <Link
                           href="/register/company"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          className="block px-4 py-2 text-sm text-mn-dark-blue-green hover:bg-mn-very-light-gray font-open-sans"
                         >
                           Företag
                         </Link>
@@ -166,17 +170,17 @@ export function Navigation() {
                 {/* Mobile Cart Button */}
                 <button
                   onClick={toggleCart}
-                  className="relative p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="relative p-2 text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 transition-colors"
                 >
                   <ShoppingCartIcon className="h-6 w-6" />
                   {getItemCount() > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-mn-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-open-sans">
                       {getItemCount()}
                     </span>
                   )}
                 </button>
                 
-                <Disclosure.Button className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500">
+                <Disclosure.Button className="inline-flex items-center justify-center p-2 rounded-md text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 hover:bg-mn-very-light-gray focus:outline-none focus:ring-2 focus:ring-inset focus:ring-mn-dark-blue-green">
                   <span className="sr-only">Öppna huvudmeny</span>
                   {open ? (
                     <XMarkIcon className="block h-6 w-6" aria-hidden="true" />
@@ -195,19 +199,19 @@ export function Navigation() {
                   key={item.name}
                   as={Link}
                   href={item.href}
-                  className="text-gray-900 hover:text-primary-600 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200"
+                  className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
                 >
                   {item.name}
                 </Disclosure.Button>
               ))}
             </div>
-            <div className="pt-4 pb-3 border-t border-gray-200">
+            <div className="pt-4 pb-3 border-t border-mn-light-gray-blue">
               {session ? (
                 <div className="space-y-1">
                   <Disclosure.Button
                     as={Link}
                     href={(session?.user as any)?.role === 'COMPANY_ADMIN' ? '/dashboard/company' : '/dashboard'}
-                    className="text-gray-900 hover:text-primary-600 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200"
+                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
                   >
                     {(session?.user as any)?.role === 'COMPANY_ADMIN' ? 'Företagsdashboard' : 'Mina Kurser'}
                   </Disclosure.Button>
@@ -215,7 +219,7 @@ export function Navigation() {
                     <Disclosure.Button
                       as={Link}
                       href="/admin"
-                      className="text-gray-900 hover:text-primary-600 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200"
+                      className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
                     >
                       Admin Panel
                     </Disclosure.Button>
@@ -223,14 +227,14 @@ export function Navigation() {
                   <Disclosure.Button
                     as={Link}
                     href="/profile"
-                    className="text-gray-900 hover:text-primary-600 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200"
+                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
                   >
                     Profil
                   </Disclosure.Button>
                   <Disclosure.Button
                     as="button"
                     onClick={() => signOut()}
-                    className="text-gray-900 hover:text-primary-600 block w-full text-left px-3 py-2 rounded-md text-base font-medium transition-colors duration-200"
+                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block w-full text-left px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
                   >
                     Logga ut
                   </Disclosure.Button>
@@ -240,21 +244,21 @@ export function Navigation() {
                   <Disclosure.Button
                     as={Link}
                     href="/auth/signin"
-                    className="text-gray-900 hover:text-primary-600 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200"
+                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
                   >
                     Logga in
                   </Disclosure.Button>
                   <Disclosure.Button
                     as={Link}
                     href="/auth/signup"
-                    className="text-gray-900 hover:text-primary-600 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200"
+                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
                   >
                     Registrera (Privatperson)
                   </Disclosure.Button>
                   <Disclosure.Button
                     as={Link}
                     href="/register/company"
-                    className="text-gray-900 hover:text-primary-600 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200"
+                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
                   >
                     Registrera (Företag)
                   </Disclosure.Button>

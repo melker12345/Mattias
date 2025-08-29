@@ -1,20 +1,15 @@
 {
   "pages": {
-    "/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
-    ],
     "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/contact/page": [
+    "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/contact/page.js"
+      "static/chunks/app/page.js"
     ],
     "/courses/page": [
       "static/chunks/webpack.js",
@@ -26,20 +21,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/courses/[id]/page.js"
     ],
-    "/auth/signin/page": [
+    "/admin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/auth/signin/page.js"
+      "static/chunks/app/admin/page.js"
     ],
-    "/dashboard/page": [
+    "/company-account/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/page.js"
+      "static/chunks/app/company-account/page.js"
     ],
-    "/courses/[id]/learn/page": [
+    "/about/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/courses/[id]/learn/page.js"
+      "static/chunks/app/about/page.js"
     ]
   }
 }

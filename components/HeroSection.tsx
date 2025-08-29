@@ -5,22 +5,22 @@ import { motion } from 'framer-motion'
 
 export function HeroSection() {
   return (
-    <section className="bg-gradient-to-br from-primary-600 to-primary-800 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+    <section className="bg-gradient-to-br from-mn-dark-blue-green to-mn-dark-blue-green/90 text-mn-white">
+      <div className="mn-container py-24">
         <div className="text-center">
           <motion.h1 
-            className="text-4xl md:text-6xl font-bold mb-6"
+            className="text-4xl md:text-6xl font-bold mb-6 font-montserrat"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
             Sveriges Ledande
             <br />
-            <span className="text-primary-200">Utbildningsplattform</span>
+            <span className="text-mn-light-gray-blue">Utbildningsplattform</span>
           </motion.h1>
           
           <motion.p 
-            className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto text-primary-100"
+            className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto text-mn-light-gray-blue font-open-sans"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
@@ -37,20 +37,20 @@ export function HeroSection() {
           >
             <Link 
               href="/company-account" 
-              className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-8 rounded-lg transition-colors duration-200"
+              className="bg-mn-white text-mn-dark-blue-green hover:bg-mn-nearly-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200 font-open-sans"
             >
               Företagskonto
             </Link>
             <Link 
               href="/courses" 
-              className="border-2 border-white text-white hover:bg-white hover:text-primary-600 font-semibold py-3 px-8 rounded-lg transition-colors duration-200"
+              className="border-2 border-mn-white text-mn-white hover:bg-mn-white hover:text-mn-dark-blue-green font-semibold py-3 px-8 rounded-lg transition-colors duration-200 font-open-sans"
             >
               Se Kurser
             </Link>
           </motion.div>
           
           <motion.div 
-            className="mt-12 flex items-center justify-center space-x-8 text-sm text-primary-200"
+            className="mt-12 flex items-center justify-center space-x-8 text-sm text-mn-light-gray-blue font-open-sans"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.6 }}

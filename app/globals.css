@@ -2,19 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* MN Group Typography - Montserrat for headings, Open Sans for body text */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Open+Sans:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  --foreground-rgb: 53, 94, 113; /* mn-dark-blue-green */
+  --background-start-rgb: 255, 255, 255; /* mn-white */
+  --background-end-rgb: 249, 250, 250; /* mn-very-light-gray */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+    --background-start-rgb: 53, 94, 113; /* mn-dark-blue-green */
+    --background-end-rgb: 53, 94, 113; /* mn-dark-blue-green */
   }
 }
 
@@ -26,23 +27,53 @@ body {
       rgb(var(--background-end-rgb))
     )
     rgb(var(--background-start-rgb));
-  font-family: 'Inter', sans-serif;
+  font-family: 'Open Sans', sans-serif;
+}
+
+/* MN Group Typography Classes */
+@layer utilities {
+  .font-heading {
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+  }
+  
+  .font-body {
+    font-family: 'Open Sans', sans-serif;
+    font-weight: 400;
+  }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-mn-dark-blue-green hover:bg-opacity-90 text-mn-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 font-open-sans;
   }
   
   .btn-secondary {
-    @apply bg-secondary-200 hover:bg-secondary-300 text-secondary-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-mn-light-gray-blue hover:bg-opacity-80 text-mn-dark-blue-green font-medium py-2 px-4 rounded-lg transition-colors duration-200 font-open-sans;
   }
   
   .card {
-    @apply bg-white rounded-lg shadow-md border border-gray-200 p-6;
+    @apply bg-mn-white rounded-lg shadow-md border border-mn-light-gray-blue p-6;
   }
   
   .input-field {
-    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors duration-200 text-gray-900 bg-white;
+    @apply w-full px-4 py-3 border border-mn-light-gray-blue rounded-lg focus:outline-none focus:ring-2 focus:ring-mn-dark-blue-green focus:border-transparent transition-colors duration-200 text-mn-dark-blue-green bg-mn-white font-open-sans;
+  }
+  
+  /* MN Group specific component styles */
+  .mn-section {
+    @apply bg-mn-very-light-gray;
+  }
+  
+  .mn-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  .mn-heading {
+    @apply font-montserrat font-bold text-mn-dark-blue-green;
+  }
+  
+  .mn-text {
+    @apply font-open-sans text-mn-dark-blue-green;
   }
 }
