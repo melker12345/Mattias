@@ -7,7 +7,6 @@ import crypto from 'crypto'
 const inviteEmployeeSchema = z.object({
   name: z.string().min(1, 'Namn är obligatoriskt'),
   email: z.string().email('Ogiltig e-postadress'),
-  personalNumber: z.string().min(10, 'Personnummer måste vara minst 10 tecken'),
 })
 
 export async function POST(
@@ -17,7 +16,7 @@ export async function POST(
   try {
     const companyId = params.id
     const body = await request.json()
-    const { name, email, personalNumber } = inviteEmployeeSchema.parse(body)
+    const { name, email } = inviteEmployeeSchema.parse(body)
 
     // Verify company exists
     const company = await prisma.company.findUnique({
@@ -55,10 +54,6 @@ export async function POST(
         data: {
           companyId: companyId,
           role: 'EMPLOYEE',
-          // Keep existing personal number if it matches, otherwise update
-          personalNumber: existingUser.personalNumber === personalNumber
-            ? existingUser.personalNumber
-            : personalNumber,
         },
       })
 
@@ -121,32 +116,20 @@ export async function POST(
       )
     }
 
-    // Generate temporary password for new user
-    const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8)
+    // For new users, we don't create the account here
+    // They will create it during the signup process with the invitation token
+    // We only store the invitation information
 
-    // Create new user
-    const employee = await prisma.user.create({
-      data: {
-        name,
-        email,
-        personalNumber,
-        password: tempPassword, // In production, this should be hashed
-        role: 'EMPLOYEE',
-        companyId: companyId,
-        bankIdVerified: false,
-        id06Eligible: false,
-      },
-    })
-
-    // Create invitation record
+    // Create invitation record for new user
     await prisma.invitation.create({
       data: {
-        email: employee.email,
+        email: email,
         token: invitationToken,
         companyId: companyId,
         expiresAt: invitationExpiresAt,
         isExistingUser: false,
-        temporaryPassword: tempPassword,
+        // Store the name in the invitation for later use
+        name: name,
       },
     })
 
@@ -155,10 +138,10 @@ export async function POST(
     const invitationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/invite/${invitationToken}`
     
     const emailData = generateInvitationEmail(
-      employee.name || 'Användare',
-      employee.email,
+      name,
+      email,
       company.name,
-      tempPassword,
+      undefined, // No temporary password for new users
       loginUrl,
       invitationUrl,
       false // isExistingUser = false
@@ -167,30 +150,26 @@ export async function POST(
     const emailSent = await sendEmail(emailData)
 
     if (!emailSent) {
-      console.error('Failed to send invitation email:', employee.email)
+      console.error('Failed to send invitation email:', email)
     }
 
     return NextResponse.json(
       {
         message: 'Anställd inbjuden framgångsrikt!',
-        employee: {
-          id: employee.id,
-          email: employee.email,
-          name: employee.name,
-          personalNumber: employee.personalNumber,
-          role: employee.role,
-          bankIdVerified: employee.bankIdVerified,
-          id06Eligible: employee.id06Eligible,
+        invitation: {
+          email: email,
+          name: name,
         },
         emailSent,
         existingUser: false,
         invitationToken,
         invitationUrl,
         nextSteps: [
-          'Anställd har skapats och inbjudits',
-          'E-post har skickats med inloggningsuppgifter',
-          'Alternativt kan användaren använda inbjudningslänken',
-          'Användaren måste verifiera sin identitet med BankID',
+          'Inbjudan har skickats till användaren',
+          'E-post har skickats med inbjudningslänk',
+          'Användaren kan skapa sitt konto via inbjudningslänken',
+          'Alternativt kan användaren använda inbjudningslänken direkt',
+          'Efter konto skapas måste användaren verifiera sin identitet med BankID',
           'Efter BankID-verifiering kan anställd ta kurser och få ID06-certifikat'
         ]
       },

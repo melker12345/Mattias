@@ -11,7 +11,6 @@ import { useSession } from 'next-auth/react'
 const inviteEmployeeSchema = z.object({
   name: z.string().min(1, 'Namn är obligatoriskt'),
   email: z.string().email('Ogiltig e-postadress'),
-  personalNumber: z.string().min(10, 'Personnummer måste vara minst 10 tecken'),
 })
 
 type InviteEmployeeForm = z.infer<typeof inviteEmployeeSchema>
@@ -149,7 +148,7 @@ export default function InviteEmployeePage() {
                         type="text"
                         value={invitationData.invitationUrl}
                         readOnly
-                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded bg-gray-50"
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded bg-gray-50 text-black"
                       />
                       <button
                         onClick={copyInvitationLink}
@@ -215,21 +214,7 @@ export default function InviteEmployeePage() {
               )}
             </div>
 
-            <div>
-              <label htmlFor="personalNumber" className="block text-sm font-medium text-gray-700 mb-1">
-                Personnummer
-              </label>
-              <input
-                {...register('personalNumber')}
-                type="text"
-                id="personalNumber"
-                className="input-field"
-                placeholder="YYYYMMDD-XXXX"
-              />
-              {errors.personalNumber && (
-                <p className="mt-1 text-sm text-red-600">{errors.personalNumber.message}</p>
-              )}
-            </div>
+
 
             <button
               type="submit"

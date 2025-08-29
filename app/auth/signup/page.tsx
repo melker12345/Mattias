@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -23,20 +23,65 @@ export default function SignUpPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [invitationInfo, setInvitationInfo] = useState<{ email: string; companyName: string } | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const {
     register,
     handleSubmit,
     formState: { errors },
+    setValue,
   } = useForm<SignUpForm>({
     resolver: zodResolver(signUpSchema),
   })
+
+  // Check for invitation token and pre-fill email
+  useEffect(() => {
+    const email = searchParams.get('email')
+    const token = searchParams.get('token')
+    const message = searchParams.get('message')
+
+    if (email) {
+      setValue('email', email)
+    }
+
+    if (message) {
+      setSuccess(message)
+    }
+
+    if (token) {
+      // Fetch invitation info to show company name
+      fetchInvitationInfo(token)
+    }
+  }, [searchParams, setValue])
+
+  const fetchInvitationInfo = async (token: string) => {
+    try {
+      const response = await fetch(`/api/invitations/${token}`)
+      if (response.ok) {
+        const data = await response.json()
+        setInvitationInfo({
+          email: data.invitation.email,
+          companyName: data.invitation.companyName,
+        })
+        
+        // Pre-fill name if available from invitation
+        if (data.invitation.name) {
+          setValue('name', data.invitation.name)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching invitation info:', error)
+    }
+  }
 
   const onSubmit = async (data: SignUpForm) => {
     setIsLoading(true)
     setError('')
     setSuccess('')
+
+    const token = searchParams.get('token')
 
     try {
       const response = await fetch('/api/auth/register', {
@@ -48,6 +93,7 @@ export default function SignUpPage() {
           name: data.name,
           email: data.email,
           password: data.password,
+          invitationToken: token, // Include invitation token if present
         }),
       })
 
@@ -56,7 +102,11 @@ export default function SignUpPage() {
       if (!response.ok) {
         setError(result.message || 'Ett fel uppstod vid registrering')
       } else {
-        setSuccess('Kontot skapades framgångsrikt! Du kan nu logga in.')
+        if (token) {
+          setSuccess('Kontot skapades framgångsrikt! Du är nu ansluten till företaget. Du kan logga in.')
+        } else {
+          setSuccess('Kontot skapades framgångsrikt! Du kan nu logga in.')
+        }
         setTimeout(() => {
           router.push('/auth/signin')
         }, 2000)
@@ -72,8 +122,13 @@ export default function SignUpPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Skapa ditt konto
+          {invitationInfo ? `Skapa konto för ${invitationInfo.companyName}` : 'Skapa ditt konto'}
         </h2>
+        {invitationInfo && (
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Du har blivit inbjuden att använda {invitationInfo.companyName}s utbildningsplattform
+          </p>
+        )}
         <p className="mt-2 text-center text-sm text-gray-600">
           Eller{' '}
           <Link href="/auth/signin" className="font-medium text-primary-600 hover:text-primary-500">
@@ -105,8 +160,9 @@ export default function SignUpPage() {
                 <input
                   {...register('name')}
                   type="text"
-                  className="input-field"
+                  className={`input-field ${invitationInfo?.email === searchParams.get('email') ? 'bg-gray-50 cursor-not-allowed' : ''}`}
                   placeholder="Ditt namn"
+                  readOnly={invitationInfo?.email === searchParams.get('email')}
                 />
                 {errors.name && (
                   <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
@@ -122,8 +178,9 @@ export default function SignUpPage() {
                 <input
                   {...register('email')}
                   type="email"
-                  className="input-field"
+                  className={`input-field ${invitationInfo ? 'bg-gray-50 cursor-not-allowed' : ''}`}
                   placeholder="din@email.se"
+                  readOnly={!!invitationInfo}
                 />
                 {errors.email && (
                   <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>

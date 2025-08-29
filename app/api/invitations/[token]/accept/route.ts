@@ -53,29 +53,13 @@ export async function POST(
       },
     })
 
-    // If it's a new user, ensure they exist and are properly set up
-    if (!invitation.isExistingUser) {
-      // Check if user exists
+    // For existing users, just update their company association
+    if (invitation.isExistingUser) {
       const existingUser = await prisma.user.findUnique({
         where: { email: invitation.email },
       })
 
-      if (!existingUser) {
-        // Create the user if they don't exist
-        await prisma.user.create({
-          data: {
-            email: invitation.email,
-            name: invitation.email.split('@')[0], // Use email prefix as name
-            personalNumber: '', // Will be filled later
-            password: invitation.temporaryPassword || '',
-            role: 'EMPLOYEE',
-            companyId: invitation.companyId,
-            bankIdVerified: false,
-            id06Eligible: false,
-          },
-        })
-      } else {
-        // Update existing user to be part of the company
+      if (existingUser) {
         await prisma.user.update({
           where: { id: existingUser.id },
           data: {
@@ -85,6 +69,8 @@ export async function POST(
         })
       }
     }
+    // For new users, we don't create the account here anymore
+    // They will be created during the signup process with the invitation token
 
     return NextResponse.json({
       message: 'Inbjudning accepterad framgångsrikt',

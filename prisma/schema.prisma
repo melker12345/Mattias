@@ -159,6 +159,13 @@ model Company {
   verifiedAt        DateTime?
   verificationMethod String @default("BUSINESS_REGISTRATION") // VerificationMethod as string
   
+  // Subscription and payment
+  plan              String    @default("STANDARD") // STANDARD
+  planPrice         Float     @default(1500) // Annual price in SEK
+  planStartDate     DateTime  @default(now())
+  planEndDate       DateTime?
+  paymentStatus     String    @default("PENDING") // PENDING, PAID, OVERDUE, CANCELLED
+  
   isActive          Boolean   @default(true)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -168,6 +175,7 @@ model Company {
   coursePurchases   CoursePurchase[]
   invoices          Invoice[]
   invitations       Invitation[]
+  paymentLogs       PaymentLog[]
 }
 
 model CoursePurchase {
@@ -234,9 +242,25 @@ model InvoiceItem {
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
 }
 
+model PaymentLog {
+  id              String   @id @default(cuid())
+  companyId       String?
+  stripePaymentId String   @unique
+  amount          Float
+  currency        String   @default("SEK")
+  status          String   // succeeded, failed, pending
+  paymentMethod   String?  // card, sepa, swish, invoice
+  metadata        String?  // JSON string
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  company         Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
 model Invitation {
   id               String   @id @default(cuid())
   email            String
+  name             String?  // For new users, store the name from invitation
   token            String   @unique
   companyId        String
   expiresAt        DateTime

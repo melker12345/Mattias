@@ -20,6 +20,7 @@ export default function InvitePage({ params }: { params: { token: string } }) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [action, setAction] = useState<'accept' | 'signin' | 'signup'>('accept')
   const router = useRouter()
   const { data: session, status } = useSession()
 
@@ -33,6 +34,12 @@ export default function InvitePage({ params }: { params: { token: string } }) {
           setError(data.message || 'Ogiltig eller utgången inbjudningslänk')
         } else {
           setInvitation(data.invitation)
+          // Auto-determine action based on user status
+          if (data.invitation.isExistingUser) {
+            setAction('signin')
+          } else {
+            setAction('signup')
+          }
         }
       } catch (error) {
         setError('Ett fel uppstod vid hämtning av inbjudningen')
@@ -57,8 +64,12 @@ export default function InvitePage({ params }: { params: { token: string } }) {
       if (!response.ok) {
         setError(data.message || 'Ett fel uppstod vid acceptering av inbjudningen')
       } else {
-        // Redirect to sign in page with success message
-        router.push('/auth/signin?message=Inbjudning accepterad! Du kan nu logga in.')
+        // Redirect based on action
+        if (action === 'signin') {
+          router.push(`/auth/signin?email=${invitation.email}&message=Inbjudning accepterad! Logga in för att fortsätta.`)
+        } else {
+          router.push(`/auth/signup?email=${invitation.email}&token=${params.token}&message=Skapa ditt konto för att acceptera inbjudningen.`)
+        }
       }
     } catch (error) {
       setError('Ett fel uppstod vid acceptering av inbjudningen')
@@ -147,43 +158,81 @@ export default function InvitePage({ params }: { params: { token: string } }) {
                 </div>
               </div>
 
-              {!invitation.isExistingUser && invitation.temporaryPassword && (
+              {!invitation.isExistingUser && (
                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <h3 className="font-medium text-yellow-900 mb-2">Dina inloggningsuppgifter</h3>
+                  <h3 className="font-medium text-yellow-900 mb-2">Skapa ditt konto</h3>
                   <div className="text-sm text-yellow-800 space-y-1">
                     <p><strong>E-post:</strong> {invitation.email}</p>
-                    <p><strong>Temporärt lösenord:</strong> {invitation.temporaryPassword}</p>
+                    <p>Du kommer att skapa ditt lösenord när du skapar ditt konto.</p>
                   </div>
                 </div>
               )}
 
               <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
                 <h3 className="font-medium text-gray-900 mb-2">Vad händer nu?</h3>
-                <ol className="text-sm text-gray-700 space-y-1">
-                  <li>1. Acceptera inbjudningen</li>
-                  <li>2. Logga in med dina uppgifter</li>
-                  <li>3. Verifiera din identitet med BankID</li>
-                  <li>4. Börja ta dina tilldelade kurser</li>
-                </ol>
+                {invitation.isExistingUser ? (
+                  <ol className="text-sm text-gray-700 space-y-1">
+                    <li>1. Acceptera inbjudningen</li>
+                    <li>2. Logga in med ditt befintliga konto</li>
+                    <li>3. Verifiera din identitet med BankID</li>
+                    <li>4. Börja ta dina tilldelade kurser</li>
+                  </ol>
+                ) : (
+                  <ol className="text-sm text-gray-700 space-y-1">
+                    <li>1. Acceptera inbjudningen</li>
+                    <li>2. Skapa ditt konto</li>
+                    <li>3. Verifiera din identitet med BankID</li>
+                    <li>4. Börja ta dina tilldelade kurser</li>
+                  </ol>
+                )}
               </div>
 
-              <button
-                onClick={acceptInvitation}
-                disabled={isProcessing}
-                className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isProcessing ? 'Accepterar...' : 'Acceptera inbjudning'}
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={acceptInvitation}
+                  disabled={isProcessing}
+                  className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isProcessing ? 'Accepterar...' : invitation.isExistingUser ? 'Acceptera och logga in' : 'Acceptera och skapa konto'}
+                </button>
+
+                {invitation.isExistingUser && (
+                  <Link
+                    href={`/auth/signin?email=${invitation.email}`}
+                    className="block w-full text-center px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Logga in direkt
+                  </Link>
+                )}
+
+                {!invitation.isExistingUser && (
+                  <Link
+                    href={`/auth/signup?email=${invitation.email}&token=${params.token}`}
+                    className="block w-full text-center px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Skapa konto direkt
+                  </Link>
+                )}
+              </div>
             </div>
           )}
 
-          <div className="mt-6 text-center">
-            <Link
-              href="/auth/signin"
-              className="text-primary-600 hover:text-primary-900 text-sm"
-            >
-              Har du redan ett konto? Logga in här
-            </Link>
+          <div className="mt-6 text-center space-y-2">
+            {invitation.isExistingUser ? (
+              <Link
+                href={`/auth/signup?email=${invitation.email}&token=${params.token}`}
+                className="block text-primary-600 hover:text-primary-900 text-sm"
+              >
+                Vill du skapa ett nytt konto istället?
+              </Link>
+            ) : (
+              <Link
+                href={`/auth/signin?email=${invitation.email}`}
+                className="block text-primary-600 hover:text-primary-900 text-sm"
+              >
+                Har du redan ett konto? Logga in här
+              </Link>
+            )}
           </div>
         </div>
       </div>

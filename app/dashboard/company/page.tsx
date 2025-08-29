@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
+import CoursePurchaseModal from '@/components/CoursePurchaseModal'
 
 interface Employee {
   id: string
@@ -68,6 +69,11 @@ export default function CompanyDashboard() {
   const [employeeDetails, setEmployeeDetails] = useState<Record<string, EmployeeDetails>>({})
   const [loadingDetails, setLoadingDetails] = useState<Record<string, boolean>>({})
   const [removingEmployee, setRemovingEmployee] = useState<string | null>(null)
+  const [coursePurchaseModal, setCoursePurchaseModal] = useState<{
+    isOpen: boolean
+    employeeId?: string
+    employeeName?: string
+  }>({ isOpen: false })
   const router = useRouter()
 
   // Fetch real employees from API
@@ -186,6 +192,22 @@ export default function CompanyDashboard() {
     } finally {
       setLoadingDetails(prev => ({ ...prev, [employeeId]: false }))
     }
+  }
+
+  const openCoursePurchaseModal = (employeeId?: string, employeeName?: string) => {
+    setCoursePurchaseModal({
+      isOpen: true,
+      employeeId,
+      employeeName
+    })
+  }
+
+  const closeCoursePurchaseModal = () => {
+    setCoursePurchaseModal({ isOpen: false })
+  }
+
+  const handlePurchaseSuccess = () => {
+    refreshEmployees()
   }
 
   const removeEmployee = async (employeeId: string) => {
@@ -360,6 +382,15 @@ export default function CompanyDashboard() {
         {/* Actions */}
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row gap-4">
+            <button
+              onClick={() => openCoursePurchaseModal()}
+              className="btn-secondary inline-flex items-center bg-green-600 hover:bg-green-700 text-white"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+              Köp kurser för alla
+            </button>
             <Link
               href="/dashboard/company/invite-employee"
               className="btn-primary inline-flex items-center"
@@ -681,7 +712,16 @@ export default function CompanyDashboard() {
                                 </div>
                               ) : (
                                 <div className="bg-white p-6 rounded-lg shadow-sm text-center">
-                                  <p className="text-gray-500">Inga kurser registrerade än</p>
+                                  <p className="text-gray-500 mb-4">Inga kurser registrerade än</p>
+                                  <button
+                                    onClick={() => openCoursePurchaseModal(employee.id, employee.name)}
+                                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                                  >
+                                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                    </svg>
+                                    Köp kurser för {employee.name}
+                                  </button>
                                 </div>
                               )}
                             </div>
@@ -700,6 +740,16 @@ export default function CompanyDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Course Purchase Modal */}
+      <CoursePurchaseModal
+        isOpen={coursePurchaseModal.isOpen}
+        onClose={closeCoursePurchaseModal}
+        employeeId={coursePurchaseModal.employeeId}
+        employeeName={coursePurchaseModal.employeeName}
+        companyId={(session?.user as any)?.companyId || ''}
+        onPurchaseSuccess={handlePurchaseSuccess}
+      />
     </div>
   )
 }

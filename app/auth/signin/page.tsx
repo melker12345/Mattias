@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { signIn, getSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -18,15 +18,32 @@ type SignInForm = z.infer<typeof signInSchema>
 export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const {
     register,
     handleSubmit,
     formState: { errors },
+    setValue,
   } = useForm<SignInForm>({
     resolver: zodResolver(signInSchema),
   })
+
+  // Check for invitation email and pre-fill
+  useEffect(() => {
+    const email = searchParams.get('email')
+    const message = searchParams.get('message')
+
+    if (email) {
+      setValue('email', email)
+    }
+
+    if (message) {
+      setSuccess(message)
+    }
+  }, [searchParams, setValue])
 
   const onSubmit = async (data: SignInForm) => {
     setIsLoading(true)
@@ -54,6 +71,8 @@ export default function SignInPage() {
           console.log('User role:', userRole)
           if (userRole === 'COMPANY_ADMIN') {
             router.push('/dashboard/company')
+          } else if (userRole === 'EMPLOYEE') {
+            router.push('/dashboard')
           } else {
             router.push('/dashboard')
           }
@@ -90,6 +109,12 @@ export default function SignInPage() {
               </div>
             )}
 
+            {success && (
+              <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-md">
+                {success}
+              </div>
+            )}
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 E-postadress
@@ -98,8 +123,9 @@ export default function SignInPage() {
                 <input
                   {...register('email')}
                   type="email"
-                  className="input-field"
+                  className={`input-field ${searchParams.get('email') ? 'bg-gray-50 cursor-not-allowed' : ''}`}
                   placeholder="din@email.se"
+                  readOnly={!!searchParams.get('email')}
                 />
                 {errors.email && (
                   <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>

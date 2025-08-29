@@ -11,6 +11,8 @@ const companyRegistrationSchema = z.object({
   address: z.string().min(5, 'Adress måste vara minst 5 tecken'),
   password: z.string().min(8, 'Lösenord måste vara minst 8 tecken'),
   confirmPassword: z.string().min(8, 'Bekräfta lösenord måste vara minst 8 tecken'),
+  plan: z.string().optional(),
+  paymentStatus: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Lösenorden matchar inte",
   path: ["confirmPassword"],
@@ -19,7 +21,7 @@ const companyRegistrationSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { organizationNumber, name, contactPerson, email, phone, address, password } = companyRegistrationSchema.parse(body)
+    const { organizationNumber, name, contactPerson, email, phone, address, password, plan, paymentStatus } = companyRegistrationSchema.parse(body)
 
     // Check if company already exists
     const existingCompany = await prisma.company.findUnique({
@@ -45,6 +47,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Fixed company registration price
+    const COMPANY_PRICE = 1500 // SEK
+
     // Create company
     const company = await prisma.company.create({
       data: {
@@ -55,7 +60,24 @@ export async function POST(request: NextRequest) {
         phone,
         address,
         verified: false, // Will be verified manually or through business registration check
+        plan: plan || 'STANDARD',
+        planPrice: COMPANY_PRICE,
+        planStartDate: new Date(),
+        planEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+        paymentStatus: paymentStatus || 'PENDING'
       },
+    })
+
+    // Create invoice for company registration
+    const invoice = await prisma.invoice.create({
+      data: {
+        companyId: company.id,
+        invoiceNumber: `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+        amount: COMPANY_PRICE,
+        currency: 'SEK',
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        status: 'PENDING'
+      }
     })
 
     // Create company admin user

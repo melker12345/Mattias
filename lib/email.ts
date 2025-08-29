@@ -29,7 +29,7 @@ export function generateInvitationEmail(
   employeeName: string,
   employeeEmail: string,
   companyName: string,
-  temporaryPassword: string,
+  temporaryPassword: string | undefined,
   loginUrl: string,
   invitationUrl: string,
   isExistingUser: boolean = false
@@ -56,7 +56,9 @@ export function generateInvitationEmail(
           <p><strong>E-post:</strong> ${employeeEmail}</p>
           ${isExistingUser
             ? '<p><strong>Lösenord:</strong> Ditt befintliga lösenord</p>'
-            : `<p><strong>Temporärt lösenord:</strong> ${temporaryPassword}</p>`
+            : temporaryPassword
+              ? `<p><strong>Temporärt lösenord:</strong> ${temporaryPassword}</p>`
+              : '<p><strong>Lösenord:</strong> Du kommer att skapa ditt lösenord när du skapar ditt konto</p>'
           }
           <p><strong>Inloggningslänk:</strong> <a href="${loginUrl}">${loginUrl}</a></p>
           <p><strong>Alternativ inbjudningslänk:</strong> <a href="${invitationUrl}">${invitationUrl}</a></p>
@@ -66,7 +68,7 @@ export function generateInvitationEmail(
         <ol>
           ${isExistingUser
             ? '<li>Logga in med dina befintliga uppgifter</li>'
-            : '<li>Logga in med dina uppgifter ovan</li>'
+            : '<li>Skapa ditt konto via inbjudningslänken</li>'
           }
           <li>Verifiera din identitet med BankID</li>
           <li>Börja ta dina tilldelade kurser</li>
@@ -97,7 +99,9 @@ export function generateInvitationEmail(
     - E-post: ${employeeEmail}
     ${isExistingUser
       ? '- Lösenord: Ditt befintliga lösenord'
-      : `- Temporärt lösenord: ${temporaryPassword}`
+      : temporaryPassword
+        ? `- Temporärt lösenord: ${temporaryPassword}`
+        : '- Lösenord: Du kommer att skapa ditt lösenord när du skapar ditt konto'
     }
     - Inloggningslänk: ${loginUrl}
     - Alternativ inbjudningslänk: ${invitationUrl}
@@ -105,7 +109,7 @@ export function generateInvitationEmail(
     Vad händer nu?
     ${isExistingUser
       ? '1. Logga in med dina befintliga uppgifter'
-      : '1. Logga in med dina uppgifter ovan'
+      : '1. Skapa ditt konto via inbjudningslänken'
     }
     2. Verifiera din identitet med BankID
     3. Börja ta dina tilldelade kurser
