@@ -926,6 +926,10 @@ video {
 .min-h-screen {
   min-height: 100vh;
 }
+.min-h-fit {
+  min-height: -moz-fit-content;
+  min-height: fit-content;
+}
 .w-0 {
   width: 0px;
 }
@@ -1111,6 +1115,9 @@ video {
 }
 .gap-3 {
   gap: 0.75rem;
+}
+.gap-2 {
+  gap: 0.5rem;
 }
 .space-x-1 > :not([hidden]) ~ :not([hidden]) {
   --tw-space-x-reverse: 0;
@@ -1830,6 +1837,9 @@ video {
 .pb-6 {
   padding-bottom: 1.5rem;
 }
+.pr-4 {
+  padding-right: 1rem;
+}
 .text-left {
   text-align: left;
 }
@@ -2543,6 +2553,10 @@ body {
   border-color: rgb(53 94 113 / var(--tw-border-opacity, 1));
 }
 
+.focus\:border-transparent:focus {
+  border-color: transparent;
+}
+
 .focus\:outline-none:focus {
   outline: 2px solid transparent;
   outline-offset: 2px;
@@ -2972,6 +2986,11 @@ body {
     padding-bottom: 6rem;
   }
 
+  .sm\:py-16 {
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+  }
+
   .sm\:pb-4 {
     padding-bottom: 1rem;
   }
@@ -3088,6 +3107,11 @@ body {
     padding-bottom: 8rem;
   }
 
+  .md\:py-20 {
+    padding-top: 5rem;
+    padding-bottom: 5rem;
+  }
+
   .md\:pt-8 {
     padding-top: 2rem;
   }
@@ -3166,6 +3190,10 @@ body {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
+  .lg\:flex-row {
+    flex-direction: row;
+  }
+
   .lg\:items-center {
     align-items: center;
   }
@@ -3192,6 +3220,11 @@ body {
   .lg\:py-40 {
     padding-top: 10rem;
     padding-bottom: 10rem;
+  }
+
+  .lg\:py-24 {
+    padding-top: 6rem;
+    padding-bottom: 6rem;
   }
 
   .lg\:pt-16 {

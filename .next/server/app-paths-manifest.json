@@ -1,5 +1,12 @@
 {
+  "/about/page": "app/about/page.js",
   "/page": "app/page.js",
+  "/courses/page": "app/courses/page.js",
+  "/contact/page": "app/contact/page.js",
   "/company-account/page": "app/company-account/page.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js"
+  "/api/courses/route": "app/api/courses/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/auth/signin/page": "app/auth/signin/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/api/user/courses/route": "app/api/user/courses/route.js"
 }
