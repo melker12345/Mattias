@@ -57,14 +57,14 @@ export function Navigation() {
       {({ open }) => (
         <>
           <div className="mn-container">
-            <div className="flex justify-between items-center h-20">
+            <div className="flex justify-between items-center h-16 sm:h-20">
               {/* Left Side - Logo */}
               <div className="flex-shrink-0 flex items-center">
                 <Link href="/" className="flex items-center group">
                   <img 
                     src={isScrolled ? "/logos/MN_Utbildning.png" : "/logos/MN_Utbildning-dark.jpeg"}
                     alt="MN Utbildning Logo" 
-                    className="h-16 w-auto transition-all duration-300 group-hover:scale-105"
+                    className="h-10 sm:h-16 w-auto transition-all duration-300 group-hover:scale-105"
                   />
                 </Link>
               </div>
@@ -88,7 +88,7 @@ export function Navigation() {
               </div>
               
               {/* Right Side - Actions */}
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2 sm:space-x-3">
                 {/* Cart Button */}
                 <button
                   onClick={toggleCart}
@@ -98,9 +98,9 @@ export function Navigation() {
                       : 'text-white hover:text-white/90 hover:bg-white/10'
                   }`}
                 >
-                  <ShoppingCartIcon className="h-6 w-6 group-hover:scale-110 transition-transform duration-200" />
+                  <ShoppingCartIcon className="h-5 w-5 sm:h-6 sm:w-6 group-hover:scale-110 transition-transform duration-200" />
                   {getItemCount() > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-accent-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-medium animate-pulse">
+                    <span className="absolute -top-1 -right-1 bg-accent-500 text-white text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-bold shadow-medium animate-pulse">
                       {getItemCount()}
                     </span>
                   )}
@@ -115,7 +115,7 @@ export function Navigation() {
                           : 'bg-white/10 hover:bg-white/20 focus:ring-white'
                       }`}>
                         <span className="sr-only">Öppna användarmenyn</span>
-                        <UserCircleIcon className={`h-6 w-6 ${
+                        <UserCircleIcon className={`h-5 w-5 sm:h-6 sm:w-6 ${
                           isScrolled ? 'text-primary-700' : 'text-white'
                         }`} />
                       </Menu.Button>
@@ -157,10 +157,10 @@ export function Navigation() {
                     </Transition>
                   </Menu>
                 ) : (
-                  <div className="flex items-center space-x-2">
+                  <div className="hidden sm:flex items-center space-x-2">
                     <Link
                       href="/auth/signin"
-                      className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 border text-sm ${
+                      className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-all duration-300 border text-sm ${
                         isScrolled 
                           ? 'bg-accent-50 text-accent-700 hover:bg-accent-100 border-accent-200 hover:border-accent-300' 
                           : 'bg-white/20 backdrop-blur-md text-white hover:bg-white hover:text-primary-700 border-white/30'
@@ -170,7 +170,7 @@ export function Navigation() {
                     </Link>
                     
                     <div className="relative group">
-                      <button className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 text-sm ${
+                      <button className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 text-sm ${
                         isScrolled 
                           ? 'bg-gradient-primary text-white hover:shadow-medium' 
                           : 'bg-white/20 backdrop-blur-md border border-white/30 text-white hover:bg-white hover:text-primary-700'
@@ -210,9 +210,9 @@ export function Navigation() {
                   }`}>
                     <span className="sr-only">Öppna huvudmeny</span>
                     {open ? (
-                      <XMarkIcon className="block h-6 w-6" aria-hidden="true" />
+                      <XMarkIcon className="block h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
                     ) : (
-                      <Bars3Icon className="block h-6 w-6" aria-hidden="true" />
+                      <Bars3Icon className="block h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
                     )}
                   </Disclosure.Button>
                 </div>
@@ -220,8 +220,8 @@ export function Navigation() {
             </div>
           </div>
 
-          <Disclosure.Panel className="sm:hidden">
-            <div className={`px-2 pt-2 pb-3 space-y-1 border-t ${
+          <Disclosure.Panel className="lg:hidden">
+            <div className={`px-4 pt-4 pb-6 space-y-2 border-t ${
               isScrolled ? 'bg-white border-gray-200' : 'bg-white/10 backdrop-blur-md border-white/20'
             }`}>
               {navigation.map((item) => (
@@ -229,7 +229,7 @@ export function Navigation() {
                   key={item.name}
                   as={Link}
                   href={item.href}
-                  className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans ${
+                  className={`block px-4 py-3 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans ${
                     isScrolled 
                       ? 'text-primary-700 hover:text-primary-600 hover:bg-primary-50' 
                       : 'text-white hover:text-white/90 hover:bg-white/10'
@@ -238,15 +238,28 @@ export function Navigation() {
                   {item.name}
                 </Disclosure.Button>
               ))}
+              
+              {/* Mobile auth buttons */}
               {!session && (
-                <>
+                <div className="pt-4 space-y-3 border-t border-white/20">
+                  <Disclosure.Button
+                    as={Link}
+                    href="/auth/signin"
+                    className={`block w-full px-4 py-3 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans text-center ${
+                      isScrolled 
+                        ? 'bg-accent-50 text-accent-700 hover:bg-accent-100 border border-accent-200' 
+                        : 'bg-white/20 text-white hover:bg-white hover:text-primary-700 border border-white/30'
+                    }`}
+                  >
+                    Logga in
+                  </Disclosure.Button>
                   <Disclosure.Button
                     as={Link}
                     href="/auth/signup"
-                    className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans ${
+                    className={`block w-full px-4 py-3 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans text-center ${
                       isScrolled 
-                        ? 'text-primary-700 hover:text-primary-600 hover:bg-primary-50' 
-                        : 'text-white hover:text-white/90 hover:bg-white/10'
+                        ? 'bg-gradient-primary text-white hover:shadow-medium' 
+                        : 'bg-white/20 text-white hover:bg-white hover:text-primary-700 border border-white/30'
                     }`}
                   >
                     Registrera (Privatperson)
@@ -254,26 +267,15 @@ export function Navigation() {
                   <Disclosure.Button
                     as={Link}
                     href="/register/company"
-                    className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans ${
+                    className={`block w-full px-4 py-3 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans text-center ${
                       isScrolled 
-                        ? 'text-primary-700 hover:text-primary-600 hover:bg-primary-50' 
-                        : 'text-white hover:text-white/90 hover:bg-white/10'
+                        ? 'bg-gradient-primary text-white hover:shadow-medium' 
+                        : 'bg-white/20 text-white hover:bg-white hover:text-primary-700 border border-white/30'
                     }`}
                   >
                     Registrera (Företag)
                   </Disclosure.Button>
-                  <Disclosure.Button
-                    as={Link}
-                    href="/auth/signin"
-                    className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans ${
-                      isScrolled 
-                        ? 'text-primary-700 hover:text-primary-600 hover:bg-primary-50' 
-                        : 'text-white hover:text-white/90 hover:bg-white/10'
-                    }`}
-                  >
-                    Logga in
-                  </Disclosure.Button>
-                </>
+                </div>
               )}
             </div>
           </Disclosure.Panel>
