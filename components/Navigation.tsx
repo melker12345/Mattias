@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
 import { Disclosure, Menu, Transition } from '@headlessui/react'
@@ -11,6 +11,9 @@ export function Navigation() {
   const { data: session } = useSession()
   const { toggleCart, getItemCount } = useCart()
   const [isOpen, setIsOpen] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
+  const [isVisible, setIsVisible] = useState(true)
+  const [lastScrollY, setLastScrollY] = useState(0)
 
   const navigation = [
     { name: 'Hem', href: '/' },
@@ -20,124 +23,121 @@ export function Navigation() {
     { name: 'Kontakt', href: '/contact' },
   ]
 
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY
+      
+      // Check if scrolled
+      setIsScrolled(currentScrollY > 10)
+      
+      // Show/hide navigation based on scroll direction
+      if (currentScrollY > lastScrollY && currentScrollY > 100) {
+        // Scrolling down - hide navigation
+        setIsVisible(false)
+      } else {
+        // Scrolling up - show navigation
+        setIsVisible(true)
+      }
+      
+      setLastScrollY(currentScrollY)
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [lastScrollY])
+
   return (
-    <Disclosure as="nav" className="bg-mn-white shadow-lg sticky top-0 z-50 border-b border-mn-light-gray-blue">
+    <Disclosure as="nav" className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${
+      isVisible ? 'translate-y-0' : '-translate-y-full'
+    } ${
+      isScrolled 
+        ? 'bg-white/95 backdrop-blur-md shadow-soft border-b border-gray-200' 
+        : 'bg-transparent'
+    }`}>
       {({ open }) => (
         <>
           <div className="mn-container">
-            <div className="flex justify-between items-center h-16">
-              {/* Logo */}
+            <div className="flex justify-between items-center h-20">
+              {/* Left Side - Logo */}
               <div className="flex-shrink-0 flex items-center">
-                <Link href="/" className="flex items-center">
+                <Link href="/" className="flex items-center group">
                   <img 
-                    src="/logos/MN_Utbildning.png" 
+                    src={isScrolled ? "/logos/MN_Utbildning.png" : "/logos/MN_Utbildning-dark.jpeg"}
                     alt="MN Utbildning Logo" 
-                    className="h-16 w-auto"
+                    className="h-16 w-auto transition-all duration-300 group-hover:scale-105"
                   />
                 </Link>
               </div>
               
-              {/* Center Navigation Links and Registrera Button */}
-              <div className="hidden sm:flex sm:items-center sm:space-x-8">
+              {/* Center - Navigation Links */}
+              <div className="hidden lg:flex lg:items-center lg:space-x-1">
                 {navigation.map((item) => (
                   <Link
                     key={item.name}
                     href={item.href}
-                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 px-4 py-3 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
+                    className={`px-4 py-2 rounded-lg text-base font-medium transition-all duration-200 font-open-sans hover:bg-white/10 relative group ${
+                      isScrolled ? 'text-primary-700 hover:text-primary-600' : 'text-white hover:text-white/90'
+                    }`}
                   >
                     {item.name}
+                    <span className={`absolute bottom-0 left-1/2 w-0 h-0.5 transition-all duration-300 group-hover:w-full group-hover:left-0 ${
+                      isScrolled ? 'bg-gradient-to-r from-accent-500 to-warning-500' : 'bg-white'
+                    }`}></span>
                   </Link>
                 ))}
-                {!session && (
-                  <div className="relative group">
-                    <button className="btn-primary">
-                      Registrera
-                    </button>
-                    <div className="absolute right-0 mt-2 w-48 bg-mn-white rounded-md shadow-lg py-1 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-mn-light-gray-blue">
-                      <Link
-                        href="/auth/signup"
-                        className="block px-4 py-2 text-sm text-mn-dark-blue-green hover:bg-mn-very-light-gray font-open-sans"
-                      >
-                        Privatperson
-                      </Link>
-                      <Link
-                        href="/register/company"
-                        className="block px-4 py-2 text-sm text-mn-dark-blue-green hover:bg-mn-very-light-gray font-open-sans"
-                      >
-                        Företag
-                      </Link>
-                    </div>
-                  </div>
-                )}
               </div>
               
-              {/* Right Side - Cart and User Menu */}
-              <div className="hidden sm:flex sm:items-center space-x-4">
+              {/* Right Side - Actions */}
+              <div className="flex items-center space-x-3">
                 {/* Cart Button */}
                 <button
                   onClick={toggleCart}
-                  className="relative p-2 text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 transition-colors"
+                  className={`relative p-2 rounded-lg transition-all duration-200 group ${
+                    isScrolled 
+                      ? 'text-primary-700 hover:text-primary-600 hover:bg-primary-50' 
+                      : 'text-white hover:text-white/90 hover:bg-white/10'
+                  }`}
                 >
-                  <ShoppingCartIcon className="h-6 w-6" />
+                  <ShoppingCartIcon className="h-6 w-6 group-hover:scale-110 transition-transform duration-200" />
                   {getItemCount() > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-mn-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-open-sans">
+                    <span className="absolute -top-1 -right-1 bg-accent-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold shadow-medium animate-pulse">
                       {getItemCount()}
                     </span>
                   )}
                 </button>
                 
                 {session ? (
-                  <Menu as="div" className="ml-3 relative">
+                  <Menu as="div" className="relative">
                     <div>
-                      <Menu.Button className="bg-mn-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-mn-dark-blue-green">
+                      <Menu.Button className={`rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 p-2 transition-all duration-200 ${
+                        isScrolled 
+                          ? 'bg-primary-50 hover:bg-primary-100 focus:ring-primary-500' 
+                          : 'bg-white/10 hover:bg-white/20 focus:ring-white'
+                      }`}>
                         <span className="sr-only">Öppna användarmenyn</span>
-                        <UserCircleIcon className="h-8 w-8 text-mn-dark-blue-green" />
+                        <UserCircleIcon className={`h-6 w-6 ${
+                          isScrolled ? 'text-primary-700' : 'text-white'
+                        }`} />
                       </Menu.Button>
                     </div>
                     <Transition
-                      enter="transition ease-out duration-100"
+                      enter="transition ease-out duration-200"
                       enterFrom="transform opacity-0 scale-95"
                       enterTo="transform opacity-100 scale-100"
-                      leave="transition ease-in duration-75"
+                      leave="transition ease-in duration-150"
                       leaveFrom="transform opacity-100 scale-100"
                       leaveTo="transform opacity-0 scale-95"
                     >
-                      <Menu.Items className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-mn-white ring-1 ring-mn-light-gray-blue focus:outline-none">
+                      <Menu.Items className="absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-strong py-2 z-50 border border-gray-200">
                         <Menu.Item>
                           {({ active }) => (
                             <Link
-                              href={(session?.user as any)?.role === 'COMPANY_ADMIN' ? '/dashboard/company' : '/dashboard'}
+                              href="/dashboard"
                               className={`${
-                                active ? 'bg-mn-very-light-gray' : ''
-                              } block px-4 py-2 text-sm text-mn-dark-blue-green font-open-sans`}
+                                active ? 'bg-primary-50 text-primary-700' : 'text-primary-700'
+                              } block px-4 py-3 text-sm font-open-sans transition-colors duration-200`}
                             >
-                              {(session?.user as any)?.role === 'COMPANY_ADMIN' ? 'Företagsdashboard' : 'Mina Kurser'}
-                            </Link>
-                          )}
-                        </Menu.Item>
-                        {(session?.user as any)?.role === 'ADMIN' && (
-                          <Menu.Item>
-                            {({ active }) => (
-                              <Link
-                                href="/admin"
-                                className={`${
-                                  active ? 'bg-mn-very-light-gray' : ''
-                                } block px-4 py-2 text-sm text-mn-dark-blue-green font-open-sans`}
-                              >
-                                Admin Panel
-                              </Link>
-                            )}
-                          </Menu.Item>
-                        )}
-                        <Menu.Item>
-                          {({ active }) => (
-                            <Link
-                              href="/profile"
-                              className={`${
-                                active ? 'bg-mn-very-light-gray' : ''
-                              } block px-4 py-2 text-sm text-mn-dark-blue-green font-open-sans`}
-                            >
-                              Profil
+                              Dashboard
                             </Link>
                           )}
                         </Menu.Item>
@@ -146,8 +146,8 @@ export function Navigation() {
                             <button
                               onClick={() => signOut()}
                               className={`${
-                                active ? 'bg-mn-very-light-gray' : ''
-                              } block w-full text-left px-4 py-2 text-sm text-mn-dark-blue-green font-open-sans`}
+                                active ? 'bg-error-50 text-error-700' : 'text-error-600'
+                              } block w-full text-left px-4 py-3 text-sm font-open-sans transition-colors duration-200`}
                             >
                               Logga ut
                             </button>
@@ -157,114 +157,123 @@ export function Navigation() {
                     </Transition>
                   </Menu>
                 ) : (
-                  <div className="flex space-x-4">
+                  <div className="flex items-center space-x-2">
                     <Link
                       href="/auth/signin"
-                      className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 px-4 py-3 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
+                      className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 border text-sm ${
+                        isScrolled 
+                          ? 'bg-accent-50 text-accent-700 hover:bg-accent-100 border-accent-200 hover:border-accent-300' 
+                          : 'bg-white/20 backdrop-blur-md text-white hover:bg-white hover:text-primary-700 border-white/30'
+                      }`}
                     >
                       Logga in
                     </Link>
+                    
+                    <div className="relative group">
+                      <button className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 text-sm ${
+                        isScrolled 
+                          ? 'bg-gradient-primary text-white hover:shadow-medium' 
+                          : 'bg-white/20 backdrop-blur-md border border-white/30 text-white hover:bg-white hover:text-primary-700'
+                      }`}>
+                        Registrera
+                      </button>
+                      <div className={`absolute right-0 mt-2 w-48 rounded-xl py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 border ${
+                        isScrolled ? 'bg-white shadow-strong border-gray-200' : 'bg-white/10 backdrop-blur-md border-white/20'
+                      }`}>
+                        <Link
+                          href="/auth/signup"
+                          className={`block px-4 py-3 text-sm font-open-sans transition-colors duration-200 ${
+                            isScrolled ? 'text-primary-700 hover:bg-primary-50' : 'text-white hover:bg-white/10'
+                          }`}
+                        >
+                          Privatperson
+                        </Link>
+                        <Link
+                          href="/register/company"
+                          className={`block px-4 py-3 text-sm font-open-sans transition-colors duration-200 ${
+                            isScrolled ? 'text-primary-700 hover:bg-primary-50' : 'text-white hover:bg-white/10'
+                          }`}
+                        >
+                          Företag
+                        </Link>
+                      </div>
+                    </div>
                   </div>
                 )}
-              </div>
-              
-              <div className="-mr-2 flex items-center sm:hidden space-x-2">
-                {/* Mobile Cart Button */}
-                <button
-                  onClick={toggleCart}
-                  className="relative p-2 text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 transition-colors"
-                >
-                  <ShoppingCartIcon className="h-6 w-6" />
-                  {getItemCount() > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-mn-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-open-sans">
-                      {getItemCount()}
-                    </span>
-                  )}
-                </button>
                 
-                <Disclosure.Button className="inline-flex items-center justify-center p-2 rounded-md text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 hover:bg-mn-very-light-gray focus:outline-none focus:ring-2 focus:ring-inset focus:ring-mn-dark-blue-green">
-                  <span className="sr-only">Öppna huvudmeny</span>
-                  {open ? (
-                    <XMarkIcon className="block h-6 w-6" aria-hidden="true" />
-                  ) : (
-                    <Bars3Icon className="block h-6 w-6" aria-hidden="true" />
-                  )}
-                </Disclosure.Button>
+                {/* Mobile menu button */}
+                <div className="lg:hidden">
+                  <Disclosure.Button className={`inline-flex items-center justify-center p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset transition-all duration-200 ${
+                    isScrolled 
+                      ? 'text-primary-700 hover:text-primary-600 hover:bg-primary-50 focus:ring-primary-500' 
+                      : 'text-white hover:text-white/90 hover:bg-white/10 focus:ring-white'
+                  }`}>
+                    <span className="sr-only">Öppna huvudmeny</span>
+                    {open ? (
+                      <XMarkIcon className="block h-6 w-6" aria-hidden="true" />
+                    ) : (
+                      <Bars3Icon className="block h-6 w-6" aria-hidden="true" />
+                    )}
+                  </Disclosure.Button>
+                </div>
               </div>
             </div>
           </div>
 
           <Disclosure.Panel className="sm:hidden">
-            <div className="pt-2 pb-3 space-y-1">
+            <div className={`px-2 pt-2 pb-3 space-y-1 border-t ${
+              isScrolled ? 'bg-white border-gray-200' : 'bg-white/10 backdrop-blur-md border-white/20'
+            }`}>
               {navigation.map((item) => (
                 <Disclosure.Button
                   key={item.name}
                   as={Link}
                   href={item.href}
-                  className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
+                  className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans ${
+                    isScrolled 
+                      ? 'text-primary-700 hover:text-primary-600 hover:bg-primary-50' 
+                      : 'text-white hover:text-white/90 hover:bg-white/10'
+                  }`}
                 >
                   {item.name}
                 </Disclosure.Button>
               ))}
-            </div>
-            <div className="pt-4 pb-3 border-t border-mn-light-gray-blue">
-              {session ? (
-                <div className="space-y-1">
-                  <Disclosure.Button
-                    as={Link}
-                    href={(session?.user as any)?.role === 'COMPANY_ADMIN' ? '/dashboard/company' : '/dashboard'}
-                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
-                  >
-                    {(session?.user as any)?.role === 'COMPANY_ADMIN' ? 'Företagsdashboard' : 'Mina Kurser'}
-                  </Disclosure.Button>
-                  {(session?.user as any)?.role === 'ADMIN' && (
-                    <Disclosure.Button
-                      as={Link}
-                      href="/admin"
-                      className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
-                    >
-                      Admin Panel
-                    </Disclosure.Button>
-                  )}
-                  <Disclosure.Button
-                    as={Link}
-                    href="/profile"
-                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
-                  >
-                    Profil
-                  </Disclosure.Button>
-                  <Disclosure.Button
-                    as="button"
-                    onClick={() => signOut()}
-                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block w-full text-left px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
-                  >
-                    Logga ut
-                  </Disclosure.Button>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  <Disclosure.Button
-                    as={Link}
-                    href="/auth/signin"
-                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
-                  >
-                    Logga in
-                  </Disclosure.Button>
+              {!session && (
+                <>
                   <Disclosure.Button
                     as={Link}
                     href="/auth/signup"
-                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
+                    className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans ${
+                      isScrolled 
+                        ? 'text-primary-700 hover:text-primary-600 hover:bg-primary-50' 
+                        : 'text-white hover:text-white/90 hover:bg-white/10'
+                    }`}
                   >
                     Registrera (Privatperson)
                   </Disclosure.Button>
                   <Disclosure.Button
                     as={Link}
                     href="/register/company"
-                    className="text-mn-dark-blue-green hover:text-mn-dark-blue-green/80 block px-3 py-2 rounded-md text-base font-medium transition-colors duration-200 font-open-sans"
+                    className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans ${
+                      isScrolled 
+                        ? 'text-primary-700 hover:text-primary-600 hover:bg-primary-50' 
+                        : 'text-white hover:text-white/90 hover:bg-white/10'
+                    }`}
                   >
                     Registrera (Företag)
                   </Disclosure.Button>
-                </div>
+                  <Disclosure.Button
+                    as={Link}
+                    href="/auth/signin"
+                    className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans ${
+                      isScrolled 
+                        ? 'text-primary-700 hover:text-primary-600 hover:bg-primary-50' 
+                        : 'text-white hover:text-white/90 hover:bg-white/10'
+                    }`}
+                  >
+                    Logga in
+                  </Disclosure.Button>
+                </>
               )}
             </div>
           </Disclosure.Panel>

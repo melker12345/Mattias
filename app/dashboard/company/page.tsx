@@ -749,6 +749,7 @@ export default function CompanyDashboard() {
         employeeName={coursePurchaseModal.employeeName}
         companyId={(session?.user as any)?.companyId || ''}
         onPurchaseSuccess={handlePurchaseSuccess}
+        userRole={(session?.user as any)?.role}
       />
     </div>
   )
