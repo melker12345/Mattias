@@ -1,0 +1,387 @@
+import { prisma } from './prisma';
+import { fortnoxAPI } from './fortnox';
+
+export interface FortnoxPaymentValidation {
+  isValid: boolean;
+  status: 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED' | 'FAILED';
+  message: string;
+  invoiceNumber?: string;
+  amount?: number;
+  dueDate?: Date;
+  paidAt?: Date;
+  fortnoxCustomerNumber?: string;
+}
+
+export interface FortnoxInvoiceValidation {
+  isValid: boolean;
+  invoiceNumber: string;
+  customerNumber: string;
+  amount: number;
+  currency: string;
+  dueDate: Date;
+  status: 'DRAFT' | 'SENT' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+  items: FortnoxInvoiceItem[];
+}
+
+interface FortnoxInvoiceItem {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  vat: number;
+}
+
+/**
+ * Validate Fortnox invoice and payment status
+ */
+export async function validateFortnoxPayment(
+  companyId: string, 
+  invoiceNumber?: string
+): Promise<FortnoxPaymentValidation> {
+  try {
+    // Get company and their invoices
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      include: {
+        invoices: {
+          where: { status: 'PENDING' },
+          orderBy: { dueDate: 'desc' },
+          take: 1
+        }
+      }
+    });
+
+    if (!company) {
+      return {
+        isValid: false,
+        status: 'FAILED',
+        message: 'Företag hittades inte'
+      };
+    }
+
+    // If no specific invoice number provided, use the latest pending invoice
+    const targetInvoiceNumber = invoiceNumber || company.invoices[0]?.invoiceNumber;
+    
+    if (!targetInvoiceNumber) {
+      return {
+        isValid: false,
+        status: 'PENDING',
+        message: 'Ingen faktura hittades'
+      };
+    }
+
+    // Check if we have Fortnox integration enabled
+    if (!process.env.FORTNOX_ACCESS_TOKEN) {
+      return {
+        isValid: false,
+        status: 'FAILED',
+        message: 'Fortnox integration är inte konfigurerad'
+      };
+    }
+
+    // Validate invoice in Fortnox
+    const fortnoxValidation = await validateFortnoxInvoice(targetInvoiceNumber, company);
+    
+    if (!fortnoxValidation.isValid) {
+      return {
+        isValid: false,
+        status: 'FAILED',
+        message: fortnoxValidation.message || 'Faktura validering misslyckades'
+      };
+    }
+
+    // Check payment status
+    const isPaid = await fortnoxAPI.isInvoicePaid(targetInvoiceNumber);
+    
+    if (isPaid) {
+      // Update local database
+      await updateLocalPaymentStatus(companyId, targetInvoiceNumber, 'PAID');
+      
+      return {
+        isValid: true,
+        status: 'PAID',
+        message: 'Fakturan är betald',
+        invoiceNumber: targetInvoiceNumber,
+        amount: fortnoxValidation.amount,
+        dueDate: fortnoxValidation.dueDate,
+        paidAt: new Date(),
+        fortnoxCustomerNumber: fortnoxValidation.customerNumber
+      };
+    }
+
+    // Check if overdue
+    const now = new Date();
+    const dueDate = fortnoxValidation.dueDate;
+    const isOverdue = dueDate < now;
+
+    if (isOverdue) {
+      return {
+        isValid: false,
+        status: 'OVERDUE',
+        message: 'Fakturan är förfallen',
+        invoiceNumber: targetInvoiceNumber,
+        amount: fortnoxValidation.amount,
+        dueDate: fortnoxValidation.dueDate,
+        fortnoxCustomerNumber: fortnoxValidation.customerNumber
+      };
+    }
+
+    return {
+      isValid: true,
+      status: 'PENDING',
+      message: 'Fakturan väntar på betalning',
+      invoiceNumber: targetInvoiceNumber,
+      amount: fortnoxValidation.amount,
+      dueDate: fortnoxValidation.dueDate,
+      fortnoxCustomerNumber: fortnoxValidation.customerNumber
+    };
+
+  } catch (error) {
+    console.error('Fortnox payment validation error:', error);
+    return {
+      isValid: false,
+      status: 'FAILED',
+      message: 'Ett fel uppstod vid validering av betalning'
+    };
+  }
+}
+
+/**
+ * Validate Fortnox invoice details
+ */
+async function validateFortnoxInvoice(
+  invoiceNumber: string, 
+  company: any
+): Promise<FortnoxInvoiceValidation> {
+  try {
+    // Get invoice from Fortnox
+    const fortnoxInvoice = await fortnoxAPI.getInvoice(invoiceNumber);
+    
+    if (!fortnoxInvoice) {
+      throw new Error('Faktura hittades inte i Fortnox');
+    }
+
+    // Validate customer information
+    if (fortnoxInvoice.CustomerNumber) {
+      const customer = await fortnoxAPI.getCustomerInvoices(fortnoxInvoice.CustomerNumber);
+      
+      // Verify this is the correct customer for this company
+      if (customer.length === 0) {
+        throw new Error('Kundinformation matchar inte');
+      }
+    }
+
+    // Validate invoice items
+    const items: FortnoxInvoiceItem[] = fortnoxInvoice.InvoiceRows?.map((row: any) => ({
+      description: row.Description,
+      quantity: row.DeliveredQuantity,
+      unitPrice: row.UnitPrice,
+      total: row.DeliveredQuantity * row.UnitPrice,
+      vat: row.VAT
+    })) || [];
+
+    // Calculate total amount
+    const totalAmount = items.reduce((sum, item) => sum + item.total, 0);
+
+    return {
+      isValid: true,
+      invoiceNumber: fortnoxInvoice.DocumentNumber || invoiceNumber,
+      customerNumber: fortnoxInvoice.CustomerNumber,
+      amount: totalAmount,
+      currency: fortnoxInvoice.Currency,
+      dueDate: new Date(fortnoxInvoice.DueDate),
+      status: determineInvoiceStatus(fortnoxInvoice),
+      items
+    };
+
+  } catch (error) {
+    console.error('Fortnox invoice validation error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Determine invoice status from Fortnox data
+ */
+function determineInvoiceStatus(fortnoxInvoice: any): 'DRAFT' | 'SENT' | 'PAID' | 'OVERDUE' | 'CANCELLED' {
+  // This would need to be adjusted based on actual Fortnox API response structure
+  // For now, we'll use a simplified approach
+  
+  if (fortnoxInvoice.Cancelled) {
+    return 'CANCELLED';
+  }
+  
+  if (fortnoxInvoice.Paid) {
+    return 'PAID';
+  }
+  
+  const dueDate = new Date(fortnoxInvoice.DueDate);
+  const now = new Date();
+  
+  if (dueDate < now) {
+    return 'OVERDUE';
+  }
+  
+  return 'SENT';
+}
+
+/**
+ * Update local payment status after Fortnox validation
+ */
+async function updateLocalPaymentStatus(
+  companyId: string, 
+  invoiceNumber: string, 
+  status: 'PAID' | 'PENDING' | 'OVERDUE' | 'CANCELLED'
+): Promise<void> {
+  try {
+    await prisma.invoice.updateMany({
+      where: {
+        companyId,
+        invoiceNumber
+      },
+      data: {
+        status,
+        paidAt: status === 'PAID' ? new Date() : null
+      }
+    });
+
+    // If payment is successful, update company payment status
+    if (status === 'PAID') {
+      await prisma.company.update({
+        where: { id: companyId },
+        data: {
+          paymentStatus: 'PAID',
+          planEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // Extend by 1 year
+          updatedAt: new Date()
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Error updating local payment status:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create Fortnox invoice for course purchase
+ */
+export async function createFortnoxInvoice(
+  companyId: string,
+  courseIds: string[],
+  totalAmount: number
+): Promise<{ success: boolean; invoiceNumber?: string; error?: string }> {
+  try {
+    // Get company information
+    const company = await prisma.company.findUnique({
+      where: { id: companyId }
+    });
+
+    if (!company) {
+      return { success: false, error: 'Företag hittades inte' };
+    }
+
+    // Get course information
+    const courses = await prisma.course.findMany({
+      where: { id: { in: courseIds } }
+    });
+
+    if (courses.length === 0) {
+      return { success: false, error: 'Inga kurser hittades' };
+    }
+
+    // Create or get Fortnox customer
+    const customerData = {
+      Name: company.name,
+      Address1: company.address,
+      ZipCode: company.address.split(' ').pop() || '12345', // Extract postal code
+      City: company.address.split(' ').slice(-2).join(' ') || 'Stockholm',
+      CountryCode: 'SE',
+      Phone1: company.phone,
+      Email: company.email,
+      OrganizationNumber: company.organizationNumber
+    };
+
+    const fortnoxCustomer = await fortnoxAPI.createCustomer(customerData);
+
+    // Create invoice rows
+    const invoiceRows = courses.map(course => ({
+      Description: course.title,
+      DeliveredQuantity: 1,
+      Unit: 'st',
+      UnitPrice: course.price,
+      VAT: 25, // Swedish VAT rate
+      Account: 3000 // Revenue account (adjust as needed)
+    }));
+
+    // Create Fortnox invoice
+    const invoiceData = {
+      CustomerNumber: fortnoxCustomer.CustomerNumber,
+      InvoiceDate: new Date().toISOString().split('T')[0],
+      DueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days
+      Currency: 'SEK',
+      CurrencyRate: 1,
+      CurrencyUnit: 1,
+      Language: 'sv',
+      ExternalInvoiceReference1: `COMPANY-${companyId}`,
+      ExternalInvoiceReference2: `COURSES-${courseIds.join(',')}`,
+      InvoiceType: 'INVOICE',
+      VATIncluded: true,
+      InvoiceRows: invoiceRows
+    };
+
+    const fortnoxInvoice = await fortnoxAPI.createInvoice(invoiceData);
+
+    // Create local invoice record
+    const localInvoice = await prisma.invoice.create({
+      data: {
+        companyId,
+        invoiceNumber: fortnoxInvoice.DocumentNumber || `INV-${Date.now()}`,
+        amount: totalAmount,
+        currency: 'SEK',
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        status: 'PENDING'
+      }
+    });
+
+    return {
+      success: true,
+      invoiceNumber: localInvoice.invoiceNumber
+    };
+
+  } catch (error) {
+    console.error('Error creating Fortnox invoice:', error);
+    return {
+      success: false,
+      error: 'Ett fel uppstod vid skapande av faktura'
+    };
+  }
+}
+
+/**
+ * Check if user has access to paywalled features based on Fortnox payment status
+ */
+export async function checkFortnoxPaywallAccess(
+  userId: string, 
+  feature: 'company_registration' | 'course_learning' | 'progress_tracking'
+): Promise<boolean> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { company: true }
+    });
+
+    if (!user || !user.companyId) {
+      return false;
+    }
+
+    // Validate payment status
+    const paymentValidation = await validateFortnoxPayment(user.companyId);
+    
+    return paymentValidation.isValid && paymentValidation.status === 'PAID';
+
+  } catch (error) {
+    console.error('Error checking Fortnox paywall access:', error);
+    return false;
+  }
+}

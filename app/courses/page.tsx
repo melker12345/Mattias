@@ -250,7 +250,6 @@ export default function CoursesPage() {
               <CourseCard
                 key={course.id}
                 course={course}
-                onAddToCart={() => handleAddToCart(course)}
               />
             ))}
           </div>

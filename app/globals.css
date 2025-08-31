@@ -60,6 +60,47 @@ body {
     @apply w-full px-4 py-3 border border-mn-light-gray-blue rounded-lg focus:outline-none focus:ring-2 focus:ring-mn-dark-blue-green focus:border-transparent transition-colors duration-200 text-mn-dark-blue-green bg-mn-white font-open-sans;
   }
   
+  /* Shadow utilities */
+  .shadow-soft {
+    @apply shadow-[0_2px_8px_rgba(0,0,0,0.08)];
+  }
+  
+  .shadow-medium {
+    @apply shadow-[0_4px_16px_rgba(0,0,0,0.12)];
+  }
+  
+  .shadow-strong {
+    @apply shadow-[0_8px_32px_rgba(0,0,0,0.16)];
+  }
+  
+  .shadow-lg {
+    @apply shadow-[0_10px_25px_rgba(0,0,0,0.15)];
+  }
+  
+  .shadow-2xl {
+    @apply shadow-[0_25px_50px_rgba(0,0,0,0.25)];
+  }
+  
+  /* Gradient utilities */
+  .bg-gradient-primary {
+    @apply bg-gradient-to-r from-primary-600 to-primary-700;
+  }
+  
+  /* Line clamp utilities */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
   /* MN Group specific component styles */
   .mn-section {
     @apply bg-mn-very-light-gray;

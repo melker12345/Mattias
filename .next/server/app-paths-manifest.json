@@ -1,12 +1,18 @@
 {
-  "/about/page": "app/about/page.js",
-  "/page": "app/page.js",
   "/courses/page": "app/courses/page.js",
-  "/contact/page": "app/contact/page.js",
-  "/company-account/page": "app/company-account/page.js",
-  "/api/courses/route": "app/api/courses/route.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/auth/signin/page": "app/auth/signin/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/page": "app/page.js",
   "/dashboard/page": "app/dashboard/page.js",
-  "/api/user/courses/route": "app/api/user/courses/route.js"
+  "/api/courses/route": "app/api/courses/route.js",
+  "/api/user/courses/route": "app/api/user/courses/route.js",
+  "/admin/page": "app/admin/page.js",
+  "/api/admin/courses/route": "app/api/admin/courses/route.js",
+  "/api/admin/users/route": "app/api/admin/users/route.js",
+  "/api/admin/companies/route": "app/api/admin/companies/route.js",
+  "/api/admin/courses/[id]/route": "app/api/admin/courses/[id]/route.js",
+  "/courses/[id]/page": "app/courses/[id]/page.js",
+  "/api/courses/[id]/route": "app/api/courses/[id]/route.js",
+  "/api/courses/[id]/enroll/route": "app/api/courses/[id]/enroll/route.js",
+  "/checkout/page": "app/checkout/page.js"
 }

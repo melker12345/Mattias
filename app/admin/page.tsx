@@ -76,7 +76,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'users' | 'companies'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'users' | 'companies' | 'apv-submissions'>('overview');
   
   // Course modal state
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
@@ -261,7 +261,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 pt-24 sm:pt-28">
         {/* Header */}
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
@@ -276,7 +276,8 @@ export default function AdminDashboard() {
                 { id: 'overview', name: 'Översikt', icon: ChartBarIcon },
                 { id: 'courses', name: 'Kurser', icon: BookOpenIcon },
                 { id: 'users', name: 'Användare', icon: UsersIcon },
-                { id: 'companies', name: 'Företag', icon: BuildingOfficeIcon }
+                { id: 'companies', name: 'Företag', icon: BuildingOfficeIcon },
+                { id: 'apv-submissions', name: 'APV Submissions', icon: DocumentTextIcon }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -635,6 +636,78 @@ export default function AdminDashboard() {
                         </td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          )}
+
+          {/* APV Submissions Tab */}
+          {activeTab === 'apv-submissions' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <h2 className="text-2xl font-bold text-gray-900">APV Submissions</h2>
+              <p className="text-gray-600">Hantera användares APV submissions för ID06-registrering</p>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Användare
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Kurs
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Poäng
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Inskickad
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Åtgärder
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {/* This will be populated with actual APV submissions data */}
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">Exempel Användare</div>
+                          <div className="text-sm text-gray-500">19850101-1234</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">Arbete på Väg - Grundkurs</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        85% (Godkänd: 80%)
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                          Väntar på granskning
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        2024-01-15
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button className="text-blue-600 hover:text-blue-900 mr-3">
+                          Granska
+                        </button>
+                        <button className="text-green-600 hover:text-green-900">
+                          Godkänn
+                        </button>
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>

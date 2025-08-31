@@ -45,9 +45,7 @@ export default async function HomePage() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
             {popularCourses.map((course, index) => (
-              <div key={course.id} className="h-full transform hover:scale-105 transition-transform duration-300">
-                <CourseCard course={course} />
-              </div>
+              <CourseCard key={course.id} course={course} />
             ))}
           </div>
           
