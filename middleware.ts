@@ -99,9 +99,14 @@ function getRedirectUrl(feature: string, baseUrl: string): URL {
 }
 
 async function checkPaywallAccess(userId: string, feature: string): Promise<boolean> {
-  // For now, allow access to all authenticated users
-  // This can be enhanced later with proper payment validation
-  return true
+  try {
+    // Import validation function dynamically to avoid circular imports
+    const { checkPaywallAccess: validateAccess } = await import('./lib/payment-validation')
+    return await validateAccess(userId, feature as any)
+  } catch (error) {
+    console.error('Paywall access check failed:', error)
+    return false // Fail secure - deny access on error
+  }
 }
 
 export const config = {

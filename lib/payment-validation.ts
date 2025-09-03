@@ -115,37 +115,13 @@ export async function validateCompanyPayment(companyId: string): Promise<Payment
 
 /**
  * Validate course access for a user
+ * @deprecated Use validateCourseAccess from enrollment-validation.ts instead
  */
 export async function validateCourseAccess(userId: string, courseId: string): Promise<boolean> {
   try {
-    const enrollment = await prisma.enrollment.findFirst({
-      where: {
-        userId,
-        courseId,
-        status: 'ACTIVE'
-      },
-      include: {
-        coursePurchase: {
-          include: {
-            company: true
-          }
-        }
-      }
-    })
-
-    if (!enrollment) {
-      return false
-    }
-
-    // If enrollment is through company, validate company payment
-    if (enrollment.coursePurchase?.companyId) {
-      const companyValidation = await validateCompanyPayment(enrollment.coursePurchase.companyId)
-      return companyValidation.isValid
-    }
-
-    // Individual enrollment - check if user has paid
-    return true
-
+    // Import the secure validation function
+    const { validateCourseAccess: secureValidation } = await import('./enrollment-validation')
+    return await secureValidation(userId, courseId)
   } catch (error) {
     console.error('Course access validation error:', error)
     return false

@@ -18,6 +18,8 @@ import {
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import CourseModal from '@/components/CourseModal';
+import SubmissionModal from '@/components/SubmissionModal';
+import GiftCourseModal from '@/components/GiftCourseModal';
 
 interface Course {
   id: string;
@@ -69,12 +71,51 @@ interface Company {
   updatedAt: string;
 }
 
+interface APVSubmission {
+  id: string;
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    personalNumber?: string;
+  };
+  course: {
+    id: string;
+    title: string;
+    category: string;
+  };
+  courseTitle: string;
+  completionDate: string;
+  finalScore: number;
+  passingScore: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  timeTaken?: number;
+  status: string;
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewNotes?: string;
+  answersData: Array<{
+    questionId: string;
+    question: string;
+    userAnswer: string;
+    correctAnswer: string;
+    isCorrect: boolean;
+    options: string[];
+    selectedIndex: number;
+    correctAnswerText: string;
+    userAnswerText: string;
+  }>;
+}
+
 export default function AdminDashboard() {
   const { data: session } = useSession();
   const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [submissions, setSubmissions] = useState<APVSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'courses' | 'users' | 'companies' | 'apv-submissions'>('overview');
   
@@ -82,6 +123,13 @@ export default function AdminDashboard() {
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [isSavingCourse, setIsSavingCourse] = useState(false);
+
+  // Submission modal state
+  const [selectedSubmission, setSelectedSubmission] = useState<APVSubmission | null>(null);
+  const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+
+  // Gift course modal state
+  const [showGiftModal, setShowGiftModal] = useState(false);
 
   useEffect(() => {
     if (session) {
@@ -94,10 +142,11 @@ export default function AdminDashboard() {
       setLoading(true);
       
       // Fetch all data in parallel
-      const [coursesRes, usersRes, companiesRes] = await Promise.all([
+      const [coursesRes, usersRes, companiesRes, submissionsRes] = await Promise.all([
         fetch('/api/admin/courses'),
         fetch('/api/admin/users'),
-        fetch('/api/admin/companies')
+        fetch('/api/admin/companies'),
+        fetch('/api/admin/submissions')
       ]);
 
       if (coursesRes.ok) {
@@ -113,6 +162,11 @@ export default function AdminDashboard() {
       if (companiesRes.ok) {
         const companiesData = await companiesRes.json();
         setCompanies(companiesData);
+      }
+
+      if (submissionsRes.ok) {
+        const submissionsData = await submissionsRes.json();
+        setSubmissions(submissionsData);
       }
     } catch (error) {
       console.error('Error fetching admin data:', error);
@@ -189,6 +243,60 @@ export default function AdminDashboard() {
 
   const handleEditCourseContent = (courseId: string) => {
     router.push(`/admin/courses/${courseId}/edit`);
+  };
+
+  const handleViewSubmission = (submission: APVSubmission) => {
+    setSelectedSubmission(submission);
+    setShowSubmissionModal(true);
+  };
+
+  const handleUpdateSubmissionStatus = async (submissionId: string, status: 'APPROVED' | 'REJECTED', reviewNotes?: string) => {
+    try {
+      const response = await fetch('/api/admin/submissions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          submissionId,
+          status,
+          reviewNotes
+        })
+      });
+
+      if (response.ok) {
+        // Refresh submissions data
+        const submissionsRes = await fetch('/api/admin/submissions');
+        if (submissionsRes.ok) {
+          const submissionsData = await submissionsRes.json();
+          setSubmissions(submissionsData);
+        }
+        setShowSubmissionModal(false);
+        setSelectedSubmission(null);
+      } else {
+        alert('Fel vid uppdatering av inlämningsstatus');
+      }
+    } catch (error) {
+      console.error('Error updating submission status:', error);
+      alert('Fel vid uppdatering av inlämningsstatus');
+    }
+  };
+
+  const getSubmissionStatusBadge = (status: string) => {
+    const statusConfig = {
+      'PENDING': { color: 'bg-yellow-100 text-yellow-800', text: 'Väntar' },
+      'APPROVED': { color: 'bg-green-100 text-green-800', text: 'Godkänd' },
+      'REJECTED': { color: 'bg-red-100 text-red-800', text: 'Avvisad' },
+      'ID06_REGISTERED': { color: 'bg-blue-100 text-blue-800', text: 'ID06 Registrerad' }
+    };
+    
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig['PENDING'];
+    
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
+        {config.text}
+      </span>
+    );
   };
 
   const getStatusColor = (status: string) => {
@@ -349,6 +457,27 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex flex-wrap gap-4 mb-6">
+                <button
+                  onClick={() => setShowGiftModal(true)}
+                  className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                  </svg>
+                  Ge bort kurs
+                </button>
+                
+                <button
+                  onClick={handleCreateCourse}
+                  className="inline-flex items-center px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+                >
+                  <PlusIcon className="w-4 h-4 mr-2" />
+                  Skapa kurs
+                </button>
               </div>
 
               {/* Recent Activity */}
@@ -677,37 +806,83 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {/* This will be populated with actual APV submissions data */}
-                    <tr className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">Exempel Användare</div>
-                          <div className="text-sm text-gray-500">19850101-1234</div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">Arbete på Väg - Grundkurs</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        85% (Godkänd: 80%)
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                          Väntar på granskning
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        2024-01-15
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button className="text-blue-600 hover:text-blue-900 mr-3">
-                          Granska
-                        </button>
-                        <button className="text-green-600 hover:text-green-900">
-                          Godkänn
-                        </button>
-                      </td>
-                    </tr>
+                    {submissions.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">
+                          Inga inlämningar att visa
+                        </td>
+                      </tr>
+                    ) : (
+                      submissions.map((submission) => (
+                        <tr key={submission.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {submission.user.name || submission.user.email}
+                              </div>
+                              <div className="text-sm text-gray-500">{submission.user.email}</div>
+                              {submission.user.personalNumber && (
+                                <div className="text-sm text-gray-500">{submission.user.personalNumber}</div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{submission.courseTitle}</div>
+                            <div className="text-sm text-gray-500">{submission.course.category}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{submission.finalScore}%</div>
+                            <div className="text-sm text-gray-500">
+                              {submission.correctAnswers}/{submission.totalQuestions} rätt
+                            </div>
+                            {submission.timeTaken && (
+                              <div className="text-sm text-gray-500">
+                                {submission.timeTaken < 60 
+                                  ? `${submission.timeTaken}min` 
+                                  : `${Math.floor(submission.timeTaken / 60)}h ${submission.timeTaken % 60}m`
+                                }
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {getSubmissionStatusBadge(submission.status)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(submission.submittedAt).toLocaleDateString('sv-SE')}
+                            <div className="text-xs text-gray-400">
+                              {new Date(submission.submittedAt).toLocaleTimeString('sv-SE', { 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button 
+                              onClick={() => handleViewSubmission(submission)}
+                              className="text-blue-600 hover:text-blue-900 mr-3"
+                            >
+                              Granska
+                            </button>
+                            {submission.status === 'PENDING' && (
+                              <>
+                                <button 
+                                  onClick={() => handleUpdateSubmissionStatus(submission.id, 'APPROVED')}
+                                  className="text-green-600 hover:text-green-900 mr-3"
+                                >
+                                  Godkänn
+                                </button>
+                                <button 
+                                  onClick={() => handleUpdateSubmissionStatus(submission.id, 'REJECTED')}
+                                  className="text-red-600 hover:text-red-900"
+                                >
+                                  Avvisa
+                                </button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -726,6 +901,27 @@ export default function AdminDashboard() {
         course={editingCourse}
         onSave={handleSaveCourse}
         isSaving={isSavingCourse}
+      />
+
+      {/* Submission Modal */}
+      <SubmissionModal
+        isOpen={showSubmissionModal}
+        onClose={() => {
+          setShowSubmissionModal(false);
+          setSelectedSubmission(null);
+        }}
+        submission={selectedSubmission}
+        onUpdateStatus={handleUpdateSubmissionStatus}
+      />
+
+      {/* Gift Course Modal */}
+      <GiftCourseModal
+        isOpen={showGiftModal}
+        onClose={() => setShowGiftModal(false)}
+        onSuccess={() => {
+          // Refresh data after successful gift
+          fetchAdminData();
+        }}
       />
     </div>
   );

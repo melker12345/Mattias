@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -13,6 +13,7 @@ import {
   ArrowRightIcon,
   ClockIcon
 } from '@heroicons/react/24/outline';
+import CourseSummary from '@/components/CourseSummary';
 
 interface Question {
   id: string;
@@ -68,6 +69,10 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
   const [showLessonList, setShowLessonList] = useState(false);
+  const [showCourseSummary, setShowCourseSummary] = useState(false);
+  const [completionData, setCompletionData] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasAlreadySubmitted, setHasAlreadySubmitted] = useState(false);
 
   useEffect(() => {
     if (session) {
@@ -230,6 +235,87 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
     return Math.round((completedLessons / course.lessons.length) * 100);
   };
 
+  const checkCourseCompletion = useCallback(async () => {
+    try {
+      console.log('Checking course completion...');
+      const response = await fetch(`/api/courses/${params.id}/completion`);
+      console.log('Completion API response status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Completion data:', data);
+        
+        if (data.completed) {
+          console.log('Course is completed, showing summary');
+          setCompletionData(data);
+          setShowCourseSummary(true);
+          
+          // Check if already submitted
+          const submissionResponse = await fetch(`/api/courses/${params.id}/submit`);
+          if (submissionResponse.ok) {
+            const submissionData = await submissionResponse.json();
+            setHasAlreadySubmitted(submissionData.hasSubmitted);
+          }
+        } else {
+          console.log('Course not yet completed:', data);
+        }
+      } else {
+        console.log('Completion API error:', response.status);
+        const errorData = await response.json();
+        console.log('Error details:', errorData);
+      }
+    } catch (error) {
+      console.error('Error checking course completion:', error);
+    }
+  }, [params.id]);
+
+  const handleSubmitForReview = async () => {
+    try {
+      setIsSubmitting(true);
+      const response = await fetch(`/api/courses/${params.id}/submit`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        setHasAlreadySubmitted(true);
+        alert('Kursen har skickats in för granskning!');
+      } else {
+        const error = await response.json();
+        alert(error.message || 'Ett fel uppstod vid inskickning');
+      }
+    } catch (error) {
+      console.error('Error submitting for review:', error);
+      alert('Ett fel uppstod vid inskickning');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRetakeCourse = () => {
+    setShowCourseSummary(false);
+    setCurrentLessonIndex(0);
+    setProgress([]);
+    setUserAnswers([]);
+    setCompletionData(null);
+    fetchCourseData();
+  };
+
+  // Check for course completion whenever progress changes
+  useEffect(() => {
+    if (course && progress.length > 0) {
+      const completedLessons = progress.filter(p => p.completed).length;
+      console.log(`Progress check: ${completedLessons}/${course.lessons.length} lessons completed`);
+      
+      if (completedLessons === course.lessons.length) {
+        console.log('All lessons completed, checking course completion...');
+        // All lessons completed, check if course is passed
+        setTimeout(() => {
+          checkCourseCompletion();
+        }, 1500); // Increased delay to ensure all progress is saved
+      }
+    }
+  }, [progress, course, checkCourseCompletion]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -255,6 +341,28 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
   }
 
   const currentLesson = course.lessons[currentLessonIndex];
+
+  // Show course summary if completed
+  if (showCourseSummary && completionData) {
+    return (
+      <CourseSummary
+        courseId={completionData.courseId}
+        courseTitle={completionData.courseTitle}
+        finalScore={completionData.finalScore}
+        passingScore={completionData.passingScore}
+        totalQuestions={completionData.totalQuestions}
+        correctAnswers={completionData.correctAnswers}
+        passed={completionData.passed}
+        timeTaken={completionData.timeTaken}
+        answers={completionData.answers}
+        userEmail={completionData.userEmail}
+        onSubmitForReview={handleSubmitForReview}
+        onRetakeCourse={handleRetakeCourse}
+        isSubmitting={isSubmitting}
+        hasAlreadySubmitted={hasAlreadySubmitted}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -536,14 +644,26 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
                         </button>
                       )}
 
-                      <button
-                        onClick={goToNextLesson}
-                        disabled={currentLessonIndex === course.lessons.length - 1}
-                        className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-                      >
-                        Nästa
-                        <ArrowRightIcon className="w-4 h-4 ml-2" />
-                      </button>
+                      {currentLessonIndex === course.lessons.length - 1 ? (
+                        <button
+                          onClick={() => {
+                            console.log('Manual completion check triggered');
+                            checkCourseCompletion();
+                          }}
+                          className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                        >
+                          Slutför kurs
+                          <CheckCircleIcon className="w-4 h-4 ml-2" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={goToNextLesson}
+                          className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+                        >
+                          Nästa
+                          <ArrowRightIcon className="w-4 h-4 ml-2" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </motion.div>

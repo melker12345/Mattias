@@ -329,7 +329,7 @@ export default function APVSubmissionModal({
                             Jag, {formData.fullName || '[Ditt namn]'}, svär på heder och samvete att:
                           </p>
                           <ul className="text-yellow-700 text-sm space-y-1 mb-3">
-                            <li>• Jag har slutfört kursen "{course.title}"</li>
+                            <li>• Jag har slutfört kursen &quot;{course.title}&quot;</li>
                             <li>• Jag har fått godkänt resultat ({userScore}%)</li>
                             <li>• All information jag angett är korrekt</li>
                             <li>• Jag förstår att falska uppgifter kan leda till återkallande av certifikat</li>

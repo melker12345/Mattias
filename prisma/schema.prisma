@@ -35,6 +35,8 @@ model User {
   progress      Progress[]
   certificates  Certificate[]
   answers       Answer[]
+  apvSubmissions APVSubmission[]
+  giftedEnrollments Enrollment[] @relation("GiftedEnrollments")
 }
 
 model Course {
@@ -56,6 +58,7 @@ model Course {
   certificates Certificate[]
   coursePurchases CoursePurchase[]
   invoiceItems InvoiceItem[]
+  apvSubmissions APVSubmission[]
 }
 
 model Lesson {
@@ -121,10 +124,17 @@ model Enrollment {
   totalQuestions Int @default(0) // Total questions in course
   correctAnswers Int @default(0) // Total correct answers
   
+  // Gift tracking
+  isGift    Boolean  @default(false) // Whether this enrollment is a gift
+  giftedBy  String?  // Admin user ID who gifted this course
+  giftedAt  DateTime? // When the gift was given
+  giftReason String? // Optional reason for the gift
+  
   // Relations
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   coursePurchase CoursePurchase? @relation(fields: [coursePurchaseId], references: [id], onDelete: Cascade)
+  giftedByUser User? @relation("GiftedEnrollments", fields: [giftedBy], references: [id], onDelete: SetNull)
   
   @@unique([userId, courseId])
 }
@@ -214,7 +224,7 @@ model Certificate {
   // Relations
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  apvSubmission APVSubmission? @relation(fields: [apvSubmissionId], references: [id])
+  apvSubmission APVSubmission?
   
   @@unique([userId, courseId])
 }
@@ -224,14 +234,14 @@ model APVSubmission {
   id        String   @id @default(cuid())
   userId    String
   courseId  String
-  certificateId String
+  certificateId String? @unique
   
   // User information for APV
   fullName  String
-  personalNumber String
-  address   String
-  postalCode String
-  city      String
+  personalNumber String?
+  address   String?
+  postalCode String?
+  city      String?
   phone     String?
   
   // Course completion verification
@@ -239,6 +249,12 @@ model APVSubmission {
   completionDate DateTime
   finalScore Int
   passingScore Int
+  totalQuestions Int
+  correctAnswers Int
+  timeTaken Int? // in minutes
+  
+  // User answers data (JSON string containing all answers with correct answers)
+  answersData String // JSON string: [{questionId, question, userAnswer, correctAnswer, isCorrect, options}]
   
   // Submission status
   status    String @default("PENDING") // PENDING, APPROVED, REJECTED, ID06_REGISTERED
@@ -255,7 +271,7 @@ model APVSubmission {
   // Relations
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  certificate Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+  certificate Certificate? @relation(fields: [certificateId], references: [id])
   
   @@unique([userId, courseId])
 }

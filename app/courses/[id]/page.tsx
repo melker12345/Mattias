@@ -44,6 +44,7 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
   const [loading, setLoading] = useState(true);
   const [enrolled, setEnrolled] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
+  const [enrollmentData, setEnrollmentData] = useState<any>(null);
 
   useEffect(() => {
     fetchCourseDetails();
@@ -92,6 +93,7 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
       if (response.ok) {
         const data = await response.json();
         setEnrolled(data.enrolled);
+        setEnrollmentData(data.enrollment);
       }
     } catch (error) {
       console.error('Error checking enrollment status:', error);
@@ -267,23 +269,60 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
               animate={{ opacity: 1, x: 0 }}
               className="bg-white rounded-lg shadow-sm p-6 sticky top-8"
             >
-              <div className="text-center mb-6">
-                <div className="text-3xl font-bold text-primary-600 mb-2">
-                  {formatPrice(course.price)}
+              {/* Price/Gift Display */}
+              {enrolled && enrollmentData?.isGift ? (
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-green-800 mb-1">Gåva!</h3>
+                  <p className="text-sm text-green-600">
+                    Denna kurs har getts som gåva till dig
+                  </p>
+                  {enrollmentData.giftReason && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      "{enrollmentData.giftReason}"
+                    </p>
+                  )}
                 </div>
-                <p className="text-gray-600">
-                  {course.price === 0 ? 'Gratis kurs' : 'Engångsbetalning'}
-                </p>
-              </div>
+              ) : (
+                <div className="text-center mb-6">
+                  <div className="text-3xl font-bold text-primary-600 mb-2">
+                    {formatPrice(course.price)}
+                  </div>
+                  <p className="text-gray-600">
+                    {course.price === 0 ? 'Gratis kurs' : 'Engångsbetalning'}
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-4">
                 {enrolled ? (
-                  <button
-                    disabled
-                    className="w-full bg-green-100 text-green-800 py-3 px-4 rounded-lg font-medium cursor-not-allowed"
-                  >
-                    Du är redan registrerad
-                  </button>
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => router.push(`/courses/${params.id}/learn`)}
+                      className="w-full bg-primary-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-primary-700 transition-colors flex items-center justify-center"
+                    >
+                      <PlayIcon className="w-5 h-5 mr-2" />
+                      {enrollmentData?.completedAt ? 'Fortsätt kurs' : 'Starta kurs'}
+                    </button>
+                    
+                    {enrollmentData?.isGift && (
+                      <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center text-sm">
+                          <svg className="w-4 h-4 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-green-800 font-medium">Kostnadsfri gåva</span>
+                        </div>
+                        <p className="text-xs text-green-700 mt-1">
+                          Gåva från administratör - {new Date(enrollmentData.giftedAt).toLocaleDateString('sv-SE')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <>
                     <button
