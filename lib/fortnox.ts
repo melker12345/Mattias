@@ -1,160 +1,336 @@
-import { prisma } from './prisma';
-
-interface FortnoxConfig {
-  accessToken: string;
-  clientSecret: string;
-  baseUrl: string;
-}
-
-interface FortnoxInvoice {
-  DocumentNumber?: string;
-  CustomerNumber: string;
-  InvoiceDate: string;
-  DueDate: string;
-  Currency: string;
-  CurrencyRate: number;
-  CurrencyUnit: number;
-  Language: string;
-  ExternalInvoiceReference1?: string;
-  ExternalInvoiceReference2?: string;
-  InvoiceType: string;
-  VATIncluded: boolean;
-  InvoiceRows: FortnoxInvoiceRow[];
-}
-
-interface FortnoxInvoiceRow {
-  ArticleNumber?: string;
-  Description: string;
-  DeliveredQuantity: number;
-  Unit: string;
-  UnitPrice: number;
-  VAT: number;
-  Account: number;
-}
-
-interface FortnoxCustomer {
-  CustomerNumber: string;
-  Name: string;
-  Address1: string;
-  Address2?: string;
-  ZipCode: string;
-  City: string;
-  CountryCode: string;
-  Phone1?: string;
-  Email?: string;
-  OrganizationNumber?: string;
-}
+import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import type {
+  FortnoxCustomer,
+  FortnoxInvoice,
+  FortnoxInvoiceResponse,
+  FortnoxError,
+  CoursePaymentData,
+  CompanyPaymentData,
+} from './types/payment';
 
 class FortnoxAPI {
-  private config: FortnoxConfig;
-  private baseUrl: string;
+  private client: AxiosInstance;
+  private baseURL = 'https://api.fortnox.se/3';
 
-  constructor(config: FortnoxConfig) {
-    this.config = config;
-    this.baseUrl = config.baseUrl || 'https://api.fortnox.se/3';
-  }
+  constructor() {
+    this.client = axios.create({
+      baseURL: this.baseURL,
+      headers: {
+        'Client-Secret': process.env.FORTNOX_CLIENT_SECRET!,
+        'Access-Token': process.env.FORTNOX_ACCESS_TOKEN!,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      timeout: 30000,
+    });
 
-  private async makeRequest(endpoint: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET', data?: any) {
-    const url = `${this.baseUrl}${endpoint}`;
-    
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Access-Token': this.config.accessToken,
-      'Client-Secret': this.config.clientSecret,
-    };
-
-    const options: RequestInit = {
-      method,
-      headers,
-    };
-
-    if (data && (method === 'POST' || method === 'PUT')) {
-      options.body = JSON.stringify(data);
-    }
-
-    try {
-      const response = await fetch(url, options);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Fortnox API error: ${response.status} - ${errorText}`);
+    // Request interceptor for logging
+    this.client.interceptors.request.use(
+      (config) => {
+        console.log(`Fortnox API Request: ${config.method?.toUpperCase()} ${config.url}`);
+        return config;
+      },
+      (error) => {
+        console.error('Fortnox API Request Error:', error);
+        return Promise.reject(error);
       }
+    );
 
-      return await response.json();
-    } catch (error) {
-      console.error('Fortnox API request failed:', error);
-      throw error;
-    }
+    // Response interceptor for error handling
+    this.client.interceptors.response.use(
+      (response) => {
+        console.log(`Fortnox API Response: ${response.status} ${response.statusText}`);
+        return response;
+      },
+      (error) => {
+        console.error('Fortnox API Response Error:', error.response?.data || error.message);
+        throw new FortnoxError(
+          error.response?.data?.ErrorInformation?.message || error.message,
+          error.response?.data?.ErrorInformation?.code || 'FORTNOX_API_ERROR',
+          error.response?.status || 500
+        );
+      }
+    );
   }
 
   /**
    * Create or update a customer in Fortnox
    */
-  async createCustomer(customerData: Omit<FortnoxCustomer, 'CustomerNumber'>): Promise<FortnoxCustomer> {
-    // Generate a unique customer number
-    const customerNumber = `C${Date.now()}`;
-    
-    const customer: FortnoxCustomer = {
-      CustomerNumber: customerNumber,
-      ...customerData
-    };
+  async createOrUpdateCustomer(customerData: {
+    email: string;
+    name: string;
+    phone?: string;
+    address?: string;
+    zipCode?: string;
+    city?: string;
+    organizationNumber?: string;
+  }): Promise<string> {
+    try {
+      // First, try to find existing customer by email
+      const existingCustomer = await this.findCustomerByEmail(customerData.email);
+      
+      if (existingCustomer) {
+        console.log(`Customer found with number: ${existingCustomer.CustomerNumber}`);
+        return existingCustomer.CustomerNumber!;
+      }
 
-    const response = await this.makeRequest('/customers', 'POST', customer);
-    return response;
+      // Create new customer
+      const fortnoxCustomer: FortnoxCustomer = {
+        Name: customerData.name,
+        Email: customerData.email,
+        Phone: customerData.phone,
+        Address1: customerData.address,
+        ZipCode: customerData.zipCode,
+        City: customerData.city,
+        Country: 'SE',
+        OrganisationNumber: customerData.organizationNumber,
+      };
+
+      const response: AxiosResponse<{ Customer: FortnoxCustomer }> = await this.client.post(
+        '/customers',
+        { Customer: fortnoxCustomer }
+      );
+
+      const customerNumber = response.data.Customer.CustomerNumber!;
+      console.log(`Created new Fortnox customer: ${customerNumber}`);
+      return customerNumber;
+    } catch (error) {
+      console.error('Failed to create/update Fortnox customer:', error);
+      throw new FortnoxError(
+        `Failed to create customer: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'CUSTOMER_CREATION_FAILED',
+        500
+      );
+    }
   }
 
   /**
-   * Create an invoice in Fortnox
+   * Find customer by email
    */
-  async createInvoice(invoiceData: Omit<FortnoxInvoice, 'DocumentNumber'>): Promise<FortnoxInvoice> {
-    const response = await this.makeRequest('/invoices', 'POST', invoiceData);
-    return response;
+  private async findCustomerByEmail(email: string): Promise<FortnoxCustomer | null> {
+    try {
+      const response: AxiosResponse<{ Customers: FortnoxCustomer[] }> = await this.client.get(
+        `/customers?filter=email~${encodeURIComponent(email)}`
+      );
+
+      const customers = response.data.Customers || [];
+      return customers.length > 0 ? customers[0] : null;
+    } catch (error) {
+      console.log('Customer not found or error searching:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Create invoice for course purchase
+   */
+  async createCourseInvoice(
+    customerNumber: string,
+    paymentData: CoursePaymentData,
+    stripePaymentId: string
+  ): Promise<string> {
+    try {
+      const invoiceDate = new Date();
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 30); // 30 days payment terms
+
+      const invoice: FortnoxInvoice = {
+        CustomerNumber: customerNumber,
+        InvoiceDate: invoiceDate.toISOString().split('T')[0],
+        DueDate: dueDate.toISOString().split('T')[0],
+        Currency: paymentData.currency.toUpperCase(),
+        Language: 'SV',
+        ExternalInvoiceReference1: stripePaymentId,
+        ExternalInvoiceReference2: paymentData.courseId,
+        YourReference: paymentData.userName,
+        OurReference: 'MN Utbildning',
+        InvoiceRows: [
+          {
+            Description: `Kurs: ${paymentData.courseName}`,
+            Price: paymentData.amount,
+            Unit: 'st',
+            VAT: 25, // 25% Swedish VAT for digital services
+            Quantity: 1,
+          },
+        ],
+      };
+
+      const response: AxiosResponse<FortnoxInvoiceResponse> = await this.client.post(
+        '/invoices',
+        { Invoice: invoice }
+      );
+
+      const invoiceNumber = response.data.Invoice.DocumentNumber;
+      console.log(`Created Fortnox invoice: ${invoiceNumber}`);
+      
+      // Mark invoice as paid since payment already processed via Stripe
+      await this.markInvoiceAsPaid(invoiceNumber, paymentData.amount, stripePaymentId);
+      
+      return invoiceNumber;
+    } catch (error) {
+      console.error('Failed to create Fortnox invoice:', error);
+      throw new FortnoxError(
+        `Failed to create invoice: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'INVOICE_CREATION_FAILED',
+        500
+      );
+    }
+  }
+
+  /**
+   * Create invoice for company subscription
+   */
+  async createCompanyInvoice(
+    customerNumber: string,
+    paymentData: CompanyPaymentData,
+    stripePaymentId: string
+  ): Promise<string> {
+    try {
+      const invoiceDate = new Date();
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 30);
+
+      const invoice: FortnoxInvoice = {
+        CustomerNumber: customerNumber,
+        InvoiceDate: invoiceDate.toISOString().split('T')[0],
+        DueDate: dueDate.toISOString().split('T')[0],
+        Currency: paymentData.currency.toUpperCase(),
+        Language: 'SV',
+        ExternalInvoiceReference1: stripePaymentId,
+        ExternalInvoiceReference2: paymentData.companyId,
+        YourReference: paymentData.companyName,
+        OurReference: 'MN Utbildning',
+        InvoiceRows: [
+          {
+            Description: `${paymentData.planName} - ${paymentData.billingPeriod === 'yearly' ? 'Årlig' : 'Månadsvis'} prenumeration`,
+            Price: paymentData.amount,
+            Unit: 'st',
+            VAT: 25,
+            Quantity: 1,
+          },
+        ],
+      };
+
+      const response: AxiosResponse<FortnoxInvoiceResponse> = await this.client.post(
+        '/invoices',
+        { Invoice: invoice }
+      );
+
+      const invoiceNumber = response.data.Invoice.DocumentNumber;
+      console.log(`Created Fortnox company invoice: ${invoiceNumber}`);
+      
+      await this.markInvoiceAsPaid(invoiceNumber, paymentData.amount, stripePaymentId);
+      
+      return invoiceNumber;
+    } catch (error) {
+      console.error('Failed to create Fortnox company invoice:', error);
+      throw new FortnoxError(
+        `Failed to create company invoice: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'COMPANY_INVOICE_CREATION_FAILED',
+        500
+      );
+    }
+  }
+
+  /**
+   * Mark invoice as paid
+   */
+  private async markInvoiceAsPaid(
+    documentNumber: string,
+    amount: number,
+    paymentReference: string
+  ): Promise<void> {
+    try {
+      const paymentData = {
+        InvoicePayment: {
+          InvoiceNumber: documentNumber,
+          Amount: amount,
+          PaymentDate: new Date().toISOString().split('T')[0],
+          ModeOfPayment: 'STRIPE',
+          ModeOfPaymentAccount: '1930', // Default bank account
+          ExternalInvoiceReference1: paymentReference,
+        },
+      };
+
+      await this.client.post('/invoicepayments', paymentData);
+      console.log(`Marked invoice ${documentNumber} as paid`);
+    } catch (error) {
+      console.error(`Failed to mark invoice ${documentNumber} as paid:`, error);
+      // Don't throw here - invoice creation was successful, payment marking is optional
+    }
   }
 
   /**
    * Get invoice by document number
    */
-  async getInvoice(documentNumber: string): Promise<FortnoxInvoice> {
-    const response = await this.makeRequest(`/invoices/${documentNumber}`);
-    return response;
-  }
-
-  /**
-   * Update invoice status (e.g., mark as paid)
-   */
-  async updateInvoice(documentNumber: string, updates: Partial<FortnoxInvoice>): Promise<FortnoxInvoice> {
-    const response = await this.makeRequest(`/invoices/${documentNumber}`, 'PUT', updates);
-    return response;
-  }
-
-  /**
-   * Get all invoices for a customer
-   */
-  async getCustomerInvoices(customerNumber: string): Promise<FortnoxInvoice[]> {
-    const response = await this.makeRequest(`/invoices?customer=${customerNumber}`);
-    return response.Invoices || [];
-  }
-
-  /**
-   * Check if invoice is paid
-   */
-  async isInvoicePaid(documentNumber: string): Promise<boolean> {
+  async getInvoice(documentNumber: string): Promise<FortnoxInvoiceResponse['Invoice'] | null> {
     try {
-      const invoice = await this.getInvoice(documentNumber);
-      return invoice.DocumentNumber ? true : false; // Fortnox returns paid status in specific field
+      const response: AxiosResponse<FortnoxInvoiceResponse> = await this.client.get(
+        `/invoices/${documentNumber}`
+      );
+      return response.data.Invoice;
     } catch (error) {
-      console.error('Error checking invoice payment status:', error);
+      console.error(`Failed to get invoice ${documentNumber}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Test Fortnox connection
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      await this.client.get('/companyinformation');
+      console.log('Fortnox connection test successful');
+      return true;
+    } catch (error) {
+      console.error('Fortnox connection test failed:', error);
       return false;
+    }
+  }
+
+  /**
+   * Get company information
+   */
+  async getCompanyInfo(): Promise<any> {
+    try {
+      const response = await this.client.get('/companyinformation');
+      return response.data.CompanyInformation;
+    } catch (error) {
+      console.error('Failed to get company information:', error);
+      throw new FortnoxError(
+        `Failed to get company info: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'COMPANY_INFO_FAILED',
+        500
+      );
     }
   }
 }
 
-// Initialize Fortnox API with environment variables
-const fortnoxAPI = new FortnoxAPI({
-  accessToken: process.env.FORTNOX_ACCESS_TOKEN!,
-  clientSecret: process.env.FORTNOX_CLIENT_SECRET!,
-  baseUrl: process.env.FORTNOX_BASE_URL || 'https://api.fortnox.se/3'
-});
+// Export singleton instance
+export const fortnox = new FortnoxAPI();
 
-export { fortnoxAPI, FortnoxAPI };
-export type { FortnoxInvoice, FortnoxCustomer, FortnoxInvoiceRow };
+// Export helper functions
+export async function createFortnoxCustomerFromPayment(
+  paymentData: CoursePaymentData | CompanyPaymentData
+): Promise<string> {
+  const customerData = {
+    email: 'userEmail' in paymentData ? paymentData.userEmail : paymentData.companyEmail,
+    name: 'userName' in paymentData ? paymentData.userName : paymentData.companyName,
+    organizationNumber: 'companyId' in paymentData ? undefined : undefined, // TODO: Get org number from company
+  };
+
+  return await fortnox.createOrUpdateCustomer(customerData);
+}
+
+export async function createInvoiceFromPayment(
+  customerNumber: string,
+  paymentData: CoursePaymentData | CompanyPaymentData,
+  stripePaymentId: string
+): Promise<string> {
+  if ('courseId' in paymentData) {
+    return await fortnox.createCourseInvoice(customerNumber, paymentData, stripePaymentId);
+  } else {
+    return await fortnox.createCompanyInvoice(customerNumber, paymentData, stripePaymentId);
+  }
+}

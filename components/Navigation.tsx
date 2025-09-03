@@ -124,6 +124,18 @@ export function Navigation() {
                             </Link>
                           )}
                         </Menu.Item>
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              href="/profile"
+                              className={`${
+                                active ? 'bg-white/10 text-white' : 'text-white'
+                              } block px-4 py-3 text-sm font-open-sans transition-colors duration-200`}
+                            >
+                              Min Profil
+                            </Link>
+                          )}
+                        </Menu.Item>
                         {(session.user as any)?.role === 'ADMIN' && (
                           <Menu.Item>
                             {({ active }) => (

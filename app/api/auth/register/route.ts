@@ -7,7 +7,7 @@ const registerSchema = z.object({
   name: z.string().min(2, 'Namnet måste vara minst 2 tecken'),
   email: z.string().email('Ogiltig e-postadress'),
   password: z.string().min(6, 'Lösenordet måste vara minst 6 tecken'),
-  invitationToken: z.string().optional(),
+  invitationToken: z.string().nullable().optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       name: invitation?.name || name, // Use invitation name if available
       email,
       password: hashedPassword,
-      role: invitation ? 'EMPLOYEE' : 'STUDENT',
+      role: invitation ? 'EMPLOYEE' : 'INDIVIDUAL',
     }
 
     if (invitation) {

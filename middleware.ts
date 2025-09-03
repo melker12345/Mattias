@@ -19,7 +19,9 @@ const PUBLIC_ROUTES = [
   '/auth/signin',
   '/auth/signup',
   '/register/company',
-  '/api/auth'
+  '/profile',
+  '/api/auth',
+  '/api/profile'
 ]
 
 export async function middleware(request: NextRequest) {
@@ -58,11 +60,21 @@ export async function middleware(request: NextRequest) {
   }
 
   // For other paywalled routes, check access
-  const hasAccess = await checkPaywallAccess(token.sub!, paywallFeature)
+  let resourceId: string | undefined = undefined
+  
+  // Extract resource ID for course learning routes
+  if (paywallFeature === 'course_learning') {
+    const courseMatch = pathname.match(/^\/courses\/([^\/]+)\/learn$/)
+    if (courseMatch) {
+      resourceId = courseMatch[1]
+    }
+  }
+  
+  const hasAccess = await checkPaywallAccess(token.sub!, paywallFeature, resourceId)
   
   if (!hasAccess) {
     // Redirect to appropriate page based on feature
-    const redirectUrl = getRedirectUrl(paywallFeature, request.url)
+    const redirectUrl = getRedirectUrl(paywallFeature, request.url, resourceId)
     return NextResponse.redirect(redirectUrl)
   }
 
@@ -81,12 +93,18 @@ function getPaywallFeature(pathname: string): string | null {
   return null
 }
 
-function getRedirectUrl(feature: string, baseUrl: string): URL {
+function getRedirectUrl(feature: string, baseUrl: string, resourceId?: string): URL {
   switch (feature) {
     case 'company_registration':
       return new URL('/register/company', baseUrl)
     
     case 'course_learning':
+      // Redirect to course detail page for payment
+      if (resourceId) {
+        return new URL(`/courses/${resourceId}`, baseUrl)
+      }
+      return new URL('/courses', baseUrl)
+    
     case 'progress_tracking':
       return new URL('/courses', baseUrl)
     
@@ -98,11 +116,12 @@ function getRedirectUrl(feature: string, baseUrl: string): URL {
   }
 }
 
-async function checkPaywallAccess(userId: string, feature: string): Promise<boolean> {
+async function checkPaywallAccess(userId: string, feature: string, resourceId?: string): Promise<boolean> {
   try {
     // Import validation function dynamically to avoid circular imports
-    const { checkPaywallAccess: validateAccess } = await import('./lib/payment-validation')
-    return await validateAccess(userId, feature as any)
+    const { validateUserAccess } = await import('./lib/payment-validation')
+    const result = await validateUserAccess(userId, feature, resourceId)
+    return result.hasAccess
   } catch (error) {
     console.error('Paywall access check failed:', error)
     return false // Fail secure - deny access on error
