@@ -198,8 +198,9 @@ export default function PaymentButton({
         <div className="flex items-center space-x-1">
           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm2 6a2 2 0 104 0 2 2 0 00-4 0zm6 0a2 2 0 104 0 2 2 0 00-4 0z" clipRule="evenodd" />
+          </svg>
+          <span>Stöder kort, Klarna, Swish</span>
         </div>
-        <span>Stöder kort, Klarna, Swish</span>
       </div>
     </div>
   );

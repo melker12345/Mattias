@@ -35,6 +35,7 @@ interface CourseSummaryProps {
   onRetakeCourse: () => void;
   isSubmitting: boolean;
   hasAlreadySubmitted: boolean;
+  isRetaking?: boolean;
 }
 
 export default function CourseSummary({
@@ -51,7 +52,8 @@ export default function CourseSummary({
   onSubmitForReview,
   onRetakeCourse,
   isSubmitting,
-  hasAlreadySubmitted
+  hasAlreadySubmitted,
+  isRetaking = false
 }: CourseSummaryProps) {
   const [showDetailedResults, setShowDetailedResults] = useState(false);
 
@@ -166,10 +168,20 @@ export default function CourseSummary({
               <div className="space-y-4">
                 <button
                   onClick={onRetakeCourse}
-                  className="w-full bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center font-medium"
+                  disabled={isRetaking}
+                  className="w-full bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center font-medium"
                 >
-                  <ArrowPathIcon className="w-5 h-5 mr-2" />
-                  Gör om kursen
+                  {isRetaking ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      Återställer kursen...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowPathIcon className="w-5 h-5 mr-2" />
+                      Gör om kursen
+                    </>
+                  )}
                 </button>
                 
                 <p className="text-sm text-gray-600 text-center">

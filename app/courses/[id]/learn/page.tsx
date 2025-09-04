@@ -73,6 +73,7 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
   const [completionData, setCompletionData] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAlreadySubmitted, setHasAlreadySubmitted] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     if (session) {
@@ -291,17 +292,51 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
     }
   };
 
-  const handleRetakeCourse = () => {
-    setShowCourseSummary(false);
-    setCurrentLessonIndex(0);
-    setProgress([]);
-    setUserAnswers([]);
-    setCompletionData(null);
-    fetchCourseData();
+  const handleRetakeCourse = async () => {
+    try {
+      setIsResetting(true);
+      
+      // Clear the completion state first
+      setShowCourseSummary(false);
+      setCompletionData(null);
+      setCurrentLessonIndex(0);
+      setProgress([]);
+      setUserAnswers([]);
+      
+      // Reset enrollment in database to allow retaking
+      const response = await fetch(`/api/courses/${params.id}/reset`, {
+        method: 'POST',
+      });
+      
+      if (response.ok) {
+        console.log('Course reset successfully');
+      } else {
+        console.warn('Failed to reset course in database');
+      }
+      
+      // Refetch course data
+      await fetchCourseData();
+    } catch (error) {
+      console.error('Error resetting course:', error);
+      // Still allow local reset even if API fails
+      setShowCourseSummary(false);
+      setCompletionData(null);
+      setCurrentLessonIndex(0);
+      setProgress([]);
+      setUserAnswers([]);
+      fetchCourseData();
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   // Check for course completion whenever progress changes
   useEffect(() => {
+    // Don't check completion if we're resetting or already showing summary
+    if (isResetting || showCourseSummary) {
+      return;
+    }
+    
     if (course && progress.length > 0) {
       const completedLessons = progress.filter(p => p.completed).length;
       console.log(`Progress check: ${completedLessons}/${course.lessons.length} lessons completed`);
@@ -310,11 +345,13 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
         console.log('All lessons completed, checking course completion...');
         // All lessons completed, check if course is passed
         setTimeout(() => {
-          checkCourseCompletion();
+          if (!isResetting && !showCourseSummary) {
+            checkCourseCompletion();
+          }
         }, 1500); // Increased delay to ensure all progress is saved
       }
     }
-  }, [progress, course, checkCourseCompletion]);
+  }, [progress, course, checkCourseCompletion, isResetting, showCourseSummary]);
 
   if (loading) {
     return (
@@ -360,6 +397,7 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
         onRetakeCourse={handleRetakeCourse}
         isSubmitting={isSubmitting}
         hasAlreadySubmitted={hasAlreadySubmitted}
+        isRetaking={isResetting}
       />
     );
   }

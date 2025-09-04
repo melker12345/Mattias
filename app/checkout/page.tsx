@@ -77,16 +77,36 @@ export default function CheckoutPage() {
     e.preventDefault();
     setIsProcessing(true);
 
-    // Simulate payment processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      console.log('Processing payment for:', state.items);
+      console.log('Form data:', formData);
 
-    // TODO: Implement actual payment processing here
-    console.log('Processing payment for:', state.items);
-    console.log('Form data:', formData);
+      // Create Stripe checkout session
+      const response = await fetch('/api/payments/cart-checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: state.items,
+          customerData: formData,
+        }),
+      });
 
-    setIsProcessing(false);
-    setIsSuccess(true);
-    clearCart();
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Payment initiation failed');
+      }
+
+      // Redirect to Stripe Checkout
+      window.location.href = data.checkoutUrl;
+
+    } catch (error) {
+      console.error('Checkout error:', error);
+      alert(error instanceof Error ? error.message : 'Ett fel uppstod vid betalning');
+      setIsProcessing(false);
+    }
   };
 
   const formatCardNumber = (value: string) => {

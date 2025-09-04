@@ -14,6 +14,8 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import Image from 'next/image';
+import PaymentButton from '@/components/PaymentButton';
+import PaymentStatus from '@/components/PaymentStatus';
 
 interface Course {
   id: string;
@@ -170,6 +172,7 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PaymentStatus />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24 sm:pt-28">
         {/* Back Button */}
         <div className="mb-6">
@@ -325,20 +328,30 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
                   </div>
                 ) : (
                   <>
-                    <button
-                      onClick={handleEnroll}
-                      disabled={enrolling}
-                      className="w-full btn-primary py-3"
-                    >
-                      {enrolling ? (
-                        <>
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                          Registrerar...
-                        </>
-                      ) : (
-                        'Registrera dig för kursen'
-                      )}
-                    </button>
+                    {course.price > 0 ? (
+                      <PaymentButton
+                        courseId={course.id}
+                        amount={course.price}
+                        courseName={course.title}
+                        className="w-full"
+                        size="lg"
+                      />
+                    ) : (
+                      <button
+                        onClick={handleEnroll}
+                        disabled={enrolling}
+                        className="w-full btn-primary py-3"
+                      >
+                        {enrolling ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                            Registrerar...
+                          </>
+                        ) : (
+                          'Registrera dig för kursen'
+                        )}
+                      </button>
+                    )}
                     
                     <button
                       onClick={handleAddToCart}

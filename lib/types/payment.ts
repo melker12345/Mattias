@@ -14,7 +14,7 @@ export interface CheckoutSession {
   paymentIntentId: string;
   customerId?: string;
   metadata: {
-    userId: string;
+    userId?: string;
     courseId?: string;
     companyId?: string;
     type: 'course' | 'subscription' | 'company_plan';

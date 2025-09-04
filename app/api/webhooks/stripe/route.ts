@@ -92,47 +92,70 @@ async function processCoursePayment(session: any): Promise<NextResponse> {
   const { userId, courseId, courseName, userName } = metadata;
 
   try {
-    // Get user and course data
+    // Get user data
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
 
-    const course = await prisma.course.findUnique({
-      where: { id: courseId },
-    });
-
-    if (!user || !course) {
-      console.error('User or course not found:', { userId, courseId });
-      return NextResponse.json({ error: 'User or course not found' }, { status: 404 });
+    if (!user) {
+      console.error('User not found:', { userId });
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Update enrollment with payment confirmation
-    const enrollment = await prisma.enrollment.upsert({
-      where: {
-        userId_courseId: {
-          userId: userId,
-          courseId: courseId,
-        },
-      },
-      create: {
-        userId: userId,
+    // Handle single course payment
+    if (courseId) {
+      return await processSingleCourse(session, user, courseId);
+    }
+    
+    // Handle cart payment (multiple courses)
+    return await processCartPayment(session, user);
+
+  } catch (error) {
+    console.error('Course payment processing error:', error);
+    return NextResponse.json(
+      { error: 'Failed to process course payment' },
+      { status: 500 }
+    );
+  }
+}
+
+async function processSingleCourse(session: any, user: any, courseId: string): Promise<NextResponse> {
+  const course = await prisma.course.findUnique({
+    where: { id: courseId },
+  });
+
+  if (!course) {
+    console.error('Course not found:', { courseId });
+    return NextResponse.json({ error: 'Course not found' }, { status: 404 });
+  }
+
+  // Update enrollment with payment confirmation
+  const enrollment = await prisma.enrollment.upsert({
+    where: {
+      userId_courseId: {
+        userId: user.id,
         courseId: courseId,
-        isPaid: true,
-        paidAt: new Date(),
-        stripePaymentId: session.payment_intent,
-        stripeCustomerId: session.customer,
-        paymentAmount: session.amount_total / 100, // Convert from cents
-        paymentMethod: session.payment_method_types?.[0] || 'card',
       },
-      update: {
-        isPaid: true,
-        paidAt: new Date(),
-        stripePaymentId: session.payment_intent,
-        stripeCustomerId: session.customer,
-        paymentAmount: session.amount_total / 100,
-        paymentMethod: session.payment_method_types?.[0] || 'card',
-      },
-    });
+    },
+    create: {
+      userId: user.id,
+      courseId: courseId,
+      isPaid: true,
+      paidAt: new Date(),
+      stripePaymentId: session.payment_intent,
+      stripeCustomerId: session.customer,
+      paymentAmount: course.price,
+      paymentMethod: session.payment_method_types?.[0] || 'card',
+    },
+    update: {
+      isPaid: true,
+      paidAt: new Date(),
+      stripePaymentId: session.payment_intent,
+      stripeCustomerId: session.customer,
+      paymentAmount: course.price,
+      paymentMethod: session.payment_method_types?.[0] || 'card',
+    },
+  });
 
     // Create Payment record
     await prisma.payment.create({
@@ -165,17 +188,101 @@ async function processCoursePayment(session: any): Promise<NextResponse> {
       // Don't fail the webhook - payment is already processed
     });
 
-    console.log(`Course payment processed successfully for user ${userId}, course ${courseId}`);
+  console.log(`Single course payment processed successfully for user ${user.id}, course ${courseId}`);
+  return NextResponse.json({ 
+    success: true, 
+    enrollmentId: enrollment.id,
+    message: 'Course payment processed successfully' 
+  });
+}
+
+async function processCartPayment(session: any, user: any): Promise<NextResponse> {
+  const metadata = session.metadata;
+  
+  try {
+    const enrollments = [];
+    
+    // Process all courses in the metadata
+    for (const [key, value] of Object.entries(metadata)) {
+      if (key.startsWith('course_')) {
+        const courseId = key.replace('course_', '');
+        
+        // Get course data
+        const course = await prisma.course.findUnique({
+          where: { id: courseId },
+        });
+
+        if (!course) {
+          console.warn(`Course not found in cart payment: ${courseId}`);
+          continue;
+        }
+
+        // Update enrollment with payment confirmation
+        const enrollment = await prisma.enrollment.upsert({
+          where: {
+            userId_courseId: {
+              userId: user.id,
+              courseId: courseId,
+            },
+          },
+          create: {
+            userId: user.id,
+            courseId: courseId,
+            isPaid: true,
+            paidAt: new Date(),
+            stripePaymentId: session.payment_intent,
+            stripeCustomerId: session.customer,
+            paymentAmount: course.price,
+            paymentMethod: session.payment_method_types?.[0] || 'card',
+          },
+          update: {
+            isPaid: true,
+            paidAt: new Date(),
+            stripePaymentId: session.payment_intent,
+            stripeCustomerId: session.customer,
+            paymentAmount: course.price,
+            paymentMethod: session.payment_method_types?.[0] || 'card',
+          },
+        });
+
+        enrollments.push(enrollment);
+
+        // Create Payment record
+        await prisma.payment.create({
+          data: {
+            userId: user.id,
+            courseId: courseId,
+            enrollmentId: enrollment.id,
+            stripePaymentId: session.payment_intent,
+            stripeCustomerId: session.customer,
+            stripeSessionId: session.id,
+            amount: course.price,
+            currency: session.currency.toUpperCase(),
+            status: 'succeeded',
+            paymentMethod: session.payment_method_types?.[0] || 'card',
+            metadata: JSON.stringify({ source: 'cart', courseName: course.title }),
+          },
+        });
+      }
+    }
+
+    // Handle company account creation if present
+    if (metadata.company_account === 'true') {
+      // Company account logic would go here
+      console.log('Company account purchased in cart');
+    }
+
+    console.log(`Cart payment processed successfully for user ${user.id}, ${enrollments.length} courses`);
     return NextResponse.json({ 
       success: true, 
-      enrollmentId: enrollment.id,
-      message: 'Course payment processed successfully' 
+      enrollments: enrollments.length,
+      message: 'Cart payment processed successfully' 
     });
 
   } catch (error) {
-    console.error('Course payment processing error:', error);
+    console.error('Cart payment processing error:', error);
     return NextResponse.json(
-      { error: 'Failed to process course payment' },
+      { error: 'Failed to process cart payment' },
       { status: 500 }
     );
   }

@@ -1,20 +1,29 @@
 import Stripe from 'stripe';
 import { loadStripe } from '@stripe/stripe-js';
+import { 
+  StripeError 
+} from './types/payment';
 import type { 
   CheckoutSession, 
   CoursePaymentData, 
-  CompanyPaymentData,
-  StripeError 
+  CompanyPaymentData
 } from './types/payment';
 
 // Server-side Stripe instance
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-11-20.acacia',
-  typescript: true,
-});
+export const stripe = new Stripe(
+  process.env.STRIPE_SECRET_KEY || 
+  'sk_test_51S3admAg9GYbrVh7z5KfLTkM34Rw9Jha40ep38J6g1Fq4fjtOWZEjhWvX2dtgPWe5NyzFXShYLq7iYSImZBlSNsu00xLEeFXcw', 
+  {
+    apiVersion: '2023-10-16',
+    typescript: true,
+  }
+);
 
 // Client-side Stripe promise
-export const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+export const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 
+  'pk_test_51S3admAg9GYbrVh7DPV15rklddjVOQBqZcshYmL262JPrVGK61M05wjqwfd7a6o2NSHUydoOPYutpKg3CLm8X0sH000UWjcTnR'
+);
 
 /**
  * Create a checkout session for course purchase
@@ -48,8 +57,8 @@ export async function createCourseCheckoutSession(
         userName: paymentData.userName,
         courseName: paymentData.courseName,
       },
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/courses/${paymentData.courseId}?payment=success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/courses/${paymentData.courseId}?payment=canceled`,
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/courses/${paymentData.courseId}?payment=success`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/courses/${paymentData.courseId}?payment=canceled`,
       automatic_tax: {
         enabled: true,
       },
@@ -118,8 +127,8 @@ export async function createCompanyCheckoutSession(
         companyName: paymentData.companyName,
         billingPeriod: paymentData.billingPeriod,
       },
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/company?payment=success`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/company?payment=canceled`,
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/dashboard/company?payment=success`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/dashboard/company?payment=canceled`,
       automatic_tax: {
         enabled: true,
       },

@@ -1,5 +1,5 @@
 import { prisma } from './prisma'
-import { validateCompanyPayment } from './payment-validation'
+import { validateCompanySubscription } from './payment-validation'
 
 export interface EnrollmentValidation {
   canEnroll: boolean
@@ -115,7 +115,7 @@ export async function validateEnrollmentEligibility(
     // For paid courses, check if user/company has purchased access
     if (user.companyId) {
       // Company user - check company purchases
-      const companyValidation = await validateCompanyPayment(user.companyId)
+      const companyValidation = await validateCompanySubscription(user.companyId)
       
       if (!companyValidation.isValid) {
         return {
@@ -261,7 +261,7 @@ export async function validateCourseAccess(userId: string, courseId: string): Pr
     }
 
     // Validate company payment status
-    const companyValidation = await validateCompanyPayment(enrollment.coursePurchase.companyId)
+    const companyValidation = await validateCompanySubscription(enrollment.coursePurchase.companyId)
     return companyValidation.isValid
 
   } catch (error) {

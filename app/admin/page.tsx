@@ -131,6 +131,11 @@ export default function AdminDashboard() {
   // Gift course modal state
   const [showGiftModal, setShowGiftModal] = useState(false);
 
+  // Delete submission state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [submissionToDelete, setSubmissionToDelete] = useState<APVSubmission | null>(null);
+  const [isDeletingSubmission, setIsDeletingSubmission] = useState(false);
+
   useEffect(() => {
     if (session) {
       fetchAdminData();
@@ -297,6 +302,45 @@ export default function AdminDashboard() {
         {config.text}
       </span>
     );
+  };
+
+  const handleDeleteSubmission = (submission: APVSubmission) => {
+    setSubmissionToDelete(submission);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteSubmission = async () => {
+    if (!submissionToDelete) return;
+
+    setIsDeletingSubmission(true);
+    try {
+      const response = await fetch(`/api/admin/submissions/${submissionToDelete.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        // Refresh submissions data
+        const submissionsRes = await fetch('/api/admin/submissions');
+        if (submissionsRes.ok) {
+          const submissionsData = await submissionsRes.json();
+          setSubmissions(submissionsData);
+        }
+        
+        setShowDeleteConfirm(false);
+        setSubmissionToDelete(null);
+        
+        const data = await response.json();
+        alert(data.message || 'Inlämning borttagen');
+      } else {
+        const error = await response.json();
+        alert(error.message || 'Fel vid borttagning av inlämning');
+      }
+    } catch (error) {
+      console.error('Error deleting submission:', error);
+      alert('Ett fel uppstod vid borttagning av inlämning');
+    } finally {
+      setIsDeletingSubmission(false);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -526,14 +570,15 @@ export default function AdminDashboard() {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-6"
             >
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Kurser</h2>
                 <button
                   onClick={handleCreateCourse}
-                  className="btn-primary inline-flex items-center w-full sm:w-auto justify-center"
+                  className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors inline-flex items-center justify-center text-sm font-medium w-full sm:w-auto"
                 >
-                  <PlusIcon className="w-5 h-5 mr-2" />
-                  Skapa Ny Kurs
+                  <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                  <span className="hidden sm:inline">Skapa Ny Kurs</span>
+                  <span className="sm:hidden">Ny Kurs</span>
                 </button>
               </div>
 
@@ -857,28 +902,42 @@ export default function AdminDashboard() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button 
-                              onClick={() => handleViewSubmission(submission)}
-                              className="text-blue-600 hover:text-blue-900 mr-3"
-                            >
-                              Granska
-                            </button>
-                            {submission.status === 'PENDING' && (
-                              <>
-                                <button 
-                                  onClick={() => handleUpdateSubmissionStatus(submission.id, 'APPROVED')}
-                                  className="text-green-600 hover:text-green-900 mr-3"
-                                >
-                                  Godkänn
-                                </button>
-                                <button 
-                                  onClick={() => handleUpdateSubmissionStatus(submission.id, 'REJECTED')}
-                                  className="text-red-600 hover:text-red-900"
-                                >
-                                  Avvisa
-                                </button>
-                              </>
-                            )}
+                            <div className="flex items-center justify-end space-x-2">
+                              <button 
+                                onClick={() => handleViewSubmission(submission)}
+                                className="text-blue-600 hover:text-blue-900 px-2 py-1 rounded transition-colors"
+                                title="Granska inlämning"
+                              >
+                                Granska
+                              </button>
+                              
+                              {submission.status === 'PENDING' && (
+                                <>
+                                  <button 
+                                    onClick={() => handleUpdateSubmissionStatus(submission.id, 'APPROVED')}
+                                    className="text-green-600 hover:text-green-900 px-2 py-1 rounded transition-colors"
+                                    title="Godkänn inlämning"
+                                  >
+                                    Godkänn
+                                  </button>
+                                  <button 
+                                    onClick={() => handleUpdateSubmissionStatus(submission.id, 'REJECTED')}
+                                    className="text-red-600 hover:text-red-900 px-2 py-1 rounded transition-colors"
+                                    title="Avvisa inlämning"
+                                  >
+                                    Avvisa
+                                  </button>
+                                </>
+                              )}
+                              
+                              <button 
+                                onClick={() => handleDeleteSubmission(submission)}
+                                className="text-red-600 hover:text-red-900 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+                                title="Ta bort inlämning (tillåter omskickning)"
+                              >
+                                <TrashIcon className="w-4 h-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -923,6 +982,64 @@ export default function AdminDashboard() {
           fetchAdminData();
         }}
       />
+
+      {/* Delete Submission Confirmation Modal */}
+      {showDeleteConfirm && submissionToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-red-900 mb-4">Ta bort inlämning</h3>
+            
+            <div className="mb-6">
+              <p className="text-sm text-gray-700 mb-4">
+                Är du säker på att du vill ta bort denna inlämning? Detta kommer att:
+              </p>
+              <ul className="text-sm text-gray-600 space-y-1 mb-4 ml-4">
+                <li>• Ta bort inlämningen permanent</li>
+                <li>• Tillåta användaren att skicka in på nytt</li>
+                <li>• Användaren kan då få en ny poäng baserat på uppdaterat kursinnehåll</li>
+              </ul>
+              
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Användare:</strong> {submissionToDelete.user.name || submissionToDelete.user.email}
+                </p>
+                <p className="text-sm text-blue-800">
+                  <strong>Kurs:</strong> {submissionToDelete.courseTitle}
+                </p>
+                <p className="text-sm text-blue-800">
+                  <strong>Nuvarande poäng:</strong> {submissionToDelete.finalScore}%
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setSubmissionToDelete(null);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={confirmDeleteSubmission}
+                disabled={isDeletingSubmission}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {isDeletingSubmission ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Tar bort...
+                  </>
+                ) : (
+                  'Ta bort inlämning'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
