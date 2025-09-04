@@ -7,9 +7,12 @@ import type { CoursePaymentData, CompanyPaymentData } from '@/lib/types/payment'
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('Cart checkout API called');
     const session = await getServerSession(authOptions);
+    console.log('Session:', session);
     
     if (!session?.user?.email) {
+      console.log('No session or email found');
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -18,8 +21,10 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { items, customerData } = body;
+    console.log('Request body:', { items, customerData });
 
     if (!items || !Array.isArray(items) || items.length === 0) {
+      console.log('No items in cart');
       return NextResponse.json(
         { error: 'No items in cart' },
         { status: 400 }
@@ -30,8 +35,10 @@ export async function POST(request: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
     });
+    console.log('User found:', user);
 
     if (!user) {
+      console.log('User not found in database');
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
@@ -100,6 +107,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Stripe checkout session
+    console.log('Creating Stripe checkout session with line items:', lineItems);
+    console.log('Metadata:', metadata);
+    console.log('Stripe instance:', !!stripe);
+    console.log('Stripe API version:', stripe.getApiField('version'));
+    
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card', 'klarna'],
@@ -188,6 +200,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Cart checkout creation error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
       { 
         error: 'Failed to create checkout session',
