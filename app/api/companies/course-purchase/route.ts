@@ -25,7 +25,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has access to this company
-    if (session.user.role !== 'ADMIN' && session.user.companyId !== companyId) {
+    const user = session.user as any
+    if (user.role !== 'ADMIN' && user.companyId !== companyId) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }
@@ -93,7 +94,6 @@ export async function POST(request: NextRequest) {
             userId: employeeId,
             courseId,
             coursePurchaseId: coursePurchase.id,
-            status: 'ACTIVE',
             enrolledAt: new Date()
           }
         })
@@ -108,7 +108,6 @@ export async function POST(request: NextRequest) {
               userId: employee.id,
               courseId,
               coursePurchaseId: coursePurchase.id,
-              status: 'ACTIVE',
               enrolledAt: new Date()
             }
           })

@@ -50,11 +50,11 @@ export async function POST(request: NextRequest) {
     const companyAccounts = items.filter(item => item.type === 'company_account');
 
     // Create line items for Stripe checkout
-    const lineItems = [];
-    let metadata = {
-      userId: user.id,
-      userEmail: user.email,
-      userName: customerData.firstName + ' ' + customerData.lastName,
+    const lineItems = [] as any[];
+    const metadata: Record<string, string> = {
+      userId: String(user.id),
+      userEmail: String(user.email),
+      userName: String(customerData.firstName + ' ' + customerData.lastName),
     };
 
     // Add course items
@@ -110,7 +110,6 @@ export async function POST(request: NextRequest) {
     console.log('Creating Stripe checkout session with line items:', lineItems);
     console.log('Metadata:', metadata);
     console.log('Stripe instance:', !!stripe);
-    console.log('Stripe API version:', stripe.getApiField('version'));
     
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: 'payment',

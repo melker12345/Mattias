@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { headers } from 'next/headers'
-import Stripe from 'stripe'
-import { handlePaymentWebhook } from '@/lib/payment-validation'
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
-})
-
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+import { verifyWebhookSignature } from '@/lib/stripe'
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,10 +15,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    let event: Stripe.Event
-
     try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+      // Verify signature and no-op (deprecated route)
+      verifyWebhookSignature(body, signature)
     } catch (err) {
       console.error('Webhook signature verification failed:', err)
       return NextResponse.json(
@@ -34,10 +26,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Handle the event
-    await handlePaymentWebhook(event)
-
-    return NextResponse.json({ received: true })
+    // This legacy endpoint is deprecated; main webhook is at /api/webhooks/stripe
+    return NextResponse.json({ received: true, note: 'Use /api/webhooks/stripe' })
 
   } catch (error) {
     console.error('Webhook error:', error)

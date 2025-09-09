@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getSubscriptionDetails } from '@/lib/payment-validation'
+import { validateCompanySubscription } from '@/lib/payment-validation'
 
 export async function GET(
   request: NextRequest,
@@ -18,25 +18,19 @@ export async function GET(
     }
 
     const companyId = params.id
+    const user = session.user as any
 
     // Validate that user has access to this company
-    if (session.user.role !== 'ADMIN' && session.user.companyId !== companyId) {
+    if (user.role !== 'ADMIN' && user.companyId !== companyId) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }
       )
     }
 
-    const subscription = await getSubscriptionDetails(companyId)
+    const validation = await validateCompanySubscription(companyId)
 
-    if (!subscription) {
-      return NextResponse.json(
-        { error: 'Company not found' },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json(subscription)
+    return NextResponse.json(validation)
 
   } catch (error) {
     console.error('Subscription details error:', error)

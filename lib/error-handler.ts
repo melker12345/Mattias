@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { logger } from './logger';
-import type { PaymentError, FortnoxError, StripeError } from './types/payment';
+import { PaymentError, FortnoxError, StripeError } from './types/payment';
 
 /**
  * Centralized error handling for the payment system
@@ -229,7 +229,8 @@ export async function withRetry<T>(
         ...context,
         attempt,
         nextRetryInMs: delayMs * attempt,
-      }, lastError);
+        error: lastError?.message,
+      });
 
       // Exponential backoff
       await new Promise(resolve => setTimeout(resolve, delayMs * attempt));

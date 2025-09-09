@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
-import type {
+import {
   FortnoxCustomer,
   FortnoxInvoice,
   FortnoxInvoiceResponse,

@@ -111,6 +111,40 @@ export async function POST(
       });
     }
 
+    // Collect questions and user's answers for this course
+    const questions = await prisma.question.findMany({
+      where: { lesson: { courseId } },
+      include: {
+        answers: {
+          where: { userId: user.id }
+        }
+      }
+    });
+
+    const totalQuestions = questions.length;
+    const correctAnswers = questions.reduce((count, q) => {
+      const ans = q.answers[0];
+      return count + (ans?.isCorrect ? 1 : 0);
+    }, 0);
+
+    const answersData = questions.map((q) => {
+      const ans = q.answers[0];
+      let options: any = undefined;
+      try {
+        options = q.options ? JSON.parse(q.options) : undefined;
+      } catch (_) {
+        options = undefined;
+      }
+      return {
+        questionId: q.id,
+        question: q.question,
+        userAnswer: ans ? ans.answer : null,
+        isCorrect: ans ? ans.isCorrect : false,
+        correctAnswer: q.correctAnswer,
+        options
+      };
+    });
+
     // Create APV submission
     const apvSubmission = await prisma.aPVSubmission.create({
       data: {
@@ -127,6 +161,9 @@ export async function POST(
         completionDate: enrollment.completedAt || new Date(),
         finalScore,
         passingScore,
+        totalQuestions,
+        correctAnswers,
+        answersData: JSON.stringify(answersData),
         status: 'PENDING'
       }
     });

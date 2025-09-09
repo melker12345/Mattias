@@ -160,7 +160,7 @@ async function processSingleCourse(session: any, user: any, courseId: string): P
     // Create Payment record
     await prisma.payment.create({
       data: {
-        userId: userId,
+        userId: user.id,
         courseId: courseId,
         enrollmentId: enrollment.id,
         stripePaymentId: session.payment_intent,
@@ -170,19 +170,19 @@ async function processSingleCourse(session: any, user: any, courseId: string): P
         currency: session.currency.toUpperCase(),
         status: 'succeeded',
         paymentMethod: session.payment_method_types?.[0] || 'card',
-        metadata: JSON.stringify(metadata),
+        metadata: JSON.stringify(session.metadata || {}),
       },
     });
 
     // Process Fortnox integration asynchronously
     processFortnoxIntegration({
-      userId,
+      userId: user.id,
       courseId,
       amount: session.amount_total / 100,
       currency: session.currency.toUpperCase(),
-      courseName,
+      courseName: (session.metadata && (session.metadata as any).courseName) || course.title,
       userEmail: user.email,
-      userName: userName || user.name || 'Unknown User',
+      userName: (session.metadata && (session.metadata as any).userName) || user.name || 'Unknown User',
     }, session.payment_intent).catch((error) => {
       console.error('Fortnox integration failed:', error);
       // Don't fail the webhook - payment is already processed

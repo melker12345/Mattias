@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { PaymentValidation, SubscriptionStatus } from '@/lib/payment-validation'
+import type { PaymentValidationResult } from '@/lib/types/payment'
 
 interface UsePaymentValidationReturn {
   isValid: boolean
@@ -13,7 +13,7 @@ interface UsePaymentValidationReturn {
 
 export function usePaymentValidation(companyId?: string): UsePaymentValidationReturn {
   const { data: session } = useSession()
-  const [validation, setValidation] = useState<PaymentValidation | null>(null)
+  const [validation, setValidation] = useState<PaymentValidationResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -48,7 +48,7 @@ export function usePaymentValidation(companyId?: string): UsePaymentValidationRe
 
   return {
     isValid: validation?.isValid ?? false,
-    status: validation?.status ?? 'UNKNOWN',
+    status: (validation?.paymentStatus ?? 'none').toUpperCase(),
     message: validation?.message ?? '',
     loading,
     error,

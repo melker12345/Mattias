@@ -286,7 +286,7 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
                   </p>
                   {enrollmentData.giftReason && (
                     <p className="text-xs text-gray-500 mt-2">
-                      "{enrollmentData.giftReason}"
+                      &quot;{enrollmentData.giftReason}&quot;
                     </p>
                   )}
                 </div>
