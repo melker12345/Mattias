@@ -3,6 +3,8 @@ import { requireAdmin, isNextResponse } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createSecureEnrollment } from '@/lib/enrollment-validation';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const adminResult = await requireAdmin();

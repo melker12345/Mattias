@@ -3,6 +3,8 @@ import { requireAuth, isNextResponse } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createSecureEnrollment } from '@/lib/enrollment-validation';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }

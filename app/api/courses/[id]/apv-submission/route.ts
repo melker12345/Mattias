@@ -3,6 +3,8 @@ import { requireAuth, isNextResponse } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { encryptPersonnummer, normalisePersonnummer } from '@/lib/encryption';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }

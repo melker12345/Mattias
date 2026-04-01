@@ -218,17 +218,15 @@ NEXT_PUBLIC_BASE_URL=
 
 
 
+TODO:
+- Make sure companies can buy courses for induviduals.
+- Hosting
+- ID06 integration
+- for him to set up Supabase account.
+- Bugs 
+- Remove stripe
 
 
-## BankID
-
-Priser för BankID förlitande part
-Specifikation	Pris
-Anslutningspris 	Enligt offert
-Månadspris	500 kr
-Transaktionspris per kontroll av legitimering (inloggning)	20 öre
-Transaktionspris per kontroll av underskrift (signering)	40 öre
-Transaktionspris per skanning av digitalt ID-kort från BankID	20 öre
-Transaktionspris per Extra kontroll av ID-handling (oavsett kanal*)	6,50 kr
-
-since BankID is quite expensive, we should consider using a different solution for authentication.
+What is jest.config.js and jest.setup.js for?
+What are we using Zod for?
+Why are we using axios?

@@ -3,6 +3,8 @@ import { requireAdmin, isNextResponse } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { generateID06Export } from '@/lib/export'
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const user = await requireAdmin()
   if (isNextResponse(user)) return user
