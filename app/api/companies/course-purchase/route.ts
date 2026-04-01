@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { requireAuth, isNextResponse } from '@/lib/auth'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+    const authResult = await requireAuth()
+    if (isNextResponse(authResult)) return authResult
 
     const { companyId, employeeId, courseIds, purchaseType } = await request.json()
 
@@ -25,134 +18,68 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has access to this company
-    const user = session.user as any
-    if (user.role !== 'ADMIN' && user.companyId !== companyId) {
+    if (authResult.role !== 'ADMIN' && authResult.companyId !== companyId) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }
       )
     }
 
-    // Get company and validate it exists
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-      include: {
-        employees: true
-      }
-    })
+    const admin = createAdminClient()
 
-    if (!company) {
-      return NextResponse.json(
-        { error: 'Company not found' },
-        { status: 404 }
-      )
-    }
+    const { data: company } = await admin.from('companies').select('id').eq('id', companyId).maybeSingle()
+    if (!company) return NextResponse.json({ error: 'Company not found' }, { status: 404 })
 
-    // Get courses and validate they exist
-    const courses = await prisma.course.findMany({
-      where: {
-        id: { in: courseIds }
-      }
-    })
+    const { data: courses } = await admin.from('courses').select('id, price').in('id', courseIds)
+    if (!courses || courses.length !== courseIds.length) return NextResponse.json({ error: 'Some courses not found' }, { status: 404 })
 
-    if (courses.length !== courseIds.length) {
-      return NextResponse.json(
-        { error: 'Some courses not found' },
-        { status: 404 }
-      )
-    }
+    const totalPrice = courses.reduce((sum, c) => sum + (c.price as number), 0)
+    const finalPrice = purchaseType === 'bulk' ? totalPrice * 0.85 : totalPrice
 
-    // Calculate total price
-    const totalPrice = courses.reduce((sum, course) => sum + course.price, 0)
-    let finalPrice = totalPrice
+    const { data: coursePurchase } = await admin.from('course_purchases').insert({
+      company_id: companyId,
+      course_id: courseIds[0],
+      quantity: 1,
+      price_per_unit: courses[0].price,
+      total_amount: finalPrice,
+    }).select().single()
 
-    // Apply bulk discount if purchasing for all employees
-    if (purchaseType === 'bulk') {
-      const discount = totalPrice * 0.15 // 15% bulk discount
-      finalPrice = totalPrice - discount
-    }
-
-    // Create course purchase record
-    const coursePurchase = await prisma.coursePurchase.create({
-      data: {
-        companyId,
-        courseId: courseIds[0], // For now, we'll create one purchase per course
-        quantity: purchaseType === 'bulk' ? company.employees.length : 1,
-        pricePerUnit: courses[0].price,
-        totalAmount: finalPrice
-      }
-    })
-
-    // Create enrollments
-    const enrollments = []
+    const enrollmentRows: { user_id: string; course_id: string; course_purchase_id: string }[] = []
 
     if (purchaseType === 'individual' && employeeId) {
-      // Individual purchase - enroll specific employee
       for (const courseId of courseIds) {
-        const enrollment = await prisma.enrollment.create({
-          data: {
-            userId: employeeId,
-            courseId,
-            coursePurchaseId: coursePurchase.id,
-            enrolledAt: new Date()
-          }
-        })
-        enrollments.push(enrollment)
+        enrollmentRows.push({ user_id: employeeId, course_id: courseId, course_purchase_id: coursePurchase!.id })
       }
     } else if (purchaseType === 'bulk') {
-      // Bulk purchase - enroll all employees
-      for (const employee of company.employees) {
+      const { data: employees } = await admin.from('users').select('id').eq('company_id', companyId).eq('role', 'EMPLOYEE')
+      for (const emp of employees ?? []) {
         for (const courseId of courseIds) {
-          const enrollment = await prisma.enrollment.create({
-            data: {
-              userId: employee.id,
-              courseId,
-              coursePurchaseId: coursePurchase.id,
-              enrolledAt: new Date()
-            }
-          })
-          enrollments.push(enrollment)
+          enrollmentRows.push({ user_id: emp.id, course_id: courseId, course_purchase_id: coursePurchase!.id })
         }
       }
     }
 
-    // Create invoice for the purchase
-    const invoice = await prisma.invoice.create({
-      data: {
-        companyId,
-        invoiceNumber: `INV-COURSE-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-        amount: finalPrice,
-        currency: 'SEK',
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-        status: 'PENDING'
-      }
-    })
+    if (enrollmentRows.length > 0) await admin.from('enrollments').insert(enrollmentRows)
 
-    // Add invoice items
+    const { data: invoice } = await admin.from('invoices').insert({
+      company_id: companyId,
+      invoice_number: `INV-COURSE-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+      amount: finalPrice, currency: 'SEK',
+      due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'PENDING',
+    }).select('id, invoice_number, amount').single()
+
     for (const course of courses) {
-      await prisma.invoiceItem.create({
-        data: {
-          invoiceId: invoice.id,
-          courseId: course.id,
-          quantity: purchaseType === 'bulk' ? company.employees.length : 1,
-          price: course.price,
-          total: purchaseType === 'bulk' ? course.price * company.employees.length : course.price
-        }
-      })
+      const qty = purchaseType === 'bulk' ? enrollmentRows.filter(e => e.course_id === course.id).length : 1
+      await admin.from('invoice_items').insert({ invoice_id: invoice!.id, course_id: course.id, quantity: qty, price: course.price, total: (course.price as number) * qty })
     }
 
     return NextResponse.json({
       success: true,
-      message: purchaseType === 'individual' 
-        ? 'Kurser köpta för anställd'
-        : 'Kurser köpta för alla anställda',
+      message: purchaseType === 'individual' ? 'Kurser köpta för anställd' : 'Kurser köpta för alla anställda',
       coursePurchase,
-      enrollments: enrollments.length,
-      invoice: {
-        id: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-        amount: invoice.amount
-      }
+      enrollments: enrollmentRows.length,
+      invoice: { id: invoice!.id, invoiceNumber: invoice!.invoice_number, amount: invoice!.amount },
     })
 
   } catch (error) {

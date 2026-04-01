@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSupabaseAuth } from '@/app/providers';
 import { useRouter } from 'next/navigation';
 import { 
   UserIcon, 
@@ -51,7 +51,7 @@ interface UserProfile {
 }
 
 export default function ProfilePage() {
-  const { data: session, status } = useSession();
+  const { user } = useSupabaseAuth();
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,15 +62,13 @@ export default function ProfilePage() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
-    if (status === 'loading') return;
-    
-    if (status === 'unauthenticated') {
+    if (!user && !loading) {
       router.push('/auth/signin');
       return;
     }
 
     fetchProfile();
-  }, [status, router]);
+  }, [user, router]);
 
   const fetchProfile = async () => {
     try {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET(
   request: NextRequest,
@@ -9,80 +9,29 @@ export async function GET(
     const companyId = params.id
     const employeeId = params.employeeId
 
-    // Verify company exists
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-    })
+    const admin = createAdminClient()
 
-    if (!company) {
-      return NextResponse.json(
-        { message: 'Företag hittades inte' },
-        { status: 404 }
-      )
+    const { data: company } = await admin.from('companies').select('id').eq('id', companyId).maybeSingle()
+    if (!company) return NextResponse.json({ message: 'Företag hittades inte' }, { status: 404 })
+
+    const { data: employee } = await admin.from('users').select('id, email, name, identity_verified')
+      .eq('id', employeeId).eq('company_id', companyId).eq('role', 'EMPLOYEE').maybeSingle()
+    if (!employee) return NextResponse.json({ message: 'Anställd hittades inte' }, { status: 404 })
+
+    if (employee.identity_verified) {
+      return NextResponse.json({ message: 'Anställd är redan verifierad' }, { status: 400 })
     }
 
-    // Get employee
-    const employee = await prisma.user.findFirst({
-      where: {
-        id: employeeId,
-        companyId: companyId,
-        role: 'EMPLOYEE'
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        bankIdVerified: true
-      }
-    })
+    const { data: invitation } = await admin.from('invitations').select('id, email, expires_at, is_existing_user, token')
+      .eq('email', employee.email).eq('company_id', companyId).eq('used', false)
+      .gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(1).maybeSingle()
 
-    if (!employee) {
-      return NextResponse.json(
-        { message: 'Anställd hittades inte' },
-        { status: 404 }
-      )
-    }
-
-    // If employee is already verified, no need for invitation link
-    if (employee.bankIdVerified) {
-      return NextResponse.json(
-        { message: 'Anställd är redan verifierad' },
-        { status: 400 }
-      )
-    }
-
-    // Find the most recent valid invitation for this employee
-    const invitation = await prisma.invitation.findFirst({
-      where: {
-        email: employee.email,
-        companyId: companyId,
-        used: false,
-        expiresAt: {
-          gt: new Date()
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
-
-    if (!invitation) {
-      return NextResponse.json(
-        { message: 'Ingen aktiv inbjudning hittades' },
-        { status: 404 }
-      )
-    }
+    if (!invitation) return NextResponse.json({ message: 'Ingen aktiv inbjudning hittades' }, { status: 404 })
 
     const invitationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/invite/${invitation.token}`
-
     return NextResponse.json({
       invitationUrl,
-      invitation: {
-        id: invitation.id,
-        email: invitation.email,
-        expiresAt: invitation.expiresAt,
-        isExistingUser: invitation.isExistingUser
-      }
+      invitation: { id: invitation.id, email: invitation.email, expiresAt: invitation.expires_at, isExistingUser: invitation.is_existing_user },
     })
   } catch (error) {
     console.error('Error fetching invitation link:', error)

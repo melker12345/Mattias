@@ -1,4 +1,4 @@
-import { prisma } from './prisma';
+import { createAdminClient } from './supabase/admin';
 import type { PaymentValidationResult } from './types/payment';
 
 /**
@@ -9,18 +9,13 @@ export async function validateCoursePayment(
   courseId: string
 ): Promise<PaymentValidationResult> {
   try {
-    const enrollment = await prisma.enrollment.findUnique({
-      where: {
-        userId_courseId: {
-          userId,
-          courseId,
-        },
-      },
-      include: {
-        course: true,
-        payment: true,
-      },
-    });
+    const admin = createAdminClient();
+    const { data: enrollment } = await admin
+      .from('enrollments')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('course_id', courseId)
+      .maybeSingle();
 
     if (!enrollment) {
       return {
@@ -32,7 +27,7 @@ export async function validateCoursePayment(
     }
 
     // Check if it's a gift
-    if (enrollment.isGift) {
+    if (enrollment.is_gift) {
       return {
         isValid: true,
         hasAccess: true,
@@ -42,7 +37,7 @@ export async function validateCoursePayment(
     }
 
     // Check if payment is confirmed
-    if (enrollment.isPaid && enrollment.paidAt) {
+    if (enrollment.is_paid && enrollment.paid_at) {
       return {
         isValid: true,
         hasAccess: true,
@@ -52,7 +47,7 @@ export async function validateCoursePayment(
     }
 
     // Check if payment is pending
-    if (enrollment.stripePaymentId && !enrollment.isPaid) {
+    if (enrollment.stripe_payment_id && !enrollment.is_paid) {
       return {
         isValid: false,
         hasAccess: false,
@@ -84,9 +79,12 @@ export async function validateCoursePayment(
  */
 export async function validateCompanySubscription(companyId: string): Promise<PaymentValidationResult> {
   try {
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-    });
+    const admin = createAdminClient();
+    const { data: company } = await admin
+      .from('companies')
+      .select('payment_status, is_active, plan_end_date')
+      .eq('id', companyId)
+      .single();
 
     if (!company) {
       return {
@@ -98,14 +96,13 @@ export async function validateCompanySubscription(companyId: string): Promise<Pa
     }
 
     // Check if subscription is active
-    if (company.paymentStatus === 'PAID' && company.isActive) {
-      // Check if subscription hasn't expired
-      if (!company.planEndDate || company.planEndDate > new Date()) {
+    if (company.payment_status === 'PAID' && company.is_active) {
+      if (!company.plan_end_date || new Date(company.plan_end_date) > new Date()) {
         return {
           isValid: true,
           hasAccess: true,
           paymentStatus: 'paid',
-          expiresAt: company.planEndDate || undefined,
+          expiresAt: company.plan_end_date ? new Date(company.plan_end_date) : undefined,
           message: 'Active subscription',
         };
       } else {
@@ -119,7 +116,7 @@ export async function validateCompanySubscription(companyId: string): Promise<Pa
     }
 
     // Check payment status
-    switch (company.paymentStatus) {
+    switch (company.payment_status) {
       case 'PENDING':
         return {
           isValid: false,
@@ -170,10 +167,12 @@ export async function validateUserAccess(
   resourceId?: string
 ): Promise<PaymentValidationResult> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { company: true },
-    });
+    const admin = createAdminClient();
+    const { data: user } = await admin
+      .from('users')
+      .select('role, company_id')
+      .eq('id', userId)
+      .single();
 
     if (!user) {
       return {
@@ -186,12 +185,7 @@ export async function validateUserAccess(
 
     // Admin always has access
     if (user.role === 'ADMIN') {
-      return {
-        isValid: true,
-        hasAccess: true,
-        paymentStatus: 'paid',
-        message: 'Admin access',
-      };
+      return { isValid: true, hasAccess: true, paymentStatus: 'paid', message: 'Admin access' };
     }
 
     switch (resourceType) {
@@ -207,8 +201,8 @@ export async function validateUserAccess(
         return await validateCoursePayment(userId, resourceId);
 
       case 'company_registration':
-        if (user.companyId) {
-          return await validateCompanySubscription(user.companyId);
+        if (user.company_id) {
+          return await validateCompanySubscription(user.company_id);
         }
         return {
           isValid: false,
@@ -270,39 +264,22 @@ export async function canEnrollInCourse(
   courseId: string
 ): Promise<{ canEnroll: boolean; reason: string; requiresPayment: boolean }> {
   try {
-    // Check if course exists and is published
-    const course = await prisma.course.findUnique({
-      where: { id: courseId },
-    });
+    const admin = createAdminClient();
+    const { data: course } = await admin.from('courses').select('is_published').eq('id', courseId).single();
 
     if (!course) {
-      return {
-        canEnroll: false,
-        reason: 'Course not found',
-        requiresPayment: false,
-      };
+      return { canEnroll: false, reason: 'Course not found', requiresPayment: false };
     }
 
-    if (!course.isPublished) {
-      return {
-        canEnroll: false,
-        reason: 'Course is not available',
-        requiresPayment: false,
-      };
+    if (!course.is_published) {
+      return { canEnroll: false, reason: 'Course is not available', requiresPayment: false };
     }
 
-    // Check existing enrollment
-    const existingEnrollment = await prisma.enrollment.findUnique({
-      where: {
-        userId_courseId: {
-          userId,
-          courseId,
-        },
-      },
-    });
+    const { data: existingEnrollment } = await admin
+      .from('enrollments').select('is_paid, is_gift').eq('user_id', userId).eq('course_id', courseId).maybeSingle();
 
     if (existingEnrollment) {
-      if (existingEnrollment.isPaid || existingEnrollment.isGift) {
+      if (existingEnrollment.is_paid || existingEnrollment.is_gift) {
         return {
           canEnroll: false,
           reason: 'Already enrolled',
@@ -340,28 +317,13 @@ export async function canEnrollInCourse(
  */
 export async function getUserPaymentHistory(userId: string) {
   try {
-    const payments = await prisma.payment.findMany({
-      where: { userId },
-      include: {
-        course: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
-        enrollment: {
-          select: {
-            id: true,
-            completedAt: true,
-            passed: true,
-            finalScore: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return payments;
+    const admin = createAdminClient();
+    const { data: payments } = await admin
+      .from('payments')
+      .select('*, course:courses(id, title), enrollment:enrollments(id, completed_at, passed, final_score)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    return payments ?? [];
   } catch (error) {
     console.error('Payment history error:', error);
     return [];
@@ -373,12 +335,13 @@ export async function getUserPaymentHistory(userId: string) {
  */
 export async function getCompanyPaymentHistory(companyId: string) {
   try {
-    const payments = await prisma.payment.findMany({
-      where: { companyId },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return payments;
+    const admin = createAdminClient();
+    const { data: payments } = await admin
+      .from('payments')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('created_at', { ascending: false });
+    return payments ?? [];
   } catch (error) {
     console.error('Company payment history error:', error);
     return [];

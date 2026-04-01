@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 
 interface InvitationData {
@@ -22,8 +21,6 @@ export default function InvitePage({ params }: { params: { token: string } }) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [action, setAction] = useState<'accept' | 'signin' | 'signup'>('accept')
   const router = useRouter()
-  const { data: session, status } = useSession()
-
   useEffect(() => {
     const fetchInvitation = async () => {
       try {

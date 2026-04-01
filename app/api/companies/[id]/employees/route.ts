@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET(
   request: NextRequest,
@@ -8,81 +8,46 @@ export async function GET(
   try {
     const companyId = params.id
 
-    // Verify company exists
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-    })
+    const admin = createAdminClient()
 
+    const { data: company } = await admin.from('companies').select('id, name').eq('id', companyId).single()
     if (!company) {
-      return NextResponse.json(
-        { message: 'Företag hittades inte' },
-        { status: 404 }
-      )
+      return NextResponse.json({ message: 'Företag hittades inte' }, { status: 404 })
     }
 
-    // Get all employees for this company
-    const employees = await prisma.user.findMany({
-      where: { 
-        companyId: companyId,
-        role: 'EMPLOYEE'
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        personalNumber: true,
-        bankIdVerified: true,
-        bankIdVerifiedAt: true,
-        id06Eligible: true,
-        createdAt: true,
-        updatedAt: true,
-        // Get enrollment and certificate counts
-        enrollments: {
-          select: {
-            id: true,
-            completedAt: true
-          }
-        },
-        certificates: {
-          select: {
-            id: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
+    const { data: employees } = await admin
+      .from('users')
+      .select('id, name, email, identity_verified, id06_eligible, created_at, updated_at')
+      .eq('company_id', companyId)
+      .eq('role', 'EMPLOYEE')
+      .order('created_at', { ascending: false })
 
-    // Transform the data to match the frontend interface
-    const transformedEmployees = employees.map(employee => {
-      const enrolledCourses = employee.enrollments.length
-      const completedCourses = employee.enrollments.filter(e => e.completedAt).length
-      const certificates = employee.certificates.length
-      
+    // Fetch enrollment + certificate counts for each employee
+    const employeeIds = (employees ?? []).map(e => e.id)
+    const [{ data: enrollments }, { data: certificates }] = await Promise.all([
+      admin.from('enrollments').select('user_id, completed_at').in('user_id', employeeIds),
+      admin.from('certificates').select('user_id').in('user_id', employeeIds),
+    ])
+
+    const transformedEmployees = (employees ?? []).map(employee => {
+      const userEnrollments = (enrollments ?? []).filter(e => e.user_id === employee.id)
+      const userCerts = (certificates ?? []).filter(c => c.user_id === employee.id)
       return {
         id: employee.id,
         name: employee.name,
         email: employee.email,
-        personalNumber: employee.personalNumber,
-        bankIdVerified: employee.bankIdVerified,
-        id06Eligible: employee.id06Eligible,
-        enrolledCourses,
-        completedCourses,
-        certificates,
-        lastActivity: employee.updatedAt ? new Date(employee.updatedAt).toLocaleDateString('sv-SE') : 'Aldrig',
-        createdAt: employee.createdAt,
-        status: employee.bankIdVerified ? 'VERIFIED' : 'PENDING_BANKID'
+        identityVerified: employee.identity_verified,
+        id06Eligible: employee.id06_eligible,
+        enrolledCourses: userEnrollments.length,
+        completedCourses: userEnrollments.filter(e => e.completed_at).length,
+        certificates: userCerts.length,
+        lastActivity: employee.updated_at ? new Date(employee.updated_at).toLocaleDateString('sv-SE') : 'Aldrig',
+        createdAt: employee.created_at,
+        status: employee.identity_verified ? 'VERIFIED' : 'PENDING_VERIFICATION',
       }
     })
 
-    return NextResponse.json({
-      employees: transformedEmployees,
-      company: {
-        id: company.id,
-        name: company.name
-      }
-    })
+    return NextResponse.json({ employees: transformedEmployees, company: { id: company.id, name: company.name } })
   } catch (error) {
     console.error('Error fetching employees:', error)
     return NextResponse.json(

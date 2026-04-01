@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 // GET - Fetch a specific lesson
 export async function GET(
@@ -7,22 +7,9 @@ export async function GET(
   { params }: { params: { id: string; lessonId: string } }
 ) {
   try {
-    const lesson = await prisma.lesson.findUnique({
-      where: { id: params.lessonId },
-      include: {
-        questions: {
-          orderBy: { order: 'asc' }
-        }
-      }
-    });
-
-    if (!lesson) {
-      return NextResponse.json(
-        { message: 'Lektion hittades inte' },
-        { status: 404 }
-      );
-    }
-
+    const admin = createAdminClient();
+    const { data: lesson } = await admin.from('lessons').select('*, questions(*)').eq('id', params.lessonId).single();
+    if (!lesson) return NextResponse.json({ message: 'Lektion hittades inte' }, { status: 404 });
     return NextResponse.json(lesson);
   } catch (error) {
     console.error('Error fetching lesson:', error);
@@ -50,18 +37,11 @@ export async function PUT(
       );
     }
 
-    const lesson = await prisma.lesson.update({
-      where: { id: params.lessonId },
-      data: {
-        title,
-        type,
-        content: content || null,
-        videoUrl: videoUrl || null,
-        imageUrl: imageUrl || null,
-        order: order || undefined
-      }
-    });
-
+    const admin = createAdminClient();
+    const { data: lesson } = await admin.from('lessons').update({
+      title, type, content: content ?? null, video_url: videoUrl ?? null,
+      image_url: imageUrl ?? null, ...(order !== undefined ? { order } : {}),
+    }).eq('id', params.lessonId).select().single();
     return NextResponse.json(lesson);
   } catch (error) {
     console.error('Error updating lesson:', error);
@@ -78,10 +58,8 @@ export async function DELETE(
   { params }: { params: { id: string; lessonId: string } }
 ) {
   try {
-    await prisma.lesson.delete({
-      where: { id: params.lessonId }
-    });
-
+    const admin = createAdminClient();
+    await admin.from('lessons').delete().eq('id', params.lessonId);
     return NextResponse.json({ message: 'Lektion borttagen framgångsrikt' });
   } catch (error) {
     console.error('Error deleting lesson:', error);

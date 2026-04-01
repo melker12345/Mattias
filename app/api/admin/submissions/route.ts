@@ -1,82 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireAdmin, isNextResponse } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
 
-    // Check if user is admin
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
+    const admin = createAdminClient();
+    const { data: submissions, error } = await admin
+      .from('apv_submissions')
+      .select('*, user:users(id, email, name), course:courses(id, title, category)')
+      .order('submitted_at', { ascending: false });
 
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { message: 'Du har inte behörighet att se denna information' },
-        { status: 403 }
-      );
-    }
+    if (error) throw error;
 
-    // Get all APV submissions
-    const submissions = await prisma.aPVSubmission.findMany({
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            personalNumber: true
-          }
-        },
-        course: {
-          select: {
-            id: true,
-            title: true,
-            category: true
-          }
-        }
-      },
-      orderBy: {
-        submittedAt: 'desc'
-      }
-    });
-
-    // Transform data for frontend
-    const transformedSubmissions = submissions.map(submission => ({
-      id: submission.id,
-      user: {
-        id: submission.user.id,
-        email: submission.user.email,
-        name: submission.user.name,
-        personalNumber: submission.user.personalNumber
-      },
-      course: {
-        id: submission.course.id,
-        title: submission.course.title,
-        category: submission.course.category
-      },
-      courseTitle: submission.courseTitle,
-      completionDate: submission.completionDate,
-      finalScore: submission.finalScore,
-      passingScore: submission.passingScore,
-      totalQuestions: submission.totalQuestions,
-      correctAnswers: submission.correctAnswers,
-      timeTaken: submission.timeTaken,
-      status: submission.status,
-      submittedAt: submission.submittedAt,
-      reviewedAt: submission.reviewedAt,
-      reviewedBy: submission.reviewedBy,
-      reviewNotes: submission.reviewNotes,
-      answersData: JSON.parse(submission.answersData)
+    const transformedSubmissions = (submissions ?? []).map(s => ({
+      id: s.id,
+      user: s.user,
+      course: s.course,
+      courseTitle: s.course_title,
+      completionDate: s.completion_date,
+      finalScore: s.final_score,
+      passingScore: s.passing_score,
+      totalQuestions: s.total_questions,
+      correctAnswers: s.correct_answers,
+      timeTaken: s.time_taken,
+      status: s.status,
+      submittedAt: s.submitted_at,
+      reviewedAt: s.reviewed_at,
+      reviewedBy: s.reviewed_by,
+      reviewNotes: s.review_notes,
+      answersData: JSON.parse(s.answers_data),
     }));
 
     return NextResponse.json(transformedSubmissions);
@@ -93,26 +48,9 @@ export async function GET(request: NextRequest) {
 // POST endpoint to update submission status (approve/reject)
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
-
-    // Check if user is admin
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
-
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { message: 'Du har inte behörighet att utföra denna åtgärd' },
-        { status: 403 }
-      );
-    }
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
+    const user = adminResult;
 
     const { submissionId, status, reviewNotes } = await request.json();
 
@@ -130,35 +68,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update submission
-    const updatedSubmission = await prisma.aPVSubmission.update({
-      where: { id: submissionId },
-      data: {
+    const admin = createAdminClient();
+    const { data: updatedSubmission, error } = await admin
+      .from('apv_submissions')
+      .update({
         status,
-        reviewNotes: reviewNotes || null,
-        reviewedAt: new Date(),
-        reviewedBy: user.email
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true
-          }
-        },
-        course: {
-          select: {
-            id: true,
-            title: true
-          }
-        }
-      }
-    });
+        review_notes: reviewNotes ?? null,
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: user.id,
+      })
+      .eq('id', submissionId)
+      .select('*, user:users(id, email, name), course:courses(id, title)')
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json({
       message: `Inlämning ${status === 'APPROVED' ? 'godkänd' : 'avvisad'}`,
-      submission: updatedSubmission
+      submission: updatedSubmission,
     });
 
   } catch (error) {

@@ -1,98 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireAuth, isNextResponse } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
     const courseId = params.id;
-    const userEmail = session.user.email;
+    const user = authResult;
 
-    // Get user
-    const user = await prisma.user.findUnique({
-      where: { email: userEmail }
-    });
+    const admin = createAdminClient();
 
-    if (!user) {
-      return NextResponse.json(
-        { message: 'Användare hittades inte' },
-        { status: 404 }
-      );
-    }
+    const { data: enrollment } = await admin
+      .from('enrollments')
+      .select('*, course:courses(id, title, passing_score)')
+      .eq('user_id', user.id).eq('course_id', courseId).maybeSingle();
 
-    // Get enrollment with course data
-    const enrollment = await prisma.enrollment.findUnique({
-      where: {
-        userId_courseId: {
-          userId: user.id,
-          courseId: courseId
-        }
-      },
-      include: {
-        course: {
-          select: {
-            id: true,
-            title: true,
-            passingScore: true
-          }
-        }
-      }
-    });
+    if (!enrollment) return NextResponse.json({ message: 'Du är inte registrerad för denna kurs' }, { status: 403 });
 
-    if (!enrollment) {
-      return NextResponse.json(
-        { message: 'Du är inte registrerad för denna kurs' },
-        { status: 403 }
-      );
-    }
+    const course = enrollment.course as { id: string; title: string; passing_score: number };
 
-    // Get all questions and user answers to calculate completion
-    const questions = await prisma.question.findMany({
-      where: {
-        lesson: {
-          courseId: courseId
-        }
-      }
-    });
+    const { data: lessonRows } = await admin.from('lessons').select('id').eq('course_id', courseId);
+    const lessonIds = (lessonRows ?? []).map(l => l.id);
+    const { data: allQuestions } = await admin.from('questions').select('id, question, options, correct_answer').in('lesson_id', lessonIds);
+    const questionIds = (allQuestions ?? []).map(q => q.id);
+    const { data: userAnswers } = questionIds.length
+      ? await admin.from('answers').select('question_id, answer, is_correct').eq('user_id', user.id).in('question_id', questionIds)
+      : { data: [] };
 
-    const userAnswers = await prisma.answer.findMany({
-      where: {
-        userId: user.id,
-        question: {
-          lesson: {
-            courseId: courseId
-          }
-        }
-      }
-    });
-
-    const totalQuestions = questions.length;
-    const answeredQuestions = userAnswers.length;
-    const correctAnswers = userAnswers.filter(answer => answer.isCorrect).length;
+    const totalQuestions = (allQuestions ?? []).length;
+    const answeredQuestions = (userAnswers ?? []).length;
+    const correctAnswers = (userAnswers ?? []).filter(a => a.is_correct).length;
     const finalScore = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
-    const passed = finalScore >= enrollment.course.passingScore;
+    const passed = finalScore >= course.passing_score;
 
-    console.log(`Course completion check for ${user.email}:`, {
-      totalQuestions,
-      answeredQuestions,
-      correctAnswers,
-      finalScore,
-      passingScore: enrollment.course.passingScore,
-      passed,
-      allQuestionsAnswered: answeredQuestions === totalQuestions
-    });
+    console.log(`Course completion check for ${user.email}:`, { totalQuestions, answeredQuestions, correctAnswers, finalScore, passingScore: course.passing_score, passed, allQuestionsAnswered: answeredQuestions === totalQuestions });
 
     // Check if all questions are answered (course is completed)
     const isCompleted = totalQuestions > 0 && answeredQuestions === totalQuestions;
@@ -109,77 +55,43 @@ export async function GET(
       });
     }
 
-    // Update enrollment with final results if not already updated
-    if (!enrollment.completedAt || enrollment.finalScore !== finalScore) {
-      console.log('Updating enrollment with final results...');
-      await prisma.enrollment.update({
-        where: {
-          userId_courseId: {
-            userId: user.id,
-            courseId: courseId
-          }
-        },
-        data: {
-          totalQuestions,
-          correctAnswers,
-          finalScore,
-          passed,
-          completedAt: passed ? new Date() : null
-        }
-      });
+    if (!enrollment.completed_at || enrollment.final_score !== finalScore) {
+      await admin.from('enrollments')
+        .update({ total_questions: totalQuestions, correct_answers: correctAnswers, final_score: finalScore, passed, completed_at: passed ? new Date().toISOString() : null })
+        .eq('user_id', user.id).eq('course_id', courseId);
     }
 
-    // Get detailed questions with lesson info for the summary
-    const detailedQuestions = await prisma.question.findMany({
-      where: {
-        lesson: {
-          courseId: courseId
-        }
-      },
-      include: {
-        lesson: true
-      },
-      orderBy: [
-        { lesson: { order: 'asc' } },
-        { order: 'asc' }
-      ]
-    });
-
-    // Create detailed answers data for the summary
-    const answersData = detailedQuestions.map(question => {
-      const userAnswer = userAnswers.find(a => a.questionId === question.id);
+    const answersData = (allQuestions ?? []).map(question => {
+      const userAnswer = (userAnswers ?? []).find(a => a.question_id === question.id);
       const options = JSON.parse(question.options);
-      const correctAnswerIndex = parseInt(question.correctAnswer);
-      
       return {
         questionId: question.id,
         question: question.question,
-        userAnswer: userAnswer?.answer || 'Ej besvarad',
-        correctAnswer: question.correctAnswer,
-        isCorrect: userAnswer?.isCorrect || false,
-        options: options,
-        selectedIndex: userAnswer ? parseInt(userAnswer.answer) : -1
+        userAnswer: userAnswer?.answer ?? 'Ej besvarad',
+        correctAnswer: question.correct_answer,
+        isCorrect: userAnswer?.is_correct ?? false,
+        options,
+        selectedIndex: userAnswer ? parseInt(userAnswer.answer) : -1,
       };
     });
 
-    // Calculate time taken (rough estimate from enrollment to completion)
-    const timeTaken = enrollment.completedAt && enrollment.enrolledAt
-      ? Math.round((enrollment.completedAt.getTime() - enrollment.enrolledAt.getTime()) / (1000 * 60))
+    const timeTaken = enrollment.completed_at && enrollment.enrolled_at
+      ? Math.round((new Date(enrollment.completed_at).getTime() - new Date(enrollment.enrolled_at).getTime()) / 60000)
       : null;
 
     return NextResponse.json({
       completed: true,
       enrolled: true,
-      courseId: enrollment.course.id,
-      courseTitle: enrollment.course.title,
-      finalScore: enrollment.finalScore || 0,
-      passingScore: enrollment.course.passingScore,
-      totalQuestions: enrollment.totalQuestions,
-      correctAnswers: enrollment.correctAnswers,
+      courseId: course.id,
+      courseTitle: course.title,
+      finalScore: enrollment.final_score ?? 0,
+      passingScore: course.passing_score,
+      totalQuestions: enrollment.total_questions,
+      correctAnswers: enrollment.correct_answers,
       passed: enrollment.passed,
-      timeTaken: timeTaken,
+      timeTaken,
       answers: answersData,
-      userEmail: user.email
+      userEmail: user.email,
     });
 
   } catch (error) {

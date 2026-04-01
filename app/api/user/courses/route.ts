@@ -1,102 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireAuth, isNextResponse } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
+    const user = authResult;
 
-    const userEmail = session.user.email;
+    const admin = createAdminClient();
+    const { data: enrollments } = await admin.from('enrollments')
+      .select('enrolled_at, course:courses(id, title, description)')
+      .eq('user_id', user.id).order('enrolled_at', { ascending: false });
 
-    // Get user
-    const user = await prisma.user.findUnique({
-      where: { email: userEmail }
-    });
+    const enrolledCourses = await Promise.all((enrollments ?? []).map(async (enrollment) => {
+      const course = enrollment.course as unknown as { id: string; title: string; description: string };
+      const { data: lessons } = await admin.from('lessons').select('id').eq('course_id', course.id);
+      const lessonIds = (lessons ?? []).map(l => l.id);
+      const { data: progressRecords } = lessonIds.length
+        ? await admin.from('progress').select('completed, completed_at').eq('user_id', user.id).in('lesson_id', lessonIds)
+        : { data: [] };
 
-    if (!user) {
-      return NextResponse.json(
-        { message: 'Användare hittades inte' },
-        { status: 404 }
-      );
-    }
+      const totalLessons = lessonIds.length;
+      const completedLessons = (progressRecords ?? []).filter(p => p.completed).length;
+      const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+      const status: 'in-progress' | 'completed' | 'not-started' =
+        completedLessons === 0 ? 'not-started' : completedLessons === totalLessons ? 'completed' : 'in-progress';
+      const lastProgress = (progressRecords ?? [])
+        .filter(p => p.completed_at)
+        .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())[0];
 
-    // Get user's enrollments with course and progress data
-    const enrollments = await prisma.enrollment.findMany({
-      where: {
-        userId: user.id
-      },
-      include: {
-        course: {
-          include: {
-            lessons: {
-              orderBy: {
-                order: 'asc'
-              }
-            }
-          }
-        }
-      },
-      orderBy: {
-        enrolledAt: 'desc'
-      }
-    });
-
-    // Transform data to include progress information
-    const enrolledCourses = await Promise.all(
-      enrollments.map(async (enrollment) => {
-        const course = enrollment.course;
-        const totalLessons = course.lessons.length;
-        
-        // Get user's progress for this course
-        const progressRecords = await prisma.progress.findMany({
-          where: {
-            userId: user.id,
-            lessonId: {
-              in: course.lessons.map(lesson => lesson.id)
-            }
-          }
-        });
-
-        const completedLessons = progressRecords.filter(p => p.completed).length;
-        const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
-
-        // Determine status
-        let status: 'in-progress' | 'completed' | 'not-started';
-        if (completedLessons === 0) {
-          status = 'not-started';
-        } else if (completedLessons === totalLessons) {
-          status = 'completed';
-        } else {
-          status = 'in-progress';
-        }
-
-        // Get last accessed date (most recent progress update)
-        const lastProgress = progressRecords
-          .filter(p => p.completedAt)
-          .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())[0];
-
-        return {
-          id: course.id,
-          title: course.title,
-          description: course.description,
-          progress,
-          totalLessons,
-          completedLessons,
-          enrolledAt: enrollment.enrolledAt,
-          lastAccessed: lastProgress?.completedAt || enrollment.enrolledAt,
-          status,
-          courseId: course.id
-        };
-      })
-    );
+      return {
+        id: course.id, title: course.title, description: course.description,
+        progress, totalLessons, completedLessons,
+        enrolledAt: enrollment.enrolled_at,
+        lastAccessed: lastProgress?.completed_at ?? enrollment.enrolled_at,
+        status, courseId: course.id,
+      };
+    }));
 
     return NextResponse.json(enrolledCourses);
   } catch (error) {

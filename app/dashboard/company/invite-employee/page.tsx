@@ -6,11 +6,13 @@ import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useSession } from 'next-auth/react'
+import { useSupabaseAuth } from '@/app/providers'
 
 const inviteEmployeeSchema = z.object({
   name: z.string().min(1, 'Namn är obligatoriskt'),
   email: z.string().email('Ogiltig e-postadress'),
+  personnummer: z.string().min(10, 'Ange ett giltigt personnummer (YYYYMMDDXXXX)'),
+  phone: z.string().min(8, 'Ange ett giltigt telefonnummer'),
 })
 
 type InviteEmployeeForm = z.infer<typeof inviteEmployeeSchema>
@@ -27,7 +29,7 @@ export default function InviteEmployeePage() {
     nextSteps: string[]
   } | null>(null)
   const router = useRouter()
-  const { data: session, status } = useSession()
+  const { user } = useSupabaseAuth()
 
   const {
     register,
@@ -39,27 +41,22 @@ export default function InviteEmployeePage() {
   })
 
   useEffect(() => {
-    if (status === 'loading') return
+    if (!user) return
 
-    if (!session) {
-      router.push('/auth/signin')
-      return
-    }
-
-    const userRole = (session.user as any)?.role
+    const userRole = user.user_metadata?.role
     if (userRole !== 'COMPANY_ADMIN') {
       router.push('/dashboard')
       return
     }
 
-    const userCompanyId = (session.user as any)?.companyId
+    const userCompanyId = user.user_metadata?.companyId
     if (!userCompanyId) {
       setError('Inget företag kopplat till ditt konto')
       return
     }
 
     setCompanyId(userCompanyId)
-  }, [session, status, router])
+  }, [user, router])
 
   const onSubmit = async (data: InviteEmployeeForm) => {
     if (!companyId) {
@@ -214,15 +211,51 @@ export default function InviteEmployeePage() {
               )}
             </div>
 
+            <div>
+              <label htmlFor="personnummer" className="block text-sm font-medium text-gray-700 mb-1">
+                Personnummer
+              </label>
+              <input
+                {...register('personnummer')}
+                type="text"
+                id="personnummer"
+                className="input-field"
+                placeholder="YYYYMMDDXXXX"
+              />
+              {errors.personnummer && (
+                <p className="mt-1 text-sm text-red-600">{errors.personnummer.message}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-500">Används för att verifiera den anställdas identitet vid registrering.</p>
+            </div>
 
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                Telefonnummer
+              </label>
+              <input
+                {...register('phone')}
+                type="tel"
+                id="phone"
+                className="input-field"
+                placeholder="07X-XXX XX XX"
+              />
+              {errors.phone && (
+                <p className="mt-1 text-sm text-red-600">{errors.phone.message}</p>
+              )}
+            </div>
+
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-xs text-yellow-800">
+                <strong>Obs:</strong> Du som arbetsgivare ansvarar för att uppgifterna är korrekta. Personnumret krypteras och lagras säkert. Det används enbart för identitetsverifiering och ID06-registrering.
+              </p>
+            </div>
 
             <button
               type="submit"
-              disabled={isSubmitting || !companyId || status === 'loading'}
+              disabled={isSubmitting || !companyId}
               className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Skickar inbjudan...' :
-               status === 'loading' ? 'Laddar...' :
                !companyId ? 'Inget företag hittat' :
                'Bjud in anställd'}
             </button>

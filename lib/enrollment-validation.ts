@@ -1,4 +1,4 @@
-import { prisma } from './prisma'
+import { createAdminClient } from './supabase/admin'
 import { validateCompanySubscription } from './payment-validation'
 
 export interface EnrollmentValidation {
@@ -19,15 +19,10 @@ export async function validateEnrollmentEligibility(
   adminUserId?: string
 ): Promise<EnrollmentValidation> {
   try {
-    // Get user and course data
-    const [user, course] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId },
-        include: { company: true }
-      }),
-      prisma.course.findUnique({
-        where: { id: courseId }
-      })
+    const admin = createAdminClient()
+    const [{ data: user }, { data: course }] = await Promise.all([
+      admin.from('users').select('id, role, company_id').eq('id', userId).single(),
+      admin.from('courses').select('id, price, is_published, passing_score').eq('id', courseId).single(),
     ])
 
     if (!user) {
@@ -46,7 +41,7 @@ export async function validateEnrollmentEligibility(
       }
     }
 
-    if (!course.isPublished) {
+    if (!course.is_published) {
       return {
         canEnroll: false,
         reason: 'Kursen är inte publicerad',
@@ -54,15 +49,8 @@ export async function validateEnrollmentEligibility(
       }
     }
 
-    // Check if already enrolled
-    const existingEnrollment = await prisma.enrollment.findUnique({
-      where: {
-        userId_courseId: {
-          userId: userId,
-          courseId: courseId
-        }
-      }
-    })
+    const { data: existingEnrollment } = await admin
+      .from('enrollments').select('id').eq('user_id', userId).eq('course_id', courseId).maybeSingle()
 
     if (existingEnrollment) {
       return {
@@ -72,13 +60,9 @@ export async function validateEnrollmentEligibility(
       }
     }
 
-    // If it's an admin gift, validate admin permissions
     if (bypassPayment && adminUserId) {
-      const admin = await prisma.user.findUnique({
-        where: { id: adminUserId }
-      })
-
-      if (!admin || admin.role !== 'ADMIN') {
+      const { data: adminUser } = await admin.from('users').select('role').eq('id', adminUserId).single()
+      if (!adminUser || adminUser.role !== 'ADMIN') {
         return {
           canEnroll: false,
           reason: 'Endast administratörer kan ge bort kurser',
@@ -95,7 +79,7 @@ export async function validateEnrollmentEligibility(
     }
 
     // If course is free, allow enrollment
-    if (course.price === 0) {
+    if ((course.price as number) === 0) {
       return {
         canEnroll: true,
         reason: 'Gratis kurs',
@@ -113,28 +97,20 @@ export async function validateEnrollmentEligibility(
     }
 
     // For paid courses, check if user/company has purchased access
-    if (user.companyId) {
-      // Company user - check company purchases
-      const companyValidation = await validateCompanySubscription(user.companyId)
-      
+    if (user.company_id) {
+      const companyValidation = await validateCompanySubscription(user.company_id)
       if (!companyValidation.isValid) {
-        return {
-          canEnroll: false,
-          reason: `Företagets betalning är inte giltig: ${companyValidation.message}`,
-          requiresPayment: true
-        }
+        return { canEnroll: false, reason: `Företagets betalning är inte giltig: ${companyValidation.message}`, requiresPayment: true }
       }
 
-      // Check if company has purchased this course
-      const coursePurchase = await prisma.coursePurchase.findFirst({
-        where: {
-          companyId: user.companyId,
-          courseId: courseId
-        },
-        orderBy: {
-          purchasedAt: 'desc'
-        }
-      })
+      const { data: coursePurchase } = await admin
+        .from('course_purchases')
+        .select('id')
+        .eq('company_id', user.company_id)
+        .eq('course_id', courseId)
+        .order('purchased_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
       if (!coursePurchase) {
         return {
@@ -144,12 +120,7 @@ export async function validateEnrollmentEligibility(
         }
       }
 
-      return {
-        canEnroll: true,
-        reason: 'Företagsköp',
-        requiresPayment: false,
-        coursePurchaseId: coursePurchase.id
-      }
+      return { canEnroll: true, reason: 'Företagsköp', requiresPayment: false, coursePurchaseId: coursePurchase.id }
     } else {
       // Individual user - for now, require payment
       // TODO: Implement individual payment system
@@ -196,18 +167,21 @@ export async function createSecureEnrollment(
       throw new Error(validation.reason)
     }
 
-    // Create the enrollment
-    const enrollment = await prisma.enrollment.create({
-      data: {
-        userId: userId,
-        courseId: courseId,
-        coursePurchaseId: options.coursePurchaseId || validation.coursePurchaseId || null,
-        isGift: options.isGift || false,
-        giftedBy: options.giftedBy || null,
-        giftedAt: options.isGift ? new Date() : null,
-        giftReason: options.giftReason || null
-      }
-    })
+    const admin = createAdminClient()
+    const { data: enrollment, error } = await admin
+      .from('enrollments')
+      .insert({
+        user_id: userId,
+        course_id: courseId,
+        course_purchase_id: options.coursePurchaseId ?? validation.coursePurchaseId ?? null,
+        is_gift: options.isGift ?? false,
+        gifted_by: options.giftedBy ?? null,
+        gifted_at: options.isGift ? new Date().toISOString() : null,
+        gift_reason: options.giftReason ?? null,
+      })
+      .select()
+      .single()
+    if (error) throw error
 
     return {
       success: true,
@@ -230,38 +204,22 @@ export async function createSecureEnrollment(
  */
 export async function validateCourseAccess(userId: string, courseId: string): Promise<boolean> {
   try {
-    const enrollment = await prisma.enrollment.findUnique({
-      where: {
-        userId_courseId: {
-          userId: userId,
-          courseId: courseId
-        }
-      },
-      include: {
-        coursePurchase: {
-          include: {
-            company: true
-          }
-        }
-      }
-    })
+    const admin = createAdminClient()
+    const { data: enrollment } = await admin
+      .from('enrollments')
+      .select('is_gift, course_purchase_id')
+      .eq('user_id', userId)
+      .eq('course_id', courseId)
+      .maybeSingle()
 
-    if (!enrollment) {
-      return false
-    }
+    if (!enrollment) return false
+    if (enrollment.is_gift || !enrollment.course_purchase_id) return true
 
-    // If it's a gift, access is always allowed
-    if (enrollment.isGift) {
-      return true
-    }
+    const { data: purchase } = await admin
+      .from('course_purchases').select('company_id').eq('id', enrollment.course_purchase_id).single()
+    if (!purchase) return false
 
-    // If no course purchase (admin or free course), allow access
-    if (!enrollment.coursePurchase) {
-      return true
-    }
-
-    // Validate company payment status
-    const companyValidation = await validateCompanySubscription(enrollment.coursePurchase.companyId)
+    const companyValidation = await validateCompanySubscription(purchase.company_id)
     return companyValidation.isValid
 
   } catch (error) {

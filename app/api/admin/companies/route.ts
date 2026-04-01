@@ -1,64 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: NextRequest) {
   try {
-    // First, get all companies
-    const companies = await prisma.company.findMany({
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+    const admin = createAdminClient();
+    const { data: companies } = await admin.from('companies').select('*').order('created_at', { ascending: false });
 
-    // Then, get employee counts and admin info for each company
-    const companiesWithStats = await Promise.all(
-      companies.map(async (company) => {
-        // Get employee count
-        const employeeCount = await prisma.user.count({
-          where: {
-            companyId: company.id,
-            role: 'EMPLOYEE'
-          }
-        });
-
-        // Get company admin
-        const companyAdmin = await prisma.user.findFirst({
-          where: {
-            companyId: company.id,
-            role: 'COMPANY_ADMIN'
-          },
-          select: {
-            name: true,
-            email: true
-          }
-        });
-
-        // Get invitation count
-        const invitationCount = await prisma.invitation.count({
-          where: {
-            companyId: company.id
-          }
-        });
-
-        return {
-          id: company.id,
-          name: company.name,
-          organizationNumber: company.organizationNumber,
-          contactPerson: company.contactPerson,
-          email: company.email,
-          phone: company.phone,
-          address: company.address,
-          verified: company.verified,
-          isActive: company.isActive,
-          adminName: companyAdmin?.name || 'Ej tilldelad',
-          adminEmail: companyAdmin?.email || 'Ej tilldelad',
-          employeeCount,
-          invitationCount,
-          createdAt: company.createdAt,
-          updatedAt: company.updatedAt
-        };
-      })
-    );
+    const companiesWithStats = await Promise.all((companies ?? []).map(async (company) => {
+      const [{ count: employeeCount }, { data: companyAdmin }, { count: invitationCount }] = await Promise.all([
+        admin.from('users').select('*', { count: 'exact', head: true }).eq('company_id', company.id).eq('role', 'EMPLOYEE'),
+        admin.from('users').select('name, email').eq('company_id', company.id).eq('role', 'COMPANY_ADMIN').limit(1).maybeSingle(),
+        admin.from('invitations').select('*', { count: 'exact', head: true }).eq('company_id', company.id),
+      ]);
+      return {
+        id: company.id, name: company.name, organizationNumber: company.organization_number,
+        contactPerson: company.contact_person, email: company.email, phone: company.phone,
+        address: company.address, verified: company.verified, isActive: company.is_active,
+        adminName: companyAdmin?.name ?? 'Ej tilldelad', adminEmail: companyAdmin?.email ?? 'Ej tilldelad',
+        employeeCount: employeeCount ?? 0, invitationCount: invitationCount ?? 0,
+        createdAt: company.created_at, updatedAt: company.updated_at,
+      };
+    }));
 
     return NextResponse.json(companiesWithStats);
   } catch (error) {

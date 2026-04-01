@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSupabaseAuth } from '@/app/providers';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import ReactPlayer from 'react-player';
@@ -56,7 +56,7 @@ interface UserAnswer {
 }
 
 export default function CourseLearningPage({ params }: { params: { id: string } }) {
-  const { data: session } = useSession();
+  const { user } = useSupabaseAuth();
   const router = useRouter();
   const [course, setCourse] = useState<Course | null>(null);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
@@ -76,10 +76,10 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
   const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
-    if (session) {
+    if (user) {
       fetchCourseData();
     }
-  }, [session, params.id]);
+  }, [user, params.id]);
 
   const fetchCourseData = async () => {
     try {

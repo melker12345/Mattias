@@ -1,158 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireAuth, isNextResponse } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
     const courseId = params.id;
-    const userEmail = session.user.email;
 
-    // Get user
-    const user = await prisma.user.findUnique({
-      where: { email: userEmail }
-    });
+    const admin = createAdminClient();
+    const userId = authResult.id;
 
-    if (!user) {
-      return NextResponse.json(
-        { message: 'Användare hittades inte' },
-        { status: 404 }
-      );
-    }
+    const { data: enrollment } = await admin
+      .from('enrollments').select('*, course:courses(id, title, passing_score, enrolled_at)')
+      .eq('user_id', userId).eq('course_id', courseId).maybeSingle();
 
-    // Check if user is enrolled and has passed the course
-    const enrollment = await prisma.enrollment.findUnique({
-      where: {
-        userId_courseId: {
-          userId: user.id,
-          courseId: courseId
-        }
-      },
-      include: {
-        course: true
-      }
-    });
+    if (!enrollment) return NextResponse.json({ message: 'Du är inte registrerad för denna kurs' }, { status: 403 });
+    if (!enrollment.passed) return NextResponse.json({ message: 'Du måste klara kursen innan du kan skicka in den för granskning' }, { status: 400 });
 
-    if (!enrollment) {
-      return NextResponse.json(
-        { message: 'Du är inte registrerad för denna kurs' },
-        { status: 403 }
-      );
-    }
+    const { data: existingSubmission } = await admin.from('apv_submissions').select('id').eq('user_id', userId).eq('course_id', courseId).maybeSingle();
+    if (existingSubmission) return NextResponse.json({ message: 'Du har redan skickat in denna kurs för granskning' }, { status: 400 });
 
-    if (!enrollment.passed) {
-      return NextResponse.json(
-        { message: 'Du måste klara kursen innan du kan skicka in den för granskning' },
-        { status: 400 }
-      );
-    }
+    const { data: lessons } = await admin.from('lessons').select('id, order').eq('course_id', courseId).order('order');
+    const lessonIds = (lessons ?? []).map(l => l.id);
+    const { data: questions } = lessonIds.length
+      ? await admin.from('questions').select('*, lesson:lessons(order)').in('lesson_id', lessonIds)
+      : { data: [] };
 
-    // Check if already submitted
-    const existingSubmission = await prisma.aPVSubmission.findUnique({
-      where: {
-        userId_courseId: {
-          userId: user.id,
-          courseId: courseId
-        }
-      }
-    });
+    const qIds = (questions ?? []).map(q => q.id);
+    const { data: userAnswers } = qIds.length
+      ? await admin.from('answers').select('question_id, answer, is_correct').eq('user_id', userId).in('question_id', qIds)
+      : { data: [] };
 
-    if (existingSubmission) {
-      return NextResponse.json(
-        { message: 'Du har redan skickat in denna kurs för granskning' },
-        { status: 400 }
-      );
-    }
-
-    // Get all questions and user answers for this course
-    const questions = await prisma.question.findMany({
-      where: {
-        lesson: {
-          courseId: courseId
-        }
-      },
-      include: {
-        lesson: true
-      },
-      orderBy: [
-        { lesson: { order: 'asc' } },
-        { order: 'asc' }
-      ]
-    });
-
-    const userAnswers = await prisma.answer.findMany({
-      where: {
-        userId: user.id,
-        question: {
-          lesson: {
-            courseId: courseId
-          }
-        }
-      },
-      include: {
-        question: true
-      }
-    });
-
-    // Create detailed answers data
-    const answersData = questions.map(question => {
-      const userAnswer = userAnswers.find(a => a.questionId === question.id);
-      const options = JSON.parse(question.options);
-      const correctAnswerIndex = parseInt(question.correctAnswer);
-      
+    const courseData = enrollment.course as { id: string; title: string; passing_score: number };
+    const answersData = (questions ?? []).map(q => {
+      const ua = (userAnswers ?? []).find(a => a.question_id === q.id);
+      const options = JSON.parse(q.options);
+      const cidx = parseInt(q.correct_answer);
       return {
-        questionId: question.id,
-        question: question.question,
-        userAnswer: userAnswer?.answer || 'Ej besvarad',
-        correctAnswer: question.correctAnswer,
-        isCorrect: userAnswer?.isCorrect || false,
-        options: options,
-        selectedIndex: userAnswer ? parseInt(userAnswer.answer) : -1,
-        correctAnswerText: options[correctAnswerIndex],
-        userAnswerText: userAnswer ? options[parseInt(userAnswer.answer)] : 'Ej besvarad'
+        questionId: q.id, question: q.question,
+        userAnswer: ua?.answer ?? 'Ej besvarad', correctAnswer: q.correct_answer,
+        isCorrect: ua?.is_correct ?? false, options,
+        selectedIndex: ua ? parseInt(ua.answer) : -1,
+        correctAnswerText: options[cidx],
+        userAnswerText: ua ? options[parseInt(ua.answer)] : 'Ej besvarad',
       };
     });
 
-    // Calculate time taken (rough estimate from enrollment to completion)
-    const timeTaken = enrollment.completedAt && enrollment.enrolledAt
-      ? Math.round((enrollment.completedAt.getTime() - enrollment.enrolledAt.getTime()) / (1000 * 60))
+    const timeTaken = enrollment.completed_at && enrollment.enrolled_at
+      ? Math.round((new Date(enrollment.completed_at).getTime() - new Date(enrollment.enrolled_at).getTime()) / 60000)
       : null;
 
-    // Create APV submission
-    const submission = await prisma.aPVSubmission.create({
-      data: {
-        userId: user.id,
-        courseId: courseId,
-        fullName: user.name || user.email,
-        personalNumber: user.personalNumber,
-        courseTitle: enrollment.course.title,
-        completionDate: enrollment.completedAt || new Date(),
-        finalScore: enrollment.finalScore || 0,
-        passingScore: enrollment.course.passingScore,
-        totalQuestions: enrollment.totalQuestions,
-        correctAnswers: enrollment.correctAnswers,
-        timeTaken: timeTaken,
-        answersData: JSON.stringify(answersData),
-        status: 'PENDING'
-      }
-    });
+    const { data: submission } = await admin.from('apv_submissions').insert({
+      user_id: userId, course_id: courseId,
+      full_name: authResult.name ?? authResult.email,
+      course_title: courseData.title,
+      completion_date: enrollment.completed_at ?? new Date().toISOString(),
+      final_score: enrollment.final_score ?? 0,
+      passing_score: courseData.passing_score,
+      total_questions: enrollment.total_questions,
+      correct_answers: enrollment.correct_answers,
+      time_taken: timeTaken,
+      answers_data: JSON.stringify(answersData),
+      status: 'PENDING',
+    }).select('id').single();
 
-    return NextResponse.json({
-      message: 'Kursen har skickats in för granskning',
-      submissionId: submission.id
-    });
+    return NextResponse.json({ message: 'Kursen har skickats in för granskning', submissionId: submission?.id });
 
   } catch (error) {
     console.error('Error submitting course for review:', error);
@@ -169,44 +86,16 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
     const courseId = params.id;
-    const userEmail = session.user.email;
+    const user = authResult;
 
-    // Get user
-    const user = await prisma.user.findUnique({
-      where: { email: userEmail }
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { message: 'Användare hittades inte' },
-        { status: 404 }
-      );
-    }
-
-    // Check if already submitted
-    const existingSubmission = await prisma.aPVSubmission.findUnique({
-      where: {
-        userId_courseId: {
-          userId: user.id,
-          courseId: courseId
-        }
-      }
-    });
-
-    return NextResponse.json({
-      hasSubmitted: !!existingSubmission,
-      submission: existingSubmission
-    });
+    const admin = createAdminClient();
+    const { data: existingSubmission } = await admin
+      .from('apv_submissions').select('*').eq('user_id', authResult.id).eq('course_id', courseId).maybeSingle();
+    return NextResponse.json({ hasSubmitted: !!existingSubmission, submission: existingSubmission });
 
   } catch (error) {
     console.error('Error checking submission status:', error);

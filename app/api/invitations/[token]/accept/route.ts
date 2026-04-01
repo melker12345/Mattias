@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(
   request: NextRequest,
@@ -8,77 +8,30 @@ export async function POST(
   try {
     const token = params.token
 
-    // Find invitation by token
-    const invitation = await prisma.invitation.findUnique({
-      where: { token },
-      include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    })
+    const admin = createAdminClient()
+    const { data: invitation } = await admin
+      .from('invitations')
+      .select('*, company:companies(id, name)')
+      .eq('token', token)
+      .single()
 
-    if (!invitation) {
-      return NextResponse.json(
-        { message: 'Inbjudningslänk hittades inte' },
-        { status: 404 }
-      )
-    }
+    if (!invitation) return NextResponse.json({ message: 'Inbjudningslänk hittades inte' }, { status: 404 })
+    if (new Date(invitation.expires_at) < new Date()) return NextResponse.json({ message: 'Inbjudningslänk har gått ut' }, { status: 410 })
+    if (invitation.used) return NextResponse.json({ message: 'Inbjudningslänk har redan använts' }, { status: 410 })
 
-    // Check if invitation has expired
-    if (new Date(invitation.expiresAt) < new Date()) {
-      return NextResponse.json(
-        { message: 'Inbjudningslänk har gått ut' },
-        { status: 410 }
-      )
-    }
+    await admin.from('invitations').update({ used: true, used_at: new Date().toISOString() }).eq('id', invitation.id)
 
-    // Check if invitation has already been used
-    if (invitation.used) {
-      return NextResponse.json(
-        { message: 'Inbjudningslänk har redan använts' },
-        { status: 410 }
-      )
-    }
-
-    // Mark invitation as used
-    await prisma.invitation.update({
-      where: { id: invitation.id },
-      data: {
-        used: true,
-        usedAt: new Date(),
-      },
-    })
-
-    // For existing users, just update their company association
-    if (invitation.isExistingUser) {
-      const existingUser = await prisma.user.findUnique({
-        where: { email: invitation.email },
-      })
-
+    if (invitation.is_existing_user) {
+      const { data: existingUser } = await admin.from('users').select('id').eq('email', invitation.email).maybeSingle()
       if (existingUser) {
-        await prisma.user.update({
-          where: { id: existingUser.id },
-          data: {
-            companyId: invitation.companyId,
-            role: 'EMPLOYEE',
-          },
-        })
+        await admin.from('users').update({ company_id: invitation.company_id, role: 'EMPLOYEE' }).eq('id', existingUser.id)
       }
     }
-    // For new users, we don't create the account here anymore
-    // They will be created during the signup process with the invitation token
 
+    const company = invitation.company as { id: string; name: string }
     return NextResponse.json({
       message: 'Inbjudning accepterad framgångsrikt',
-      invitation: {
-        email: invitation.email,
-        companyName: invitation.company.name,
-        isExistingUser: invitation.isExistingUser,
-      },
+      invitation: { email: invitation.email, companyName: company?.name, isExistingUser: invitation.is_existing_user },
     })
   } catch (error) {
     console.error('Error accepting invitation:', error)

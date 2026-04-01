@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { prisma } from '@/lib/prisma';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { verifyWebhookSignature } from '@/lib/stripe';
 import { createFortnoxCustomerFromPayment, createInvoiceFromPayment } from '@/lib/fortnox';
 import type { CoursePaymentData, CompanyPaymentData, PaymentProcessingResult } from '@/lib/types/payment';
@@ -92,11 +92,8 @@ async function processCoursePayment(session: any): Promise<NextResponse> {
   const { userId, courseId, courseName, userName } = metadata;
 
   try {
-    // Get user data
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
+    const admin = createAdminClient();
+    const { data: user } = await admin.from('users').select('id, email, name').eq('id', userId).single();
     if (!user) {
       console.error('User not found:', { userId });
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -120,62 +117,31 @@ async function processCoursePayment(session: any): Promise<NextResponse> {
 }
 
 async function processSingleCourse(session: any, user: any, courseId: string): Promise<NextResponse> {
-  const course = await prisma.course.findUnique({
-    where: { id: courseId },
-  });
-
+  const admin = createAdminClient();
+  const { data: course } = await admin.from('courses').select('id, title, price').eq('id', courseId).single();
   if (!course) {
     console.error('Course not found:', { courseId });
     return NextResponse.json({ error: 'Course not found' }, { status: 404 });
   }
 
-  // Update enrollment with payment confirmation
-  const enrollment = await prisma.enrollment.upsert({
-    where: {
-      userId_courseId: {
-        userId: user.id,
-        courseId: courseId,
-      },
-    },
-    create: {
-      userId: user.id,
-      courseId: courseId,
-      isPaid: true,
-      paidAt: new Date(),
-      stripePaymentId: session.payment_intent,
-      stripeCustomerId: session.customer,
-      paymentAmount: course.price,
-      paymentMethod: session.payment_method_types?.[0] || 'card',
-    },
-    update: {
-      isPaid: true,
-      paidAt: new Date(),
-      stripePaymentId: session.payment_intent,
-      stripeCustomerId: session.customer,
-      paymentAmount: course.price,
-      paymentMethod: session.payment_method_types?.[0] || 'card',
-    },
+  const enrollmentData = {
+    user_id: user.id, course_id: courseId, is_paid: true, paid_at: new Date().toISOString(),
+    stripe_payment_id: session.payment_intent, stripe_customer_id: session.customer,
+    payment_amount: course.price, payment_method: session.payment_method_types?.[0] ?? 'card',
+  };
+  const { data: enrollment } = await admin.from('enrollments')
+    .upsert(enrollmentData, { onConflict: 'user_id,course_id' }).select('id').single();
+
+  await admin.from('payments').insert({
+    user_id: user.id, course_id: courseId, enrollment_id: enrollment?.id,
+    stripe_payment_id: session.payment_intent, stripe_customer_id: session.customer,
+    stripe_session_id: session.id, amount: session.amount_total / 100,
+    currency: session.currency.toUpperCase(), status: 'succeeded',
+    payment_method: session.payment_method_types?.[0] ?? 'card',
+    metadata: JSON.stringify(session.metadata ?? {}),
   });
 
-    // Create Payment record
-    await prisma.payment.create({
-      data: {
-        userId: user.id,
-        courseId: courseId,
-        enrollmentId: enrollment.id,
-        stripePaymentId: session.payment_intent,
-        stripeCustomerId: session.customer,
-        stripeSessionId: session.id,
-        amount: session.amount_total / 100,
-        currency: session.currency.toUpperCase(),
-        status: 'succeeded',
-        paymentMethod: session.payment_method_types?.[0] || 'card',
-        metadata: JSON.stringify(session.metadata || {}),
-      },
-    });
-
-    // Process Fortnox integration asynchronously
-    processFortnoxIntegration({
+  processFortnoxIntegration({
       userId: user.id,
       courseId,
       amount: session.amount_total / 100,
@@ -183,17 +149,12 @@ async function processSingleCourse(session: any, user: any, courseId: string): P
       courseName: (session.metadata && (session.metadata as any).courseName) || course.title,
       userEmail: user.email,
       userName: (session.metadata && (session.metadata as any).userName) || user.name || 'Unknown User',
-    }, session.payment_intent).catch((error) => {
-      console.error('Fortnox integration failed:', error);
-      // Don't fail the webhook - payment is already processed
-    });
+  }, session.payment_intent).catch((error) => {
+    console.error('Fortnox integration failed:', error);
+  });
 
   console.log(`Single course payment processed successfully for user ${user.id}, course ${courseId}`);
-  return NextResponse.json({ 
-    success: true, 
-    enrollmentId: enrollment.id,
-    message: 'Course payment processed successfully' 
-  });
+  return NextResponse.json({ success: true, enrollmentId: enrollment?.id, message: 'Course payment processed successfully' });
 }
 
 async function processCartPayment(session: any, user: any): Promise<NextResponse> {
@@ -202,66 +163,29 @@ async function processCartPayment(session: any, user: any): Promise<NextResponse
   try {
     const enrollments = [];
     
-    // Process all courses in the metadata
-    for (const [key, value] of Object.entries(metadata)) {
+    const admin = createAdminClient();
+    for (const [key] of Object.entries(metadata)) {
       if (key.startsWith('course_')) {
         const courseId = key.replace('course_', '');
-        
-        // Get course data
-        const course = await prisma.course.findUnique({
-          where: { id: courseId },
-        });
+        const { data: course } = await admin.from('courses').select('id, title, price').eq('id', courseId).single();
+        if (!course) { console.warn(`Course not found in cart payment: ${courseId}`); continue; }
 
-        if (!course) {
-          console.warn(`Course not found in cart payment: ${courseId}`);
-          continue;
-        }
-
-        // Update enrollment with payment confirmation
-        const enrollment = await prisma.enrollment.upsert({
-          where: {
-            userId_courseId: {
-              userId: user.id,
-              courseId: courseId,
-            },
-          },
-          create: {
-            userId: user.id,
-            courseId: courseId,
-            isPaid: true,
-            paidAt: new Date(),
-            stripePaymentId: session.payment_intent,
-            stripeCustomerId: session.customer,
-            paymentAmount: course.price,
-            paymentMethod: session.payment_method_types?.[0] || 'card',
-          },
-          update: {
-            isPaid: true,
-            paidAt: new Date(),
-            stripePaymentId: session.payment_intent,
-            stripeCustomerId: session.customer,
-            paymentAmount: course.price,
-            paymentMethod: session.payment_method_types?.[0] || 'card',
-          },
-        });
+        const { data: enrollment } = await admin.from('enrollments').upsert(
+          { user_id: user.id, course_id: courseId, is_paid: true, paid_at: new Date().toISOString(),
+            stripe_payment_id: session.payment_intent, stripe_customer_id: session.customer,
+            payment_amount: course.price, payment_method: session.payment_method_types?.[0] ?? 'card' },
+          { onConflict: 'user_id,course_id' }
+        ).select('id').single();
 
         enrollments.push(enrollment);
 
-        // Create Payment record
-        await prisma.payment.create({
-          data: {
-            userId: user.id,
-            courseId: courseId,
-            enrollmentId: enrollment.id,
-            stripePaymentId: session.payment_intent,
-            stripeCustomerId: session.customer,
-            stripeSessionId: session.id,
-            amount: course.price,
-            currency: session.currency.toUpperCase(),
-            status: 'succeeded',
-            paymentMethod: session.payment_method_types?.[0] || 'card',
-            metadata: JSON.stringify({ source: 'cart', courseName: course.title }),
-          },
+        await admin.from('payments').insert({
+          user_id: user.id, course_id: courseId, enrollment_id: enrollment?.id,
+          stripe_payment_id: session.payment_intent, stripe_customer_id: session.customer,
+          stripe_session_id: session.id, amount: course.price,
+          currency: session.currency.toUpperCase(), status: 'succeeded',
+          payment_method: session.payment_method_types?.[0] ?? 'card',
+          metadata: JSON.stringify({ source: 'cart', courseName: course.title }),
         });
       }
     }
@@ -293,63 +217,36 @@ async function processCompanyPayment(session: any): Promise<NextResponse> {
   const { companyId, planName, companyName, billingPeriod } = metadata;
 
   try {
-    // Get company data
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-    });
-
+    const admin = createAdminClient();
+    const { data: company } = await admin.from('companies').select('id, email').eq('id', companyId).single();
     if (!company) {
       console.error('Company not found:', companyId);
       return NextResponse.json({ error: 'Company not found' }, { status: 404 });
     }
 
-    // Calculate plan end date
     const planStartDate = new Date();
     const planEndDate = new Date();
-    if (billingPeriod === 'yearly') {
-      planEndDate.setFullYear(planEndDate.getFullYear() + 1);
-    } else {
-      planEndDate.setMonth(planEndDate.getMonth() + 1);
-    }
+    if (billingPeriod === 'yearly') planEndDate.setFullYear(planEndDate.getFullYear() + 1);
+    else planEndDate.setMonth(planEndDate.getMonth() + 1);
 
-    // Update company subscription
-    await prisma.company.update({
-      where: { id: companyId },
-      data: {
-        paymentStatus: 'PAID',
-        planStartDate: planStartDate,
-        planEndDate: planEndDate,
-        isActive: true,
-      },
+    await admin.from('companies').update({
+      payment_status: 'PAID', plan_start_date: planStartDate.toISOString(),
+      plan_end_date: planEndDate.toISOString(), is_active: true,
+    }).eq('id', companyId);
+
+    await admin.from('payments').insert({
+      company_id: companyId, stripe_payment_id: session.payment_intent,
+      stripe_customer_id: session.customer, stripe_session_id: session.id,
+      amount: session.amount_total / 100, currency: session.currency.toUpperCase(),
+      status: 'succeeded', payment_method: session.payment_method_types?.[0] ?? 'card',
+      metadata: JSON.stringify(metadata),
     });
 
-    // Create Payment record
-    await prisma.payment.create({
-      data: {
-        companyId: companyId,
-        stripePaymentId: session.payment_intent,
-        stripeCustomerId: session.customer,
-        stripeSessionId: session.id,
-        amount: session.amount_total / 100,
-        currency: session.currency.toUpperCase(),
-        status: 'succeeded',
-        paymentMethod: session.payment_method_types?.[0] || 'card',
-        metadata: JSON.stringify(metadata),
-      },
-    });
-
-    // Process Fortnox integration asynchronously
     processFortnoxIntegration({
-      companyId,
-      amount: session.amount_total / 100,
-      currency: session.currency.toUpperCase(),
-      planName,
-      companyName,
-      companyEmail: company.email,
-      billingPeriod: billingPeriod as 'monthly' | 'yearly',
+      companyId, amount: session.amount_total / 100, currency: session.currency.toUpperCase(),
+      planName, companyName, companyEmail: company.email, billingPeriod: billingPeriod as 'monthly' | 'yearly',
     }, session.payment_intent).catch((error) => {
       console.error('Fortnox company integration failed:', error);
-      // Don't fail the webhook - payment is already processed
     });
 
     console.log(`Company payment processed successfully for company ${companyId}`);
@@ -371,11 +268,8 @@ async function handlePaymentIntentSucceeded(paymentIntent: any): Promise<NextRes
   try {
     console.log(`Payment intent succeeded: ${paymentIntent.id}`);
     
-    // Update payment record status
-    await prisma.payment.updateMany({
-      where: { stripePaymentId: paymentIntent.id },
-      data: { status: 'succeeded' },
-    });
+    const admin = createAdminClient();
+    await admin.from('payments').update({ status: 'succeeded' }).eq('stripe_payment_id', paymentIntent.id);
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -388,20 +282,9 @@ async function handlePaymentIntentFailed(paymentIntent: any): Promise<NextRespon
   try {
     console.log(`Payment intent failed: ${paymentIntent.id}`);
     
-    // Update payment record status
-    await prisma.payment.updateMany({
-      where: { stripePaymentId: paymentIntent.id },
-      data: { 
-        status: 'failed',
-        failureReason: paymentIntent.last_payment_error?.message || 'Unknown error',
-      },
-    });
-
-    // Update enrollment status
-    await prisma.enrollment.updateMany({
-      where: { stripePaymentId: paymentIntent.id },
-      data: { isPaid: false },
-    });
+    const admin = createAdminClient();
+    await admin.from('payments').update({ status: 'failed', failure_reason: paymentIntent.last_payment_error?.message ?? 'Unknown error' }).eq('stripe_payment_id', paymentIntent.id);
+    await admin.from('enrollments').update({ is_paid: false }).eq('stripe_payment_id', paymentIntent.id);
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -446,39 +329,24 @@ async function processFortnoxIntegration(
     // Create invoice in Fortnox
     const invoiceNumber = await createInvoiceFromPayment(customerNumber, paymentData, stripePaymentId);
     
-    // Update payment record with Fortnox data
-    await prisma.payment.updateMany({
-      where: { stripePaymentId },
-      data: {
-        fortnoxInvoiceId: invoiceNumber,
-        fortnoxCustomerId: customerNumber,
-        fortnoxSynced: true,
-        fortnoxSyncedAt: new Date(),
-      },
-    });
+    const admin = createAdminClient();
+    await admin.from('payments').update({
+      fortnox_invoice_id: invoiceNumber, fortnox_customer_id: customerNumber,
+      fortnox_synced: true, fortnox_synced_at: new Date().toISOString(),
+    }).eq('stripe_payment_id', stripePaymentId);
 
-    // Update enrollment with Fortnox data if it's a course payment
     if ('courseId' in paymentData) {
-      await prisma.enrollment.updateMany({
-        where: { stripePaymentId },
-        data: { fortnoxInvoiceId: invoiceNumber },
-      });
+      await admin.from('enrollments').update({ fortnox_invoice_id: invoiceNumber }).eq('stripe_payment_id', stripePaymentId);
     }
 
     console.log(`Fortnox integration completed: Customer ${customerNumber}, Invoice ${invoiceNumber}`);
   } catch (error) {
     console.error('Fortnox integration error:', error);
     
-    // Update payment record to indicate Fortnox sync failure
-    await prisma.payment.updateMany({
-      where: { stripePaymentId },
-      data: {
-        fortnoxSynced: false,
-        metadata: JSON.stringify({
-          fortnoxError: error instanceof Error ? error.message : 'Unknown error',
-          fortnoxErrorAt: new Date().toISOString(),
-        }),
-      },
-    });
+    const admin = createAdminClient();
+    await admin.from('payments').update({
+      fortnox_synced: false,
+      metadata: JSON.stringify({ fortnoxError: error instanceof Error ? error.message : 'Unknown error', fortnoxErrorAt: new Date().toISOString() }),
+    }).eq('stripe_payment_id', stripePaymentId);
   }
 }

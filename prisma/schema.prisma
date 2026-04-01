@@ -12,17 +12,16 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String    @id
   email         String    @unique
   name          String?
-  password      String
   personalNumber String?
   role          String    @default("EMPLOYEE") // UserRole as string
   companyId     String?
   
-  // BankID verification (required for ID06)
-  bankIdVerified Boolean  @default(false)
-  bankIdVerifiedAt DateTime?
+  phone                 String?
+  personnummerEncrypted String?   // AES-256-GCM encrypted personnummer
+  identityVerified      Boolean   @default(false)  // true once cross-check passes on signup
   
   // ID06 eligibility
   id06Eligible Boolean @default(false)
@@ -374,11 +373,13 @@ model PaymentLog {
 }
 
 model Invitation {
-  id               String   @id @default(cuid())
-  email            String
-  name             String?  // For new users, store the name from invitation
-  token            String   @unique
-  companyId        String
+  id                    String   @id @default(cuid())
+  email                 String
+  name                  String?  // For new users, store the name from invitation
+  phone                 String?  // Company-provided phone for identity cross-check
+  personnummerEncrypted String?  // Company-provided personnummer (AES-256 encrypted) for cross-check
+  token                 String   @unique
+  companyId             String
   expiresAt        DateTime
   isExistingUser   Boolean  @default(false)
   temporaryPassword String?
@@ -394,7 +395,7 @@ model Invitation {
   @@index([companyId])
 }
 
-// Enums converted to strings for SQLite compatibility
+// User.id = Supabase Auth UUID (set at user creation, not auto-generated)
 // UserRole: "ADMIN", "COMPANY_ADMIN", "EMPLOYEE", "INDIVIDUAL"
 // VerificationMethod: "BUSINESS_REGISTRATION", "CREDIT_CHECK", "MANUAL_APPROVAL"
 // InvoiceStatus: "PENDING", "PAID", "OVERDUE", "CANCELLED"

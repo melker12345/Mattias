@@ -1,25 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireAuth, isNextResponse } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string; questionId: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
     const courseId = params.id;
     const questionId = params.questionId;
-    const userEmail = session.user.email;
+    const user = authResult;
     const body = await request.json();
     const { answer, isCorrect } = body;
 
@@ -30,76 +23,25 @@ export async function POST(
       );
     }
 
-    // Get user
-    const user = await prisma.user.findUnique({
-      where: { email: userEmail }
-    });
+    const admin = createAdminClient();
 
-    if (!user) {
-      return NextResponse.json(
-        { message: 'Användare hittades inte' },
-        { status: 404 }
-      );
-    }
+    const { data: enrollment } = await admin.from('enrollments').select('id').eq('user_id', user.id).eq('course_id', courseId).maybeSingle();
+    if (!enrollment) return NextResponse.json({ message: 'Du är inte registrerad för denna kurs' }, { status: 403 });
 
-    // Check if user is enrolled in this course
-    const enrollment = await prisma.enrollment.findUnique({
-      where: {
-        userId_courseId: {
-          userId: user.id,
-          courseId: courseId
-        }
-      }
-    });
+    // Verify question belongs to this course via its lesson
+    const { data: question } = await admin
+      .from('questions').select('id')
+      .eq('id', questionId)
+      .in('lesson_id', (await admin.from('lessons').select('id').eq('course_id', courseId)).data?.map(l => l.id) ?? [])
+      .maybeSingle();
+    if (!question) return NextResponse.json({ message: 'Fråga hittades inte i denna kurs' }, { status: 404 });
 
-    if (!enrollment) {
-      return NextResponse.json(
-        { message: 'Du är inte registrerad för denna kurs' },
-        { status: 403 }
-      );
-    }
+    const { data: userAnswer } = await admin.from('answers').upsert(
+      { user_id: user.id, question_id: questionId, answer, is_correct: isCorrect },
+      { onConflict: 'user_id,question_id' }
+    ).select().single();
 
-    // Verify question exists and belongs to this course
-    const question = await prisma.question.findFirst({
-      where: {
-        id: questionId,
-        lesson: {
-          courseId: courseId
-        }
-      }
-    });
-
-    if (!question) {
-      return NextResponse.json(
-        { message: 'Fråga hittades inte i denna kurs' },
-        { status: 404 }
-      );
-    }
-
-    // Upsert answer record
-    const userAnswer = await prisma.answer.upsert({
-      where: {
-        userId_questionId: {
-          userId: user.id,
-          questionId: questionId
-        }
-      },
-      update: {
-        answer: answer,
-        isCorrect: isCorrect
-      },
-      create: {
-        userId: user.id,
-        questionId: questionId,
-        answer: answer,
-        isCorrect: isCorrect
-      }
-    });
-
-    return NextResponse.json({
-      message: 'Svar sparades framgångsrikt',
-      answer: userAnswer
-    });
+    return NextResponse.json({ message: 'Svar sparades framgångsrikt', answer: userAnswer });
   } catch (error) {
     console.error('Error saving answer:', error);
     return NextResponse.json(

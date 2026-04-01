@@ -3,17 +3,13 @@ import { CourseCard } from '@/components/CourseCard'
 import { HeroSection } from '@/components/HeroSection'
 import { FeaturesSection } from '@/components/FeaturesSection'
 import { TestimonialsSection } from '@/components/TestimonialsSection'
-import { prisma } from '@/lib/prisma'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 async function getPopularCourses() {
   try {
-    const courses = await prisma.course.findMany({
-      take: 3,
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
-    return courses
+    const admin = createAdminClient()
+    const { data: courses } = await admin.from('courses').select('id, title, description, price, duration, category, image, is_published').eq('is_published', true).order('created_at', { ascending: false }).limit(3)
+    return courses ?? []
   } catch (error) {
     console.error('Error fetching popular courses:', error)
     return []

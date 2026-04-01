@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSupabaseAuth } from '@/app/providers';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
@@ -110,7 +110,7 @@ interface APVSubmission {
 }
 
 export default function AdminDashboard() {
-  const { data: session } = useSession();
+  const { user } = useSupabaseAuth();
   const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -137,10 +137,10 @@ export default function AdminDashboard() {
   const [isDeletingSubmission, setIsDeletingSubmission] = useState(false);
 
   useEffect(() => {
-    if (session) {
+    if (user) {
       fetchAdminData();
     }
-  }, [session]);
+  }, [user]);
 
   const fetchAdminData = async () => {
     try {
@@ -389,7 +389,7 @@ export default function AdminDashboard() {
   }
 
   // Check if user is admin
-  if (!session || (session.user as any)?.role !== 'ADMIN') {
+  if (!user || (user as any)?.role !== 'ADMIN') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

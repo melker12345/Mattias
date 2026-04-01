@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function PUT(
   request: NextRequest,
@@ -17,16 +17,11 @@ export async function PUT(
       );
     }
 
-    const updatedQuestion = await prisma.question.update({
-      where: { id: params.questionId },
-      data: {
-        question,
-        type,
-        options: options || '[]',
-        correctAnswer: JSON.stringify(Number(correctAnswer)) // Ensure it's stored as a number
-      }
-    });
-
+    const admin = createAdminClient();
+    const { data: updatedQuestion } = await admin.from('questions').update({
+      question, type, options: options ?? '[]',
+      correct_answer: JSON.stringify(Number(correctAnswer)),
+    }).eq('id', params.questionId).select().single();
     return NextResponse.json(updatedQuestion);
   } catch (error) {
     console.error('Error updating question:', error);

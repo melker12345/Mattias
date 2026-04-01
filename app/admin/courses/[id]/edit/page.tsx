@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSupabaseAuth } from '@/app/providers';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -53,7 +53,7 @@ interface Question {
 }
 
 export default function CourseEditorPage({ params }: { params: { id: string } }) {
-  const { data: session } = useSession();
+  const { user } = useSupabaseAuth();
   const router = useRouter();
   const [course, setCourse] = useState<Course | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
@@ -63,10 +63,10 @@ export default function CourseEditorPage({ params }: { params: { id: string } })
   const [isLessonEditorOpen, setIsLessonEditorOpen] = useState(false);
 
   useEffect(() => {
-    if (session) {
+    if (user) {
       fetchCourseData();
     }
-  }, [session, params.id]);
+  }, [user, params.id]);
 
   const fetchCourseData = async () => {
     try {

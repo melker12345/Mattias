@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 import { sendEmail, generateInvitationEmail } from '@/lib/email'
 import crypto from 'crypto'
+import { encryptPersonnummer, normalisePersonnummer } from '@/lib/encryption'
 
 const inviteEmployeeSchema = z.object({
   name: z.string().min(1, 'Namn är obligatoriskt'),
   email: z.string().email('Ogiltig e-postadress'),
+  personnummer: z.string().min(10, 'Ogiltigt personnummer'),
+  phone: z.string().min(8, 'Ogiltigt telefonnummer'),
 })
 
 export async function POST(
@@ -16,56 +19,38 @@ export async function POST(
   try {
     const companyId = params.id
     const body = await request.json()
-    const { name, email } = inviteEmployeeSchema.parse(body)
+    const { name, email, personnummer, phone } = inviteEmployeeSchema.parse(body)
 
-    // Verify company exists
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-    })
+    const personnummerEncrypted = encryptPersonnummer(normalisePersonnummer(personnummer))
 
+    const admin = createAdminClient()
+
+    const { data: company } = await admin.from('companies').select('id, name').eq('id', companyId).single()
     if (!company) {
-      return NextResponse.json(
-        { message: 'Företag hittades inte' },
-        { status: 404 }
-      )
+      return NextResponse.json({ message: 'Företag hittades inte' }, { status: 404 })
     }
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    })
+    const { data: existingUser } = await admin.from('users').select('id, email, name, company_id, role, id06_eligible').eq('email', email).maybeSingle()
 
     // Generate unique invitation token
     const invitationToken = crypto.randomBytes(32).toString('hex')
     const invitationExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
 
     if (existingUser) {
-      // If user exists, check if they're already part of this company
-      if (existingUser.companyId === companyId) {
-        return NextResponse.json(
-          { message: 'Användaren är redan anställd i detta företag' },
-          { status: 400 }
-        )
+      if (existingUser.company_id === companyId) {
+        return NextResponse.json({ message: 'Användaren är redan anställd i detta företag' }, { status: 400 })
       }
 
-      // If user exists but is not part of this company, add them to the company
-      const updatedUser = await prisma.user.update({
-        where: { id: existingUser.id },
-        data: {
-          companyId: companyId,
-          role: 'EMPLOYEE',
-        },
-      })
+      await admin.from('users').update({ company_id: companyId, role: 'EMPLOYEE' }).eq('id', existingUser.id)
 
-      // Create invitation record
-      await prisma.invitation.create({
-        data: {
-          email: updatedUser.email,
-          token: invitationToken,
-          companyId: companyId,
-          expiresAt: invitationExpiresAt,
-          isExistingUser: true,
-        },
+      await admin.from('invitations').insert({
+        email: existingUser.email,
+        token: invitationToken,
+        company_id: companyId,
+        expires_at: invitationExpiresAt.toISOString(),
+        is_existing_user: true,
+        phone,
+        personnummer_encrypted: personnummerEncrypted,
       })
 
       // Send invitation email to existing user
@@ -73,8 +58,8 @@ export async function POST(
       const invitationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/auth/invite/${invitationToken}`
       
       const emailData = generateInvitationEmail(
-        updatedUser.name || 'Användare',
-        updatedUser.email,
+        existingUser.name || 'Användare',
+        existingUser.email,
         company.name,
         'Ditt befintliga lösenord', // They use their existing password
         loginUrl,
@@ -85,20 +70,18 @@ export async function POST(
       const emailSent = await sendEmail(emailData)
 
       if (!emailSent) {
-        console.error('Failed to send invitation email to existing user:', updatedUser.email)
+        console.error('Failed to send invitation email to existing user:', existingUser.email)
       }
 
       return NextResponse.json(
         {
           message: 'Befintlig användare har lagts till i företaget',
           employee: {
-            id: updatedUser.id,
-            email: updatedUser.email,
-            name: updatedUser.name,
-            personalNumber: updatedUser.personalNumber,
-            role: updatedUser.role,
-            bankIdVerified: updatedUser.bankIdVerified,
-            id06Eligible: updatedUser.id06Eligible,
+            id: existingUser.id,
+            email: existingUser.email,
+            name: existingUser.name,
+            role: 'EMPLOYEE',
+            id06Eligible: existingUser.id06_eligible,
           },
           emailSent,
           existingUser: true,
@@ -107,9 +90,7 @@ export async function POST(
           nextSteps: [
             'Befintlig användare har lagts till i företaget',
             'Användaren kan logga in med sina befintliga uppgifter',
-            'Alternativt kan användaren använda inbjudningslänken',
-            'Användaren måste verifiera sin identitet med BankID om inte redan gjort',
-            'Efter BankID-verifiering kan anställd ta kurser och få ID06-certifikat'
+            'Alternativt kan användaren använda inbjudningslänken'
           ]
         },
         { status: 200 }
@@ -120,17 +101,15 @@ export async function POST(
     // They will create it during the signup process with the invitation token
     // We only store the invitation information
 
-    // Create invitation record for new user
-    await prisma.invitation.create({
-      data: {
-        email: email,
-        token: invitationToken,
-        companyId: companyId,
-        expiresAt: invitationExpiresAt,
-        isExistingUser: false,
-        // Store the name in the invitation for later use
-        name: name,
-      },
+    await admin.from('invitations').insert({
+      email,
+      name,
+      phone,
+      personnummer_encrypted: personnummerEncrypted,
+      token: invitationToken,
+      company_id: companyId,
+      expires_at: invitationExpiresAt.toISOString(),
+      is_existing_user: false,
     })
 
     // Send invitation email
@@ -167,10 +146,8 @@ export async function POST(
         nextSteps: [
           'Inbjudan har skickats till användaren',
           'E-post har skickats med inbjudningslänk',
-          'Användaren kan skapa sitt konto via inbjudningslänken',
-          'Alternativt kan användaren använda inbjudningslänken direkt',
-          'Efter konto skapas måste användaren verifiera sin identitet med BankID',
-          'Efter BankID-verifiering kan anställd ta kurser och få ID06-certifikat'
+          'Användaren skapar sitt konto via inbjudningslänken och verifierar med personnummer och telefon',
+          'När identiteten är bekräftad kan anställd ta kurser och få ID06-certifikat'
         ]
       },
       { status: 201 }

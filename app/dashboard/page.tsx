@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSupabaseAuth } from '@/app/providers';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
@@ -27,7 +27,7 @@ interface EnrolledCourse {
 }
 
 export default function UserDashboard() {
-  const { data: session } = useSession();
+  const { user } = useSupabaseAuth();
   const router = useRouter();
   const [enrolledCourses, setEnrolledCourses] = useState<EnrolledCourse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +89,7 @@ export default function UserDashboard() {
     );
   }
 
-  if (!session) {
+  if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -113,7 +113,7 @@ export default function UserDashboard() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Mina Kurser</h1>
           </div>
           <p className="text-sm sm:text-base text-gray-600">
-            Välkommen tillbaka, {(session.user as any)?.name || session.user?.email}!
+            Välkommen tillbaka, {(user as any)?.user_metadata?.name || user?.email}!
           </p>
         </div>
 

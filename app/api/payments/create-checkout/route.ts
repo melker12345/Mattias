@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireAuth, isNextResponse } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createCourseCheckoutSession, createCompanyCheckoutSession } from '@/lib/stripe';
 import type { CoursePaymentData, CompanyPaymentData } from '@/lib/types/payment';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
     const body = await request.json();
     const { type, courseId, companyId } = body;
@@ -27,23 +20,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user from database
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { company: true },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
+    const admin = createAdminClient();
+    const { data: user } = await admin.from('users').select('id, email, name, role, company_id').eq('id', authResult.id).single();
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
     if (type === 'course') {
-      return await handleCoursePayment(courseId, user);
+      return await handleCoursePayment(courseId, user, admin);
     } else if (type === 'company_plan') {
-      return await handleCompanyPayment(companyId, user);
+      return await handleCompanyPayment(companyId, user, admin);
     }
 
     return NextResponse.json(
@@ -63,182 +47,64 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleCoursePayment(courseId: string, user: any) {
-  if (!courseId) {
-    return NextResponse.json(
-      { error: 'Course ID is required for course payments' },
-      { status: 400 }
-    );
+async function handleCoursePayment(courseId: string, user: any, admin: ReturnType<typeof createAdminClient>) {
+  if (!courseId) return NextResponse.json({ error: 'Course ID is required for course payments' }, { status: 400 });
+
+  const { data: course } = await admin.from('courses').select('id, title, price, is_published').eq('id', courseId).single();
+  if (!course) return NextResponse.json({ error: 'Course not found' }, { status: 404 });
+  if (!course.is_published) return NextResponse.json({ error: 'Course is not available for purchase' }, { status: 400 });
+
+  const { data: existingEnrollment } = await admin.from('enrollments').select('is_paid, is_gift')
+    .eq('user_id', user.id).eq('course_id', courseId).maybeSingle();
+  if (existingEnrollment?.is_paid || existingEnrollment?.is_gift) {
+    return NextResponse.json({ error: 'You already have access to this course' }, { status: 400 });
   }
 
-  // Get course details
-  const course = await prisma.course.findUnique({
-    where: { id: courseId },
-  });
-
-  if (!course) {
-    return NextResponse.json(
-      { error: 'Course not found' },
-      { status: 404 }
-    );
-  }
-
-  if (!course.isPublished) {
-    return NextResponse.json(
-      { error: 'Course is not available for purchase' },
-      { status: 400 }
-    );
-  }
-
-  // Check if user already has access to this course
-  const existingEnrollment = await prisma.enrollment.findUnique({
-    where: {
-      userId_courseId: {
-        userId: user.id,
-        courseId: courseId,
-      },
-    },
-  });
-
-  if (existingEnrollment) {
-    if (existingEnrollment.isPaid || existingEnrollment.isGift) {
-      return NextResponse.json(
-        { error: 'You already have access to this course' },
-        { status: 400 }
-      );
-    }
-  }
-
-  // Create payment data
   const paymentData: CoursePaymentData = {
-    courseId: course.id,
-    userId: user.id,
-    amount: course.price,
-    currency: 'SEK',
-    courseName: course.title,
-    userEmail: user.email,
-    userName: user.name || 'Unknown User',
+    courseId: course.id, userId: user.id, amount: course.price, currency: 'SEK',
+    courseName: course.title, userEmail: user.email, userName: user.name ?? 'Unknown User',
   };
 
   try {
-    // Create Stripe checkout session
     const checkoutSession = await createCourseCheckoutSession(paymentData);
-
-    // Create or update enrollment record
-    await prisma.enrollment.upsert({
-      where: {
-        userId_courseId: {
-          userId: user.id,
-          courseId: courseId,
-        },
-      },
-      create: {
-        userId: user.id,
-        courseId: courseId,
-        isPaid: false,
-        paymentAmount: course.price,
-        stripePaymentId: checkoutSession.paymentIntentId,
-        stripeCustomerId: checkoutSession.customerId,
-      },
-      update: {
-        isPaid: false,
-        paymentAmount: course.price,
-        stripePaymentId: checkoutSession.paymentIntentId,
-        stripeCustomerId: checkoutSession.customerId,
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      checkoutUrl: checkoutSession.url,
-      sessionId: checkoutSession.id,
-    });
-
+    await admin.from('enrollments').upsert(
+      { user_id: user.id, course_id: courseId, is_paid: false, payment_amount: course.price,
+        stripe_payment_id: checkoutSession.paymentIntentId, stripe_customer_id: checkoutSession.customerId },
+      { onConflict: 'user_id,course_id' }
+    );
+    return NextResponse.json({ success: true, checkoutUrl: checkoutSession.url, sessionId: checkoutSession.id });
   } catch (error) {
     console.error('Course payment creation error:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to create payment session',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create payment session', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }
 
-async function handleCompanyPayment(companyId: string, user: any) {
-  // Check if user is admin of the company
-  if (!user.companyId || user.companyId !== companyId) {
-    return NextResponse.json(
-      { error: 'You are not authorized to make payments for this company' },
-      { status: 403 }
-    );
+async function handleCompanyPayment(companyId: string, user: any, admin: ReturnType<typeof createAdminClient>) {
+  if (!user.company_id || user.company_id !== companyId) {
+    return NextResponse.json({ error: 'You are not authorized to make payments for this company' }, { status: 403 });
   }
-
   if (user.role !== 'COMPANY_ADMIN') {
-    return NextResponse.json(
-      { error: 'Only company administrators can make payments' },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: 'Only company administrators can make payments' }, { status: 403 });
   }
 
-  // Get company details
-  const company = await prisma.company.findUnique({
-    where: { id: companyId },
-  });
+  const { data: company } = await admin.from('companies').select('id, name, email, plan, plan_price, payment_status, plan_end_date').eq('id', companyId).single();
+  if (!company) return NextResponse.json({ error: 'Company not found' }, { status: 404 });
 
-  if (!company) {
-    return NextResponse.json(
-      { error: 'Company not found' },
-      { status: 404 }
-    );
+  if (company.payment_status === 'PAID' && company.plan_end_date && new Date(company.plan_end_date) > new Date()) {
+    return NextResponse.json({ error: 'Company already has an active subscription' }, { status: 400 });
   }
 
-  // Check if company already has active subscription
-  if (company.paymentStatus === 'PAID' && company.planEndDate && company.planEndDate > new Date()) {
-    return NextResponse.json(
-      { error: 'Company already has an active subscription' },
-      { status: 400 }
-    );
-  }
-
-  // Create payment data
   const paymentData: CompanyPaymentData = {
-    companyId: company.id,
-    amount: company.planPrice,
-    currency: 'SEK',
-    planName: company.plan,
-    companyName: company.name,
-    companyEmail: company.email,
-    billingPeriod: 'yearly',
+    companyId: company.id, amount: company.plan_price, currency: 'SEK',
+    planName: company.plan, companyName: company.name, companyEmail: company.email, billingPeriod: 'yearly',
   };
 
   try {
-    // Create Stripe checkout session
     const checkoutSession = await createCompanyCheckoutSession(paymentData);
-
-    // Update company payment tracking
-    await prisma.company.update({
-      where: { id: companyId },
-      data: {
-        paymentStatus: 'PENDING',
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      checkoutUrl: checkoutSession.url,
-      sessionId: checkoutSession.id,
-    });
-
+    await admin.from('companies').update({ payment_status: 'PENDING' }).eq('id', companyId);
+    return NextResponse.json({ success: true, checkoutUrl: checkoutSession.url, sessionId: checkoutSession.id });
   } catch (error) {
     console.error('Company payment creation error:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to create company payment session',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create company payment session', details: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }

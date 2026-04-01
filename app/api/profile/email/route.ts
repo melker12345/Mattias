@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireAuth, isNextResponse } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
     const { email } = await request.json();
 
@@ -29,28 +26,19 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Check if email is already taken by another user
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existingUser && existingUser.email !== session.user.email) {
-      return NextResponse.json(
-        { error: 'Email is already taken' },
-        { status: 409 }
-      );
+    const admin = createAdminClient();
+    const { data: existingUser } = await admin.from('users').select('id').eq('email', email).maybeSingle();
+    if (existingUser && existingUser.id !== authResult.id) {
+      return NextResponse.json({ error: 'Email is already taken' }, { status: 409 });
     }
 
-    // Update the user's email
-    const updatedUser = await prisma.user.update({
-      where: { email: session.user.email },
-      data: { email },
-    });
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.updateUser({ email });
+    if (authError) return NextResponse.json({ error: 'Failed to update email' }, { status: 500 });
 
-    return NextResponse.json({
-      message: 'Email updated successfully',
-      email: updatedUser.email,
-    });
+    await admin.from('users').update({ email }).eq('id', authResult.id);
+
+    return NextResponse.json({ message: 'Email updated successfully', email });
   } catch (error) {
     console.error('Error updating email:', error);
     return NextResponse.json(

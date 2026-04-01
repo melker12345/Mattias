@@ -1,7 +1,8 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -10,6 +11,8 @@ import { z } from 'zod'
 const signUpSchema = z.object({
   name: z.string().min(2, 'Namnet måste vara minst 2 tecken'),
   email: z.string().email('Ogiltig e-postadress'),
+  personnummer: z.string().optional(),
+  phone: z.string().optional(),
   password: z.string().min(6, 'Lösenordet måste vara minst 6 tecken'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -23,7 +26,7 @@ export default function SignUpPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [invitationInfo, setInvitationInfo] = useState<{ email: string; companyName: string } | null>(null)
+  const [invitationInfo, setInvitationInfo] = useState<{ email: string; companyName: string; requiresVerification: boolean } | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -64,6 +67,7 @@ export default function SignUpPage() {
         setInvitationInfo({
           email: data.invitation.email,
           companyName: data.invitation.companyName,
+          requiresVerification: !!(data.invitation.hasPersonnummer || data.invitation.phone),
         })
         
         // Pre-fill name if available from invitation
@@ -92,8 +96,10 @@ export default function SignUpPage() {
         body: JSON.stringify({
           name: data.name,
           email: data.email,
+          personnummer: data.personnummer,
+          phone: data.phone,
           password: data.password,
-          invitationToken: token, // Include invitation token if present
+          invitationToken: token,
         }),
       })
 
@@ -152,6 +158,12 @@ export default function SignUpPage() {
               </div>
             )}
 
+            {invitationInfo?.requiresVerification && (
+              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-md text-sm">
+                Ditt företag har registrerat dina uppgifter. Ange samma personnummer och telefonnummer för att verifiera din identitet.
+              </div>
+            )}
+
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
                 Namn
@@ -169,6 +181,44 @@ export default function SignUpPage() {
                 )}
               </div>
             </div>
+
+            {invitationInfo?.requiresVerification && (
+              <>
+                <div>
+                  <label htmlFor="personnummer" className="block text-sm font-medium text-gray-700">
+                    Personnummer <span className="text-red-500">*</span>
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      {...register('personnummer')}
+                      type="text"
+                      className="input-field"
+                      placeholder="YYYYMMDDXXXX"
+                    />
+                    {errors.personnummer && (
+                      <p className="mt-1 text-sm text-red-600">{errors.personnummer.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                    Telefonnummer <span className="text-red-500">*</span>
+                  </label>
+                  <div className="mt-1">
+                    <input
+                      {...register('phone')}
+                      type="tel"
+                      className="input-field"
+                      placeholder="07X-XXX XX XX"
+                    />
+                    {errors.phone && (
+                      <p className="mt-1 text-sm text-red-600">{errors.phone.message}</p>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">

@@ -1,46 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: NextRequest) {
   try {
-    const courses = await prisma.course.findMany({
-      include: {
-        enrollments: {
-          include: {
-            user: true
-          }
-        },
-        _count: {
-          select: {
-            enrollments: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+    const admin = createAdminClient();
+    const { data: courses } = await admin.from('courses').select('*').order('created_at', { ascending: false });
 
-    // Transform data to include enrollment statistics
-    const coursesWithStats = courses.map(course => {
-      const completedEnrollments = course.enrollments.filter(e => e.completedAt !== null);
-      
+    const coursesWithStats = await Promise.all((courses ?? []).map(async (course) => {
+      const [{ count: enrolledUsers }, { data: completed }] = await Promise.all([
+        admin.from('enrollments').select('*', { count: 'exact', head: true }).eq('course_id', course.id),
+        admin.from('enrollments').select('id').eq('course_id', course.id).not('completed_at', 'is', null),
+      ]);
       return {
-        id: course.id,
-        title: course.title,
-        description: course.description,
-        price: course.price,
-        duration: course.duration,
-        category: course.category,
-        image: course.image,
-        isPublished: course.isPublished,
-        enrolledUsers: course._count.enrollments,
-        completedUsers: completedEnrollments.length,
-        status: course.isPublished ? 'active' : 'draft',
-        createdAt: course.createdAt,
-        updatedAt: course.updatedAt
+        id: course.id, title: course.title, description: course.description,
+        price: course.price, duration: course.duration, category: course.category,
+        image: course.image, isPublished: course.is_published,
+        enrolledUsers: enrolledUsers ?? 0, completedUsers: completed?.length ?? 0,
+        status: course.is_published ? 'active' : 'draft',
+        createdAt: course.created_at, updatedAt: course.updated_at,
       };
-    });
+    }));
 
     return NextResponse.json(coursesWithStats);
   } catch (error) {
@@ -65,18 +44,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const course = await prisma.course.create({
-      data: {
-        title,
-        description,
-        price: parseFloat(price),
-        duration: parseInt(duration),
-        category,
-        image: image || null,
-        passingScore: parseInt(passingScore) || 80, // Default to 80%
-        isPublished: false // Default to draft
-      }
-    });
+    const admin = createAdminClient();
+    const { data: course } = await admin.from('courses').insert({
+      title, description, price: parseFloat(price), duration: parseInt(duration),
+      category, image: image ?? null, passing_score: parseInt(passingScore) || 80, is_published: false,
+    }).select().single();
 
     return NextResponse.json(course, { status: 201 });
   } catch (error) {

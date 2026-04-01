@@ -1,16 +1,6 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-import { getToken } from 'next-auth/jwt'
+import { NextResponse, type NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 
-// Protected routes that require payment validation
-const PAYWALLED_ROUTES = {
-  '/dashboard/company': 'company_registration',
-  '/courses/[id]/learn': 'course_learning',
-  '/dashboard': 'progress_tracking',
-  '/admin': 'admin_access'
-}
-
-// Routes that are always accessible
 const PUBLIC_ROUTES = [
   '/',
   '/about',
@@ -18,125 +8,67 @@ const PUBLIC_ROUTES = [
   '/courses',
   '/auth/signin',
   '/auth/signup',
+  '/auth/callback',
+  '/auth/forgot-password',
+  '/auth/reset-password',
   '/register/company',
-  '/profile',
   '/api/auth',
-  '/api/profile'
+  '/api/webhooks',
 ]
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Allow public routes
-  if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
-    return NextResponse.next()
-  }
-
-  // Check if route is paywalled
-  const paywallFeature = getPaywallFeature(pathname)
-  if (!paywallFeature) {
-    return NextResponse.next()
-  }
-
-  // Get session token
-  const token = await getToken({ 
-    req: request, 
-    secret: process.env.NEXTAUTH_SECRET 
+  let response = NextResponse.next({
+    request,
   })
 
-  if (!token) {
-    // Redirect to signin if not authenticated
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          response = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  // Refresh session — required for Server Components to pick up the updated session
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const isPublic = PUBLIC_ROUTES.some(route => pathname.startsWith(route))
+  if (isPublic) return response
+
+  // Protect all non-public routes
+  if (!user) {
     const signinUrl = new URL('/auth/signin', request.url)
     signinUrl.searchParams.set('callbackUrl', pathname)
     return NextResponse.redirect(signinUrl)
   }
 
-  // For admin routes, check admin role
-  if (paywallFeature === 'admin_access') {
-    if (token.role !== 'ADMIN') {
+  // Protect admin routes — role from user_metadata or ADMIN_EMAIL env var
+  if (pathname.startsWith('/admin')) {
+    const role = user.user_metadata?.role
+    const isAdminEmail = user.email === process.env.ADMIN_EMAIL
+    if (role !== 'ADMIN' && !isAdminEmail) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
-    return NextResponse.next()
   }
 
-  // For other paywalled routes, check access
-  let resourceId: string | undefined = undefined
-  
-  // Extract resource ID for course learning routes
-  if (paywallFeature === 'course_learning') {
-    const courseMatch = pathname.match(/^\/courses\/([^\/]+)\/learn$/)
-    if (courseMatch) {
-      resourceId = courseMatch[1]
-    }
-  }
-  
-  const hasAccess = await checkPaywallAccess(token.sub!, paywallFeature, resourceId)
-  
-  if (!hasAccess) {
-    // Redirect to appropriate page based on feature
-    const redirectUrl = getRedirectUrl(paywallFeature, request.url, resourceId)
-    return NextResponse.redirect(redirectUrl)
-  }
-
-  return NextResponse.next()
-}
-
-function getPaywallFeature(pathname: string): string | null {
-  // Check exact matches first
-  if (pathname === '/dashboard/company') return 'company_registration'
-  if (pathname === '/dashboard') return 'progress_tracking'
-  if (pathname === '/admin') return 'admin_access'
-  
-  // Check pattern matches
-  if (pathname.match(/^\/courses\/[^\/]+\/learn$/)) return 'course_learning'
-  
-  return null
-}
-
-function getRedirectUrl(feature: string, baseUrl: string, resourceId?: string): URL {
-  switch (feature) {
-    case 'company_registration':
-      return new URL('/register/company', baseUrl)
-    
-    case 'course_learning':
-      // Redirect to course detail page for payment
-      if (resourceId) {
-        return new URL(`/courses/${resourceId}`, baseUrl)
-      }
-      return new URL('/courses', baseUrl)
-    
-    case 'progress_tracking':
-      return new URL('/courses', baseUrl)
-    
-    case 'admin_access':
-      return new URL('/dashboard', baseUrl)
-    
-    default:
-      return new URL('/', baseUrl)
-  }
-}
-
-async function checkPaywallAccess(userId: string, feature: string, resourceId?: string): Promise<boolean> {
-  try {
-    // Import validation function dynamically to avoid circular imports
-    const { validateUserAccess } = await import('./lib/payment-validation')
-    const result = await validateUserAccess(userId, feature, resourceId)
-    return result.hasAccess
-  } catch (error) {
-    console.error('Paywall access check failed:', error)
-    return false // Fail secure - deny access on error
-  }
+  return response
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

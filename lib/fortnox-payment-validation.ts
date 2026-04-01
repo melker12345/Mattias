@@ -1,4 +1,4 @@
-import { prisma } from './prisma';
+import { createAdminClient } from './supabase/admin';
 import { fortnox } from './fortnox';
 
 export interface FortnoxPaymentValidation {
@@ -39,28 +39,19 @@ export async function validateFortnoxPayment(
   invoiceNumber?: string
 ): Promise<FortnoxPaymentValidation> {
   try {
-    // Get company and their invoices
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-      include: {
-        invoices: {
-          where: { status: 'PENDING' },
-          orderBy: { dueDate: 'desc' },
-          take: 1
-        }
-      }
-    });
+    const admin = createAdminClient();
+    const { data: company } = await admin.from('companies').select('id, name, email').eq('id', companyId).single();
 
     if (!company) {
-      return {
-        isValid: false,
-        status: 'FAILED',
-        message: 'Företag hittades inte'
-      };
+      return { isValid: false, status: 'FAILED', message: 'Företag hittades inte' };
     }
 
-    // If no specific invoice number provided, use the latest pending invoice
-    const targetInvoiceNumber = invoiceNumber || company.invoices[0]?.invoiceNumber;
+    let targetInvoiceNumber = invoiceNumber;
+    if (!targetInvoiceNumber) {
+      const { data: latestInvoice } = await admin.from('invoices').select('invoice_number')
+        .eq('company_id', companyId).eq('status', 'PENDING').order('due_date', { ascending: false }).limit(1).maybeSingle();
+      targetInvoiceNumber = latestInvoice?.invoice_number;
+    }
     
     if (!targetInvoiceNumber) {
       return {
@@ -225,27 +216,15 @@ async function updateLocalPaymentStatus(
   status: 'PAID' | 'PENDING' | 'OVERDUE' | 'CANCELLED'
 ): Promise<void> {
   try {
-    await prisma.invoice.updateMany({
-      where: {
-        companyId,
-        invoiceNumber
-      },
-      data: {
-        status,
-        paidAt: status === 'PAID' ? new Date() : null
-      }
-    });
+    const admin = createAdminClient();
+    await admin.from('invoices').update({ status, paid_at: status === 'PAID' ? new Date().toISOString() : null })
+      .eq('company_id', companyId).eq('invoice_number', invoiceNumber);
 
-    // If payment is successful, update company payment status
     if (status === 'PAID') {
-      await prisma.company.update({
-        where: { id: companyId },
-        data: {
-          paymentStatus: 'PAID',
-          planEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // Extend by 1 year
-          updatedAt: new Date()
-        }
-      });
+      await admin.from('companies').update({
+        payment_status: 'PAID',
+        plan_end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      }).eq('id', companyId);
     }
 
   } catch (error) {
@@ -263,23 +242,12 @@ export async function createFortnoxInvoice(
   totalAmount: number
 ): Promise<{ success: boolean; invoiceNumber?: string; error?: string }> {
   try {
-    // Get company information
-    const company = await prisma.company.findUnique({
-      where: { id: companyId }
-    });
+    const admin = createAdminClient();
+    const { data: company } = await admin.from('companies').select('*').eq('id', companyId).single();
+    if (!company) return { success: false, error: 'Företag hittades inte' };
 
-    if (!company) {
-      return { success: false, error: 'Företag hittades inte' };
-    }
-
-    // Get course information
-    const courses = await prisma.course.findMany({
-      where: { id: { in: courseIds } }
-    });
-
-    if (courses.length === 0) {
-      return { success: false, error: 'Inga kurser hittades' };
-    }
+    const { data: courses } = await admin.from('courses').select('*').in('id', courseIds);
+    if (!courses || courses.length === 0) return { success: false, error: 'Inga kurser hittades' };
 
     // Create or get Fortnox customer
     const customerData = {
@@ -343,22 +311,17 @@ export async function createFortnoxInvoice(
       `LOCAL-${Date.now()}`
     );
 
-    // Create local invoice record
-    const localInvoice = await prisma.invoice.create({
-      data: {
-        companyId,
-        invoiceNumber: fortnoxInvoiceNumber || `INV-${Date.now()}`,
-        amount: totalAmount,
-        currency: 'SEK',
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        status: 'PENDING'
-      }
+    const invNum = fortnoxInvoiceNumber || `INV-${Date.now()}`;
+    await admin.from('invoices').insert({
+      company_id: companyId,
+      invoice_number: invNum,
+      amount: totalAmount,
+      currency: 'SEK',
+      due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'PENDING',
     });
 
-    return {
-      success: true,
-      invoiceNumber: localInvoice.invoiceNumber
-    };
+    return { success: true, invoiceNumber: invNum };
 
   } catch (error) {
     console.error('Error creating Fortnox invoice:', error);
@@ -377,17 +340,11 @@ export async function checkFortnoxPaywallAccess(
   feature: 'company_registration' | 'course_learning' | 'progress_tracking'
 ): Promise<boolean> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { company: true }
-    });
+    const admin = createAdminClient();
+    const { data: user } = await admin.from('users').select('company_id').eq('id', userId).single();
+    if (!user || !user.company_id) return false;
 
-    if (!user || !user.companyId) {
-      return false;
-    }
-
-    // Validate payment status
-    const paymentValidation = await validateFortnoxPayment(user.companyId);
+    const paymentValidation = await validateFortnoxPayment(user.company_id);
     
     return paymentValidation.isValid && paymentValidation.status === 'PAID';
 

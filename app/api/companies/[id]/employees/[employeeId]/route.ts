@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function DELETE(
   request: NextRequest,
@@ -9,52 +9,19 @@ export async function DELETE(
     const companyId = params.id
     const employeeId = params.employeeId
 
-    // Verify company exists
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-    })
+    const admin = createAdminClient()
 
-    if (!company) {
-      return NextResponse.json(
-        { message: 'Företag hittades inte' },
-        { status: 404 }
-      )
-    }
+    const { data: company } = await admin.from('companies').select('id').eq('id', companyId).maybeSingle()
+    if (!company) return NextResponse.json({ message: 'Företag hittades inte' }, { status: 404 })
 
-    // Verify employee exists and belongs to this company
-    const employee = await prisma.user.findFirst({
-      where: { 
-        id: employeeId,
-        companyId: companyId,
-        role: 'EMPLOYEE'
-      },
-    })
+    const { data: employee } = await admin.from('users').select('id, name, email')
+      .eq('id', employeeId).eq('company_id', companyId).eq('role', 'EMPLOYEE').maybeSingle()
+    if (!employee) return NextResponse.json({ message: 'Anställd hittades inte eller tillhör inte detta företag' }, { status: 404 })
 
-    if (!employee) {
-      return NextResponse.json(
-        { message: 'Anställd hittades inte eller tillhör inte detta företag' },
-        { status: 404 }
-      )
-    }
-
-    // Remove employee from company (set companyId to null and role to INDIVIDUAL)
-    const updatedEmployee = await prisma.user.update({
-      where: { id: employeeId },
-      data: {
-        companyId: null,
-        role: 'INDIVIDUAL', // Convert to individual user
-      },
-    })
+    await admin.from('users').update({ company_id: null, role: 'INDIVIDUAL' }).eq('id', employeeId)
 
     return NextResponse.json(
-      { 
-        message: 'Anställd har tagits bort från företaget',
-        employee: {
-          id: updatedEmployee.id,
-          name: updatedEmployee.name,
-          email: updatedEmployee.email,
-        }
-      },
+      { message: 'Anställd har tagits bort från företaget', employee: { id: employee.id, name: employee.name, email: employee.email } },
       { status: 200 }
     )
   } catch (error) {

@@ -1,34 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { requireAuth, isNextResponse } from '@/lib/auth';
 import { validateFortnoxPayment, createFortnoxInvoice } from '@/lib/fortnox-payment-validation';
-import { prisma } from '@/lib/prisma';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
     const companyId = params.id;
     const { searchParams } = new URL(request.url);
     const invoiceNumber = searchParams.get('invoiceNumber');
 
-    // Check if user has access to this company
-    const user = await prisma.user.findUnique({
-      where: { id: (session.user as any).id },
-      include: { company: true }
-    });
-
-    if (!user || user.companyId !== companyId) {
+    if (authResult.role !== 'ADMIN' && authResult.companyId !== companyId) {
       return NextResponse.json(
         { message: 'Du har inte behörighet att komma åt denna information' },
         { status: 403 }
@@ -54,26 +40,14 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
     const companyId = params.id;
     const body = await request.json();
     const { courseIds, totalAmount } = body;
 
-    // Check if user has access to this company
-    const user = await prisma.user.findUnique({
-      where: { id: (session.user as any).id },
-      include: { company: true }
-    });
-
-    if (!user || user.companyId !== companyId) {
+    if (authResult.role !== 'ADMIN' && authResult.companyId !== companyId) {
       return NextResponse.json(
         { message: 'Du har inte behörighet att skapa fakturor för detta företag' },
         { status: 403 }

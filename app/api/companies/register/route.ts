@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 
 const companyRegistrationSchema = z.object({
@@ -23,10 +23,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { organizationNumber, name, contactPerson, email, phone, address, password, plan, paymentStatus } = companyRegistrationSchema.parse(body)
 
+    const admin = createAdminClient()
+
     // Check if company already exists
-    const existingCompany = await prisma.company.findUnique({
-      where: { organizationNumber },
-    })
+    const { data: existingCompany } = await admin
+      .from('companies')
+      .select('id')
+      .eq('organization_number', organizationNumber)
+      .maybeSingle()
 
     if (existingCompany) {
       return NextResponse.json(
@@ -35,84 +39,76 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if email is already used
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
+    const COMPANY_PRICE = 1500
+
+    // Create company
+    const { data: company, error: companyError } = await admin
+      .from('companies')
+      .insert({
+        organization_number: organizationNumber,
+        name,
+        contact_person: contactPerson,
+        email,
+        phone,
+        address,
+        verified: false,
+        plan: plan ?? 'STANDARD',
+        plan_price: COMPANY_PRICE,
+        plan_start_date: new Date().toISOString(),
+        plan_end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        payment_status: paymentStatus ?? 'PENDING',
+      })
+      .select()
+      .single()
+
+    if (companyError || !company) {
+      console.error('Company create error:', companyError)
+      return NextResponse.json({ message: 'Kunde inte skapa företag' }, { status: 500 })
+    }
+
+    // Create invoice
+    await admin.from('invoices').insert({
+      company_id: company.id,
+      invoice_number: `INV-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+      amount: COMPANY_PRICE,
+      currency: 'SEK',
+      due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'PENDING',
     })
 
-    if (existingUser) {
+    // Create Supabase Auth user (handles password hashing)
+    const { data: authData, error: authError } = await admin.auth.admin.createUser({
+      email,
+      password,
+      user_metadata: { name: contactPerson, role: 'COMPANY_ADMIN' },
+      email_confirm: true,
+    })
+
+    if (authError || !authData.user) {
+      // Rollback company
+      await admin.from('companies').delete().eq('id', company.id)
       return NextResponse.json(
-        { message: 'E-postadressen används redan av en annan användare' },
+        { message: authError?.message?.includes('already registered')
+            ? 'E-postadressen används redan'
+            : 'Kunde inte skapa användarkonto' },
         { status: 400 }
       )
     }
 
-    // Fixed company registration price
-    const COMPANY_PRICE = 1500 // SEK
-
-    // Create company
-    const company = await prisma.company.create({
-      data: {
-        organizationNumber,
-        name,
-        contactPerson,
-        email,
-        phone,
-        address,
-        verified: false, // Will be verified manually or through business registration check
-        plan: plan || 'STANDARD',
-        planPrice: COMPANY_PRICE,
-        planStartDate: new Date(),
-        planEndDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
-        paymentStatus: paymentStatus || 'PENDING'
-      },
-    })
-
-    // Create invoice for company registration
-    const invoice = await prisma.invoice.create({
-      data: {
-        companyId: company.id,
-        invoiceNumber: `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-        amount: COMPANY_PRICE,
-        currency: 'SEK',
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-        status: 'PENDING'
-      }
-    })
-
-    // Create company admin user
-    const hashedPassword = await import('bcryptjs').then(bcrypt => 
-      bcrypt.hash(password, 12)
-    )
-
-    const companyAdmin = await prisma.user.create({
-      data: {
-        email,
-        name: contactPerson,
-        password: hashedPassword,
-        role: 'COMPANY_ADMIN',
-        companyId: company.id,
-        bankIdVerified: false, // Company admins don't need BankID initially
-      },
+    // Create public.users profile
+    await admin.from('users').insert({
+      id: authData.user.id,
+      email,
+      name: contactPerson,
+      role: 'COMPANY_ADMIN',
+      company_id: company.id,
     })
 
     return NextResponse.json(
-      { 
+      {
         message: 'Företag registrerat framgångsrikt! Du kan nu logga in med din e-postadress och lösenord.',
-        company: {
-          id: company.id,
-          name: company.name,
-          organizationNumber: company.organizationNumber,
-          contactPerson: company.contactPerson,
-          email: company.email,
-          verified: company.verified,
-        },
-        adminUser: {
-          id: companyAdmin.id,
-          email: companyAdmin.email,
-          name: companyAdmin.name,
-          role: companyAdmin.role,
-        }
+        company: { id: company.id, name: company.name, organizationNumber, contactPerson, email, verified: false },
+        adminUser: { id: authData.user.id, email, name: contactPerson, role: 'COMPANY_ADMIN' },
       },
       { status: 201 }
     )

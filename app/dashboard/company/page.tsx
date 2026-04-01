@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useSupabaseAuth } from '@/app/providers'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
@@ -61,7 +61,7 @@ interface EmployeeDetails {
 }
 
 export default function CompanyDashboard() {
-  const { data: session, status } = useSession()
+  const { user } = useSupabaseAuth()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -78,20 +78,18 @@ export default function CompanyDashboard() {
 
   // Fetch real employees from API
   useEffect(() => {
-    if (status === 'loading') return
-
-    if (!session) {
+    if (!user) {
       router.push('/auth/signin')
       return
     }
 
-    const userRole = (session.user as any)?.role
+    const userRole = user.user_metadata?.role
     if (userRole !== 'COMPANY_ADMIN') {
       router.push('/dashboard')
       return
     }
 
-    const companyId = (session.user as any)?.companyId
+    const companyId = user.user_metadata?.companyId
     if (!companyId) {
       setError('Inget företag kopplat till ditt konto')
       setIsLoading(false)
@@ -117,7 +115,7 @@ export default function CompanyDashboard() {
     }
 
     fetchEmployees()
-  }, [session, status, router])
+  }, [user, router])
 
   const stats = {
     totalEmployees: employees.length,
@@ -127,9 +125,9 @@ export default function CompanyDashboard() {
   }
 
   const refreshEmployees = async () => {
-    if (!session) return
+    if (!user) return
     
-    const companyId = (session.user as any)?.companyId
+    const companyId = user.user_metadata?.companyId
     if (!companyId) return
 
     setIsLoading(true)
@@ -151,9 +149,9 @@ export default function CompanyDashboard() {
   }
 
   const fetchEmployeeDetails = async (employeeId: string) => {
-    if (!session) return
+    if (!user) return
     
-    const companyId = (session.user as any)?.companyId
+    const companyId = user.user_metadata?.companyId
     if (!companyId) return
 
     setLoadingDetails(prev => ({ ...prev, [employeeId]: true }))
@@ -211,9 +209,9 @@ export default function CompanyDashboard() {
   }
 
   const removeEmployee = async (employeeId: string) => {
-    if (!session) return
+    if (!user) return
     
-    const companyId = (session.user as any)?.companyId
+    const companyId = user.user_metadata?.companyId
     if (!companyId) return
 
     if (!confirm('Är du säker på att du vill ta bort denna anställd från företaget?')) {
@@ -747,9 +745,9 @@ export default function CompanyDashboard() {
         onClose={closeCoursePurchaseModal}
         employeeId={coursePurchaseModal.employeeId}
         employeeName={coursePurchaseModal.employeeName}
-        companyId={(session?.user as any)?.companyId || ''}
+        companyId={user?.user_metadata?.companyId || ''}
         onPurchaseSuccess={handlePurchaseSuccess}
-        userRole={(session?.user as any)?.role}
+        userRole={user?.user_metadata?.role}
       />
     </div>
   )

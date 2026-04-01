@@ -1,69 +1,78 @@
-import CredentialsProvider from 'next-auth/providers/credentials'
-import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
-import type { NextAuthOptions } from 'next-auth'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { NextResponse } from 'next/server'
 
-export const authOptions: NextAuthOptions = {
-  providers: [
-    CredentialsProvider({
-      name: 'credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null
-        }
+export interface AuthUser {
+  id: string
+  email: string
+  name: string | null
+  role: string
+  companyId: string | null
+}
 
-        const user = await prisma.user.findUnique({
-          where: {
-            email: credentials.email
-          }
-        })
+/**
+ * Get the current authenticated user from Supabase session + public.users profile.
+ * Returns null if not authenticated or user profile not found.
+ */
+export async function getAuthUser(): Promise<AuthUser | null> {
+  try {
+    const supabase = createClient()
+    const { data: { user }, error } = await supabase.auth.getUser()
 
-        if (!user) {
-          return null
-        }
+    if (error || !user) return null
 
-        const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
+    const admin = createAdminClient()
+    const { data: dbUser } = await admin
+      .from('users')
+      .select('id, email, name, role, company_id')
+      .eq('id', user.id)
+      .single()
 
-        if (!isPasswordValid) {
-          return null
-        }
+    if (!dbUser) return null
 
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          companyId: user.companyId,
-        }
-      }
-    })
-  ],
-  session: {
-    strategy: 'jwt' as const
-  },
-  pages: {
-    signIn: '/auth/signin',
-  },
-  callbacks: {
-    async jwt({ token, user }: any) {
-      if (user) {
-        const userAny = user as any
-        token.role = userAny.role
-        token.companyId = userAny.companyId
-      }
-      return token
-    },
-    async session({ session, token }: any) {
-      if (token && session.user) {
-        const user = session.user as any
-        user.role = token.role || null
-        user.companyId = token.companyId || null
-      }
-      return session
+    // ADMIN_EMAIL in .env always grants admin regardless of DB role
+    if (process.env.ADMIN_EMAIL && dbUser.email === process.env.ADMIN_EMAIL) {
+      dbUser.role = 'ADMIN'
     }
+
+    return {
+      id: dbUser.id,
+      email: dbUser.email,
+      name: dbUser.name,
+      role: dbUser.role,
+      companyId: dbUser.company_id,
+    }
+  } catch {
+    return null
   }
+}
+
+/**
+ * Use in API route handlers. Returns the user or a 401 NextResponse.
+ */
+export async function requireAuth(): Promise<AuthUser | NextResponse> {
+  const user = await getAuthUser()
+  if (!user) {
+    return NextResponse.json({ message: 'Du måste vara inloggad' }, { status: 401 })
+  }
+  return user
+}
+
+/**
+ * Use in API route handlers. Returns the user only if they have the ADMIN role,
+ * otherwise returns a 403 NextResponse.
+ */
+export async function requireAdmin(): Promise<AuthUser | NextResponse> {
+  const user = await getAuthUser()
+  if (!user) {
+    return NextResponse.json({ message: 'Du måste vara inloggad' }, { status: 401 })
+  }
+  if (user.role !== 'ADMIN') {
+    return NextResponse.json({ message: 'Åtkomst nekad' }, { status: 403 })
+  }
+  return user
+}
+
+export function isNextResponse(value: unknown): value is NextResponse {
+  return value instanceof NextResponse
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET(
   request: NextRequest,
@@ -8,18 +8,12 @@ export async function GET(
   try {
     const token = params.token
 
-    // Find invitation by token
-    const invitation = await prisma.invitation.findUnique({
-      where: { token },
-      include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    })
+    const admin = createAdminClient()
+    const { data: invitation } = await admin
+      .from('invitations')
+      .select('*, company:companies(id, name)')
+      .eq('token', token)
+      .single()
 
     if (!invitation) {
       return NextResponse.json(
@@ -28,15 +22,13 @@ export async function GET(
       )
     }
 
-    // Check if invitation has expired
-    if (new Date(invitation.expiresAt) < new Date()) {
+    if (new Date(invitation.expires_at) < new Date()) {
       return NextResponse.json(
         { message: 'Inbjudningslänk har gått ut' },
         { status: 410 }
       )
     }
 
-    // Check if invitation has already been used
     if (invitation.used) {
       return NextResponse.json(
         { message: 'Inbjudningslänk har redan använts' },
@@ -48,11 +40,14 @@ export async function GET(
       invitation: {
         id: invitation.id,
         email: invitation.email,
-        companyId: invitation.companyId,
-        companyName: invitation.company.name,
-        isExistingUser: invitation.isExistingUser,
-        temporaryPassword: invitation.temporaryPassword,
-        expiresAt: invitation.expiresAt,
+        name: invitation.name,
+        companyId: invitation.company_id,
+        companyName: (invitation.company as any)?.name,
+        isExistingUser: invitation.is_existing_user,
+        temporaryPassword: invitation.temporary_password,
+        expiresAt: invitation.expires_at,
+        hasPersonnummer: !!invitation.personnummer_encrypted,
+        phone: invitation.phone ?? null,
       },
     })
   } catch (error) {

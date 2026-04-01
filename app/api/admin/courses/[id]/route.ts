@@ -1,38 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const course = await prisma.course.findUnique({
-      where: { id: params.id },
-      include: {
-        lessons: {
-          orderBy: { order: 'asc' }
-        },
-        enrollments: {
-          include: {
-            user: true
-          }
-        },
-        _count: {
-          select: {
-            enrollments: true
-          }
-        }
-      }
-    });
-
-    if (!course) {
-      return NextResponse.json(
-        { message: 'Kurs hittades inte' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(course);
+    const admin = createAdminClient();
+    const [{ data: course }, { data: lessons }, { data: enrollments }] = await Promise.all([
+      admin.from('courses').select('*').eq('id', params.id).single(),
+      admin.from('lessons').select('*').eq('course_id', params.id).order('order'),
+      admin.from('enrollments').select('*, user:users(id, name, email)').eq('course_id', params.id),
+    ]);
+    if (!course) return NextResponse.json({ message: 'Kurs hittades inte' }, { status: 404 });
+    return NextResponse.json({ ...course, lessons: lessons ?? [], enrollments: enrollments ?? [] });
   } catch (error) {
     console.error('Error fetching course:', error);
     return NextResponse.json(
@@ -58,19 +39,11 @@ export async function PUT(
       );
     }
 
-    const course = await prisma.course.update({
-      where: { id: params.id },
-      data: {
-        title,
-        description,
-        price: parseFloat(price),
-        duration: parseInt(duration),
-        category,
-        image: image || null,
-        isPublished: isPublished || false
-      }
-    });
-
+    const admin = createAdminClient();
+    const { data: course } = await admin.from('courses').update({
+      title, description, price: parseFloat(price), duration: parseInt(duration),
+      category, image: image ?? null, is_published: isPublished ?? false,
+    }).eq('id', params.id).select().single();
     return NextResponse.json(course);
   } catch (error) {
     console.error('Error updating course:', error);
@@ -86,22 +59,10 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Check if course has enrollments
-    const enrollments = await prisma.enrollment.findMany({
-      where: { courseId: params.id }
-    });
-
-    if (enrollments.length > 0) {
-      return NextResponse.json(
-        { message: 'Kan inte ta bort kurs som har registrerade användare' },
-        { status: 400 }
-      );
-    }
-
-    await prisma.course.delete({
-      where: { id: params.id }
-    });
-
+    const admin = createAdminClient();
+    const { count } = await admin.from('enrollments').select('*', { count: 'exact', head: true }).eq('course_id', params.id);
+    if (count && count > 0) return NextResponse.json({ message: 'Kan inte ta bort kurs som har registrerade användare' }, { status: 400 });
+    await admin.from('courses').delete().eq('id', params.id);
     return NextResponse.json({ message: 'Kurs borttagen framgångsrikt' });
   } catch (error) {
     console.error('Error deleting course:', error);

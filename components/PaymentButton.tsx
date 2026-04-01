@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSupabaseAuth } from '@/app/providers';
 import { useRouter } from 'next/navigation';
 import { 
   CreditCardIcon, 
@@ -41,12 +41,12 @@ export default function PaymentButton({
   variant = 'primary',
   size = 'md',
 }: PaymentButtonProps) {
-  const { data: session } = useSession();
+  const { user } = useSupabaseAuth();
   const router = useRouter();
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>({ status: 'idle' });
 
   const handlePayment = async () => {
-    if (!session) {
+    if (!user) {
       router.push('/auth/signin');
       return;
     }

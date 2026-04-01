@@ -1,48 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: NextRequest) {
   try {
-    const users = await prisma.user.findMany({
-      include: {
-        company: true,
-        enrollments: {
-          include: {
-            course: true
-          }
-        },
-        _count: {
-          select: {
-            enrollments: true,
-            certificates: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+    const admin = createAdminClient();
+    const { data: users } = await admin.from('users')
+      .select('id, name, email, role, identity_verified, created_at, updated_at, company:companies(name)')
+      .order('created_at', { ascending: false });
 
-    // Transform data for admin view
-    const usersWithStats = users.map(user => {
-      const completedCourses = user.enrollments.filter(e => e.completedAt !== null);
-      
+    const usersWithStats = await Promise.all((users ?? []).map(async (user) => {
+      const [{ count: enrolledCourses }, { data: completedEnrollments }, { count: certificates }] = await Promise.all([
+        admin.from('enrollments').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+        admin.from('enrollments').select('id').eq('user_id', user.id).not('completed_at', 'is', null),
+        admin.from('certificates').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+      ]);
+      const company = user.company as unknown as { name: string } | null;
       return {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        company: user.company?.name || null,
-        personalNumber: user.personalNumber,
-        bankIdVerified: user.bankIdVerified,
-        id06Eligible: user.id06Eligible,
-        enrolledCourses: user._count.enrollments,
-        completedCourses: completedCourses.length,
-        certificates: user._count.certificates,
-        lastActive: user.updatedAt,
-        createdAt: user.createdAt
+        id: user.id, name: user.name, email: user.email, role: user.role,
+        company: company?.name ?? null,
+        identityVerified: user.identity_verified,
+        enrolledCourses: enrolledCourses ?? 0,
+        completedCourses: completedEnrollments?.length ?? 0,
+        certificates: certificates ?? 0,
+        lastActive: user.updated_at, createdAt: user.created_at,
       };
-    });
+    }));
 
     return NextResponse.json(usersWithStats);
   } catch (error) {

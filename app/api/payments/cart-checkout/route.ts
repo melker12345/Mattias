@@ -1,23 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireAuth, isNextResponse } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { stripe } from '@/lib/stripe';
-import type { CoursePaymentData, CompanyPaymentData } from '@/lib/types/payment';
 
 export async function POST(request: NextRequest) {
   try {
     console.log('Cart checkout API called');
-    const session = await getServerSession(authOptions);
-    console.log('Session:', session);
-    
-    if (!session?.user?.email) {
-      console.log('No session or email found');
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
     const body = await request.json();
     const { items, customerData } = body;
@@ -31,19 +21,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user from database
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    });
-    console.log('User found:', user);
-
-    if (!user) {
-      console.log('User not found in database');
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
+    const admin = createAdminClient();
+    const { data: user } = await admin.from('users').select('id, email, name').eq('id', authResult.id).single();
+    console.log('User found:', user?.email);
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
     // Separate courses and company accounts
     const courses = items.filter(item => item.type === 'course');
@@ -59,16 +40,9 @@ export async function POST(request: NextRequest) {
 
     // Add course items
     for (const course of courses) {
-      // Verify course exists and get current price
-      const dbCourse = await prisma.course.findUnique({
-        where: { id: course.id }
-      });
-
-      if (!dbCourse || !dbCourse.isPublished) {
-        return NextResponse.json(
-          { error: `Course ${course.title} is not available` },
-          { status: 400 }
-        );
+      const { data: dbCourse } = await admin.from('courses').select('id, title, description, price, image, is_published').eq('id', course.id).single();
+      if (!dbCourse || !dbCourse.is_published) {
+        return NextResponse.json({ error: `Course ${course.title} is not available` }, { status: 400 });
       }
 
       lineItems.push({
@@ -77,7 +51,7 @@ export async function POST(request: NextRequest) {
           product_data: {
             name: dbCourse.title,
             description: dbCourse.description,
-            images: dbCourse.image ? [dbCourse.image] : [],
+            images: dbCourse.image ? [(dbCourse.image as string)] : [],
           },
           unit_amount: Math.round(dbCourse.price * 100), // Convert to öre
         },
@@ -137,56 +111,24 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Store pending enrollments/purchases in database
     for (const course of courses) {
-      await prisma.enrollment.upsert({
-        where: {
-          userId_courseId: {
-            userId: user.id,
-            courseId: course.id,
-          },
-        },
-        create: {
-          userId: user.id,
-          courseId: course.id,
-          isPaid: false,
-          paymentAmount: course.price,
-          stripePaymentId: checkoutSession.payment_intent as string,
-          stripeCustomerId: checkoutSession.customer as string,
-        },
-        update: {
-          isPaid: false,
-          paymentAmount: course.price,
-          stripePaymentId: checkoutSession.payment_intent as string,
-          stripeCustomerId: checkoutSession.customer as string,
-        },
-      });
+      await admin.from('enrollments').upsert(
+        { user_id: user.id, course_id: course.id, is_paid: false, payment_amount: course.price,
+          stripe_payment_id: checkoutSession.payment_intent as string,
+          stripe_customer_id: checkoutSession.customer as string },
+        { onConflict: 'user_id,course_id' }
+      );
     }
 
-    // Handle company account purchases
-    if (companyAccounts.length > 0) {
-      // Create or update company based on customer data
-      const company = await prisma.company.upsert({
-        where: {
-          organizationNumber: customerData.organizationNumber,
-        },
-        create: {
-          organizationNumber: customerData.organizationNumber,
-          name: customerData.companyName,
-          contactPerson: `${customerData.firstName} ${customerData.lastName}`,
-          email: customerData.email,
-          phone: customerData.phone,
-          address: `${customerData.address}, ${customerData.postalCode} ${customerData.city}`,
-          paymentStatus: 'PENDING',
-        },
-        update: {
-          contactPerson: `${customerData.firstName} ${customerData.lastName}`,
-          email: customerData.email,
-          phone: customerData.phone,
-          address: `${customerData.address}, ${customerData.postalCode} ${customerData.city}`,
-          paymentStatus: 'PENDING',
-        },
-      });
+    if (companyAccounts.length > 0 && customerData?.organizationNumber) {
+      const contactName = `${customerData.firstName} ${customerData.lastName}`;
+      const addr = `${customerData.address}, ${customerData.postalCode} ${customerData.city}`;
+      await admin.from('companies').upsert(
+        { organization_number: customerData.organizationNumber, name: customerData.companyName,
+          contact_person: contactName, email: customerData.email, phone: customerData.phone,
+          address: addr, payment_status: 'PENDING' },
+        { onConflict: 'organization_number' }
+      );
     }
 
     console.log(`Cart checkout session created: ${checkoutSession.id} for ${user.email}`);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSupabaseAuth } from '@/app/providers';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/contexts/CartContext';
 import { motion } from 'framer-motion';
@@ -39,7 +39,7 @@ interface Lesson {
 }
 
 export default function CourseDetailPage({ params }: { params: { id: string } }) {
-  const { data: session } = useSession();
+  const { user } = useSupabaseAuth();
   const router = useRouter();
   const { addItem } = useCart();
   const [course, setCourse] = useState<Course | null>(null);
@@ -50,10 +50,10 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
 
   useEffect(() => {
     fetchCourseDetails();
-    if (session?.user?.email) {
+    if (user?.email) {
       checkEnrollmentStatus();
     }
-  }, [params.id, session]);
+  }, [params.id, user]);
 
   const fetchCourseDetails = async () => {
     try {
@@ -103,7 +103,7 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
   };
 
   const handleEnroll = async () => {
-    if (!session) {
+    if (!user) {
       // Redirect to login
       window.location.href = '/auth/signin';
       return;

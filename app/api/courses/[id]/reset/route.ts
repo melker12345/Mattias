@@ -1,97 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireAuth, isNextResponse } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
     const courseId = params.id;
-    const userEmail = session.user.email;
+    const user = authResult;
 
-    // Get user
-    const user = await prisma.user.findUnique({
-      where: { email: userEmail }
-    });
+    const admin = createAdminClient();
 
-    if (!user) {
-      return NextResponse.json(
-        { message: 'Användare hittades inte' },
-        { status: 404 }
-      );
-    }
-
-    // Check if user is enrolled
-    const enrollment = await prisma.enrollment.findUnique({
-      where: {
-        userId_courseId: {
-          userId: user.id,
-          courseId: courseId
-        }
-      }
-    });
-
-    if (!enrollment) {
-      return NextResponse.json(
-        { message: 'Du är inte registrerad för denna kurs' },
-        { status: 403 }
-      );
-    }
+    const { data: enrollment } = await admin.from('enrollments').select('id').eq('user_id', user.id).eq('course_id', courseId).maybeSingle();
+    if (!enrollment) return NextResponse.json({ message: 'Du är inte registrerad för denna kurs' }, { status: 403 });
 
     console.log(`Resetting course ${courseId} for user ${user.email}`);
 
-    // Reset course progress in database
-    await prisma.$transaction(async (tx) => {
-      // Delete all user answers for this course
-      await tx.answer.deleteMany({
-        where: {
-          userId: user.id,
-          question: {
-            lesson: {
-              courseId: courseId
-            }
-          }
-        }
-      });
+    // Get lesson + question IDs for this course
+    const { data: lessons } = await admin.from('lessons').select('id').eq('course_id', courseId);
+    const lessonIds = (lessons ?? []).map(l => l.id);
+    const { data: questions } = lessonIds.length
+      ? await admin.from('questions').select('id').in('lesson_id', lessonIds)
+      : { data: [] };
+    const questionIds = (questions ?? []).map(q => q.id);
 
-      // Delete all progress for this course
-      await tx.progress.deleteMany({
-        where: {
-          userId: user.id,
-          lesson: {
-            courseId: courseId
-          }
-        }
-      });
-
-      // Reset enrollment data
-      await tx.enrollment.update({
-        where: {
-          userId_courseId: {
-            userId: user.id,
-            courseId: courseId
-          }
-        },
-        data: {
-          completedAt: null,
-          passed: false,
-          finalScore: null,
-          totalQuestions: 0,
-          correctAnswers: 0
-        }
-      });
-    });
+    // Delete answers, progress, then reset enrollment
+    if (questionIds.length) {
+      await admin.from('answers').delete().eq('user_id', user.id).in('question_id', questionIds);
+    }
+    if (lessonIds.length) {
+      await admin.from('progress').delete().eq('user_id', user.id).in('lesson_id', lessonIds);
+    }
+    await admin.from('enrollments')
+      .update({ completed_at: null, passed: false, final_score: null, total_questions: 0, correct_answers: 0 })
+      .eq('user_id', user.id).eq('course_id', courseId);
 
     console.log(`Course reset completed for user ${user.email}`);
 

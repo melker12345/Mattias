@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
 import type { PaymentValidationResult } from '@/lib/types/payment'
 
 interface UsePaymentValidationReturn {
@@ -12,7 +11,6 @@ interface UsePaymentValidationReturn {
 }
 
 export function usePaymentValidation(companyId?: string): UsePaymentValidationReturn {
-  const { data: session } = useSession()
   const [validation, setValidation] = useState<PaymentValidationResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

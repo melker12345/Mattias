@@ -9,21 +9,18 @@ import type {
   CompanyPaymentData
 } from './types/payment';
 
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('STRIPE_SECRET_KEY environment variable is not set');
+}
+
 // Server-side Stripe instance
-export const stripe = new Stripe(
-  process.env.STRIPE_SECRET_KEY || 
-  'sk_test_51S3admAg9GYbrVh7z5KfLTkM34Rw9Jha40ep38J6g1Fq4fjtOWZEjhWvX2dtgPWe5NyzFXShYLq7iYSImZBlSNsu00xLEeFXcw', 
-  {
-    apiVersion: '2023-10-16',
-    typescript: true,
-  }
-);
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: '2023-10-16',
+  typescript: true,
+});
 
 // Client-side Stripe promise
-export const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 
-  'pk_test_51S3admAg9GYbrVh7DPV15rklddjVOQBqZcshYmL262JPrVGK61M05wjqwfd7a6o2NSHUydoOPYutpKg3CLm8X0sH000UWjcTnR'
-);
+export const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 /**
  * Create a checkout session for course purchase

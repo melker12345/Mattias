@@ -2,14 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useSession, signOut } from 'next-auth/react'
+import { useSupabaseAuth } from '@/app/providers'
 import { Disclosure, Menu, Transition } from '@headlessui/react'
 import { Bars3Icon, XMarkIcon, UserCircleIcon, ShoppingCartIcon } from '@heroicons/react/24/outline'
 import { useCart } from '@/contexts/CartContext'
 
 
 export function Navigation() {
-  const { data: session } = useSession()
+  const { user, signOut } = useSupabaseAuth()
   const { toggleCart, getItemCount } = useCart()
   const [isOpen, setIsOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
@@ -95,7 +95,7 @@ export function Navigation() {
                   )}
                 </button>
                 
-                {session ? (
+                {user ? (
                   <Menu as="div" className="relative">
                     <div>
                       <Menu.Button className="rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 p-2 transition-all duration-200 bg-white/10 hover:bg-white/20 focus:ring-white">
@@ -136,7 +136,7 @@ export function Navigation() {
                             </Link>
                           )}
                         </Menu.Item>
-                        {(session.user as any)?.role === 'ADMIN' && (
+                        {(user as any)?.role === 'ADMIN' && (
                           <Menu.Item>
                             {({ active }) => (
                               <Link
@@ -225,9 +225,9 @@ export function Navigation() {
               ))}
               
               {/* Mobile menu items for logged in users */}
-              {session && (
+              {user && (
                 <div className="pt-4 space-y-3 border-t border-white/20">
-                  {(session.user as any)?.role === 'ADMIN' && (
+                  {(user as any)?.role === 'ADMIN' && (
                     <Disclosure.Button
                       as={Link}
                       href="/admin"
@@ -240,7 +240,7 @@ export function Navigation() {
               )}
 
               {/* Mobile auth buttons */}
-              {!session && (
+              {!user && (
                 <div className="pt-4 space-y-3 border-t border-white/20">
                   <Disclosure.Button
                     as={Link}

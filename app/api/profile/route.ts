@@ -1,73 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireAuth, isNextResponse } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: {
-        company: true,
-        enrollments: {
-          include: {
-            course: true,
-          },
-          orderBy: { enrolledAt: 'desc' },
-        },
-        certificates: {
-          include: {
-            course: true,
-          },
-          orderBy: { issuedAt: 'desc' },
-        },
-      },
-    });
+    const admin = createAdminClient();
+    const [{ data: user }, { data: enrollments }, { data: certificates }] = await Promise.all([
+      admin.from('users').select('id, name, email, role, created_at, company:companies(id, name)').eq('id', authResult.id).single(),
+      admin.from('enrollments').select('id, enrolled_at, completed_at, passed, final_score, is_gift, gifted_by, gifted_at, gift_reason, course:courses(id, title, description)').eq('user_id', authResult.id).order('enrolled_at', { ascending: false }),
+      admin.from('certificates').select('id, issued_at, course:courses(title)').eq('user_id', authResult.id).order('issued_at', { ascending: false }),
+    ]);
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-    // Transform the data to match the frontend interface
+    const company = user.company as unknown as { id: string; name: string } | null;
     const profile = {
-      id: user.id,
-      name: user.name || 'Unknown',
-      email: user.email,
-      role: user.role,
-      createdAt: user.createdAt.toISOString(),
-      company: user.company ? {
-        id: user.company.id,
-        name: user.company.name,
-        role: 'Employee', // Default role for company employees
-      } : undefined,
-      enrollments: user.enrollments.map((enrollment: any) => ({
-        id: enrollment.id,
-        course: {
-          id: enrollment.course.id,
-          name: enrollment.course.title,
-          description: enrollment.course.description,
-        },
-        enrolledAt: enrollment.enrolledAt.toISOString(),
-        completedAt: enrollment.completedAt?.toISOString(),
-        passed: enrollment.passed,
-        finalScore: enrollment.finalScore,
-        isGift: enrollment.isGift,
-        giftedBy: enrollment.giftedBy,
-        giftedAt: enrollment.giftedAt?.toISOString(),
-        giftReason: enrollment.giftReason,
+      id: user.id, name: user.name ?? 'Unknown', email: user.email, role: user.role,
+      createdAt: user.created_at,
+      company: company ? { id: company.id, name: company.name, role: 'Employee' } : undefined,
+      enrollments: (enrollments ?? []).map((e: any) => ({
+        id: e.id,
+        course: { id: e.course?.id, name: e.course?.title, description: e.course?.description },
+        enrolledAt: e.enrolled_at, completedAt: e.completed_at, passed: e.passed,
+        finalScore: e.final_score, isGift: e.is_gift, giftedBy: e.gifted_by,
+        giftedAt: e.gifted_at, giftReason: e.gift_reason,
       })),
-      certificates: user.certificates.map((certificate: any) => ({
-        id: certificate.id,
-        course: {
-          name: certificate.course.title,
-        },
-        issuedAt: certificate.issuedAt.toISOString(),
+      certificates: (certificates ?? []).map((c: any) => ({
+        id: c.id, course: { name: c.course?.title }, issuedAt: c.issued_at,
       })),
     };
 
@@ -83,60 +45,22 @@ export async function GET() {
 
 export async function DELETE() {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: {
-        enrollments: true,
-        certificates: true,
-        answers: true,
-        progress: true,
-        apvSubmissions: true,
-        company: true,
-      },
-    });
+    const admin = createAdminClient();
+    const { data: user } = await admin.from('users').select('id').eq('id', authResult.id).single();
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    // Delete all related data first
-    await prisma.$transaction([
-      // Delete APV submissions
-      prisma.aPVSubmission.deleteMany({
-        where: { userId: user.id },
-      }),
-      
-      // Delete answers
-      prisma.answer.deleteMany({
-        where: { userId: user.id },
-      }),
-      
-      // Delete progress
-      prisma.progress.deleteMany({
-        where: { userId: user.id },
-      }),
-      
-      // Delete certificates
-      prisma.certificate.deleteMany({
-        where: { userId: user.id },
-      }),
-      
-      // Delete enrollments
-      prisma.enrollment.deleteMany({
-        where: { userId: user.id },
-      }),
-      
-      // Delete the user
-      prisma.user.delete({
-        where: { id: user.id },
-      }),
-    ]);
+    // Delete related data in dependency order
+    await admin.from('apv_submissions').delete().eq('user_id', user.id);
+    await admin.from('answers').delete().eq('user_id', user.id);
+    await admin.from('progress').delete().eq('user_id', user.id);
+    await admin.from('certificates').delete().eq('user_id', user.id);
+    await admin.from('enrollments').delete().eq('user_id', user.id);
+    await admin.from('users').delete().eq('id', user.id);
+    // Also delete from Supabase Auth
+    await admin.auth.admin.deleteUser(user.id);
 
     return NextResponse.json({ message: 'Account deleted successfully' });
   } catch (error) {

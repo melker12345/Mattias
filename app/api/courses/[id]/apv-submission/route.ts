@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireAuth, isNextResponse } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { encryptPersonnummer, normalisePersonnummer } from '@/lib/encryption';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
     const courseId = params.id;
     const body = await request.json();
@@ -38,150 +32,63 @@ export async function POST(
       );
     }
 
-    // Get user and course
-    const user = await prisma.user.findUnique({
-      where: { id: (session.user as any).id },
-      include: {
-        enrollments: {
-          where: { courseId },
-          include: { course: true }
-        }
-      }
-    });
+    const admin = createAdminClient();
+    const userId = authResult.id;
 
-    if (!user) {
-      return NextResponse.json(
-        { message: 'Användare hittades inte' },
-        { status: 404 }
-      );
-    }
+    const { data: enrollment } = await admin
+      .from('enrollments').select('*, course:courses(id, title, passing_score)')
+      .eq('user_id', userId).eq('course_id', courseId).maybeSingle();
+    if (!enrollment) return NextResponse.json({ message: 'Du är inte registrerad för denna kurs' }, { status: 400 });
+    if (!enrollment.passed) return NextResponse.json({ message: 'Du måste ha godkänt kursen för att kunna skicka APV submission' }, { status: 400 });
 
-    const enrollment = user.enrollments[0];
-    if (!enrollment) {
-      return NextResponse.json(
-        { message: 'Du är inte registrerad för denna kurs' },
-        { status: 400 }
-      );
-    }
+    const { data: existingSubmission } = await admin.from('apv_submissions').select('id').eq('user_id', userId).eq('course_id', courseId).maybeSingle();
+    if (existingSubmission) return NextResponse.json({ message: 'APV submission har redan skickats för denna kurs' }, { status: 400 });
 
-    if (!enrollment.passed) {
-      return NextResponse.json(
-        { message: 'Du måste ha godkänt kursen för att kunna skicka APV submission' },
-        { status: 400 }
-      );
-    }
-
-    // Check if APV submission already exists
-    const existingSubmission = await prisma.aPVSubmission.findUnique({
-      where: {
-        userId_courseId: {
-          userId: user.id,
-          courseId
-        }
-      }
-    });
-
-    if (existingSubmission) {
-      return NextResponse.json(
-        { message: 'APV submission har redan skickats för denna kurs' },
-        { status: 400 }
-      );
-    }
-
-    // Create or get certificate
-    let certificate = await prisma.certificate.findUnique({
-      where: {
-        userId_courseId: {
-          userId: user.id,
-          courseId
-        }
-      }
-    });
-
+    // Upsert certificate
+    let { data: certificate } = await admin.from('certificates').select('id').eq('user_id', userId).eq('course_id', courseId).maybeSingle();
     if (!certificate) {
-      // Generate certificate number
-      const certificateNumber = `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-      
-      certificate = await prisma.certificate.create({
-        data: {
-          userId: user.id,
-          courseId,
-          certificateNumber
-        }
-      });
+      const { data: newCert } = await admin.from('certificates').insert({
+        user_id: userId, course_id: courseId,
+        certificate_number: `CERT-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+      }).select('id').single();
+      certificate = newCert;
     }
 
-    // Collect questions and user's answers for this course
-    const questions = await prisma.question.findMany({
-      where: { lesson: { courseId } },
-      include: {
-        answers: {
-          where: { userId: user.id }
-        }
-      }
+    // Build answers data
+    const { data: lessons } = await admin.from('lessons').select('id').eq('course_id', courseId);
+    const lessonIds = (lessons ?? []).map(l => l.id);
+    const { data: questions } = lessonIds.length ? await admin.from('questions').select('*').in('lesson_id', lessonIds) : { data: [] };
+    const qIds = (questions ?? []).map(q => q.id);
+    const { data: userAnswersRaw } = qIds.length ? await admin.from('answers').select('*').eq('user_id', userId).in('question_id', qIds) : { data: [] };
+
+    const totalQuestions = (questions ?? []).length;
+    const correctAnswers = (userAnswersRaw ?? []).filter(a => a.is_correct).length;
+    const answersData = (questions ?? []).map(q => {
+      const ans = (userAnswersRaw ?? []).find(a => a.question_id === q.id);
+      let options: unknown;
+      try { options = q.options ? JSON.parse(q.options) : undefined; } catch { options = undefined; }
+      return { questionId: q.id, question: q.question, userAnswer: ans?.answer ?? null, isCorrect: ans?.is_correct ?? false, correctAnswer: q.correct_answer, options };
     });
 
-    const totalQuestions = questions.length;
-    const correctAnswers = questions.reduce((count, q) => {
-      const ans = q.answers[0];
-      return count + (ans?.isCorrect ? 1 : 0);
-    }, 0);
+    const encryptedPnr = personalNumber ? encryptPersonnummer(normalisePersonnummer(personalNumber)) : null;
+    const courseData = enrollment.course as { id: string; title: string; passing_score: number };
 
-    const answersData = questions.map((q) => {
-      const ans = q.answers[0];
-      let options: any = undefined;
-      try {
-        options = q.options ? JSON.parse(q.options) : undefined;
-      } catch (_) {
-        options = undefined;
-      }
-      return {
-        questionId: q.id,
-        question: q.question,
-        userAnswer: ans ? ans.answer : null,
-        isCorrect: ans ? ans.isCorrect : false,
-        correctAnswer: q.correctAnswer,
-        options
-      };
-    });
+    const { data: apvSubmission } = await admin.from('apv_submissions').insert({
+      user_id: userId, course_id: courseId, certificate_id: certificate?.id ?? null,
+      full_name: fullName, personnummer_encrypted: encryptedPnr,
+      address, postal_code: postalCode, city, phone: phone ?? null,
+      course_title: courseData.title,
+      completion_date: enrollment.completed_at ?? new Date().toISOString(),
+      final_score: finalScore, passing_score: passingScore,
+      total_questions: totalQuestions, correct_answers: correctAnswers,
+      answers_data: JSON.stringify(answersData), status: 'PENDING',
+    }).select().single();
 
-    // Create APV submission
-    const apvSubmission = await prisma.aPVSubmission.create({
-      data: {
-        userId: user.id,
-        courseId,
-        certificateId: certificate.id,
-        fullName,
-        personalNumber,
-        address,
-        postalCode,
-        city,
-        phone: phone || null,
-        courseTitle: enrollment.course.title,
-        completionDate: enrollment.completedAt || new Date(),
-        finalScore,
-        passingScore,
-        totalQuestions,
-        correctAnswers,
-        answersData: JSON.stringify(answersData),
-        status: 'PENDING'
-      }
-    });
+    if (certificate) {
+      await admin.from('certificates').update({ apv_submitted: true, apv_submitted_at: new Date().toISOString(), apv_submission_id: apvSubmission?.id }).eq('id', certificate.id);
+    }
 
-    // Update certificate with APV submission reference
-    await prisma.certificate.update({
-      where: { id: certificate.id },
-      data: {
-        apvSubmitted: true,
-        apvSubmittedAt: new Date(),
-        apvSubmissionId: apvSubmission.id
-      }
-    });
-
-    return NextResponse.json({
-      message: 'APV submission skickades framgångsrikt',
-      submission: apvSubmission
-    });
+    return NextResponse.json({ message: 'APV submission skickades framgångsrikt', submission: apvSubmission });
 
   } catch (error) {
     console.error('Error creating APV submission:', error);
@@ -197,39 +104,19 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
     const courseId = params.id;
-    const userId = (session.user as any).id;
+    const userId = authResult.id;
 
-    // Get APV submission for this user and course
-    const submission = await prisma.aPVSubmission.findUnique({
-      where: {
-        userId_courseId: {
-          userId,
-          courseId
-        }
-      },
-      include: {
-        course: true,
-        certificate: true
-      }
-    });
+    const admin = createAdminClient();
+    const { data: submission } = await admin
+      .from('apv_submissions')
+      .select('*, course:courses(*), certificate:certificates(*)')
+      .eq('user_id', userId).eq('course_id', courseId).maybeSingle();
 
-    if (!submission) {
-      return NextResponse.json(
-        { message: 'Ingen APV submission hittades' },
-        { status: 404 }
-      );
-    }
-
+    if (!submission) return NextResponse.json({ message: 'Ingen APV submission hittades' }, { status: 404 });
     return NextResponse.json(submission);
 
   } catch (error) {

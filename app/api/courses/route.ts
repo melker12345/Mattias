@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,46 +7,15 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const search = searchParams.get('search');
 
-    // Build where clause
-    const where: any = {
-      isPublished: true // Only show published courses
-    };
+    const admin = createAdminClient();
+    let query = admin.from('courses').select('id, title, description, price, duration, category, image').eq('is_published', true);
+    if (category && category !== 'all') query = query.eq('category', category);
+    if (search) query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
+    const { data: courses } = await query.order('created_at', { ascending: false });
 
-    if (category && category !== 'all') {
-      where.category = category;
-    }
-
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
-      ];
-    }
-
-    const courses = await prisma.course.findMany({
-      where,
-      include: {
-        _count: {
-          select: {
-            enrollments: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-
-    // Transform data for frontend
-    const transformedCourses = courses.map(course => ({
-      id: course.id,
-      title: course.title,
-      description: course.description,
-      price: course.price,
-      duration: course.duration,
-      category: course.category,
-      image: course.image,
-      enrolledUsers: course._count.enrollments
+    const transformedCourses = await Promise.all((courses ?? []).map(async (course) => {
+      const { count } = await admin.from('enrollments').select('*', { count: 'exact', head: true }).eq('course_id', course.id);
+      return { ...course, enrolledUsers: count ?? 0 };
     }));
 
     return NextResponse.json(transformedCourses);

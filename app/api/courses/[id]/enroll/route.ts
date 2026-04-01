@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireAuth, isNextResponse } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createSecureEnrollment } from '@/lib/enrollment-validation';
 
 export async function GET(
@@ -9,67 +8,36 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
     const courseId = params.id;
-    const userEmail = session.user.email;
+    const user = authResult;
 
-    // Get user
-    const user = await prisma.user.findUnique({
-      where: { email: userEmail }
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { message: 'Användare hittades inte' },
-        { status: 404 }
-      );
-    }
-
-    // Check if user is enrolled
-    const enrollment = await prisma.enrollment.findUnique({
-      where: {
-        userId_courseId: {
-          userId: user.id,
-          courseId: courseId
-        }
-      },
-      include: {
-        giftedByUser: {
-          select: {
-            name: true,
-            email: true
-          }
-        }
-      }
-    });
+    const admin = createAdminClient();
+    const { data: enrollment } = await admin
+      .from('enrollments')
+      .select('id, is_gift, gifted_by, gifted_at, gift_reason, completed_at, passed, final_score, gifter:users!gifted_by(name, email)')
+      .eq('user_id', user.id)
+      .eq('course_id', courseId)
+      .maybeSingle();
 
     if (enrollment) {
       return NextResponse.json({
         enrolled: true,
         enrollment: {
           id: enrollment.id,
-          isGift: enrollment.isGift,
-          giftedBy: enrollment.giftedByUser,
-          giftedAt: enrollment.giftedAt,
-          giftReason: enrollment.giftReason,
-          completedAt: enrollment.completedAt,
+          isGift: enrollment.is_gift,
+          giftedBy: enrollment.gifter,
+          giftedAt: enrollment.gifted_at,
+          giftReason: enrollment.gift_reason,
+          completedAt: enrollment.completed_at,
           passed: enrollment.passed,
-          finalScore: enrollment.finalScore
-        }
-      });
-    } else {
-      return NextResponse.json({
-        enrolled: false
+          finalScore: enrollment.final_score,
+        },
       });
     }
+    return NextResponse.json({ enrolled: false });
 
   } catch (error) {
     console.error('Error checking enrollment status:', error);
@@ -85,29 +53,11 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad för att registrera dig för kurser' },
-        { status: 401 }
-      );
-    }
+    const authResult = await requireAuth();
+    if (isNextResponse(authResult)) return authResult;
 
     const courseId = params.id;
-    const userEmail = session.user.email;
-
-    // Get user
-    const user = await prisma.user.findUnique({
-      where: { email: userEmail }
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { message: 'Användare hittades inte' },
-        { status: 404 }
-      );
-    }
+    const user = authResult;
 
     // Use secure enrollment creation
     const result = await createSecureEnrollment(user.id, courseId);

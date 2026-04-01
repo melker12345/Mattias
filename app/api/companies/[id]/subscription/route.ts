@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { requireAuth, isNextResponse } from '@/lib/auth'
 import { validateCompanySubscription } from '@/lib/payment-validation'
 
 export async function GET(
@@ -8,20 +7,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
+    const authResult = await requireAuth()
+    if (isNextResponse(authResult)) return authResult
 
     const companyId = params.id
-    const user = session.user as any
 
     // Validate that user has access to this company
-    if (user.role !== 'ADMIN' && user.companyId !== companyId) {
+    if (authResult.role !== 'ADMIN' && authResult.companyId !== companyId) {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }

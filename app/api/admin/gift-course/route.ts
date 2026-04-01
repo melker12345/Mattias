@@ -1,31 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { requireAdmin, isNextResponse } from '@/lib/auth';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createSecureEnrollment } from '@/lib/enrollment-validation';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
-
-    // Get admin user
-    const admin = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
-
-    if (!admin || admin.role !== 'ADMIN') {
-      return NextResponse.json(
-        { message: 'Endast administratörer kan ge bort kurser' },
-        { status: 403 }
-      );
-    }
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
+    const admin = adminResult;
 
     const { userEmail, courseId, reason } = await request.json();
 
@@ -36,29 +18,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find the target user
-    const targetUser = await prisma.user.findUnique({
-      where: { email: userEmail }
-    });
+    const supabaseAdmin = createAdminClient();
 
-    if (!targetUser) {
-      return NextResponse.json(
-        { message: 'Användare med den e-postadressen hittades inte' },
-        { status: 404 }
-      );
-    }
+    const { data: targetUser } = await supabaseAdmin.from('users').select('id, email, name').eq('email', userEmail).maybeSingle();
+    if (!targetUser) return NextResponse.json({ message: 'Användare med den e-postadressen hittades inte' }, { status: 404 });
 
-    // Validate course exists
-    const course = await prisma.course.findUnique({
-      where: { id: courseId }
-    });
-
-    if (!course) {
-      return NextResponse.json(
-        { message: 'Kurs hittades inte' },
-        { status: 404 }
-      );
-    }
+    const { data: course } = await supabaseAdmin.from('courses').select('id, title').eq('id', courseId).maybeSingle();
+    if (!course) return NextResponse.json({ message: 'Kurs hittades inte' }, { status: 404 });
 
     // Create secure enrollment as gift
     const result = await createSecureEnrollment(targetUser.id, courseId, {
@@ -74,12 +40,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Log the gift action
     console.log(`ADMIN GIFT: ${admin.email} gifted course "${course.title}" to ${targetUser.email}. Reason: ${reason || 'No reason provided'}`);
 
     return NextResponse.json({
       message: `Kursen "${course.title}" har getts som gåva till ${targetUser.email}`,
-      enrollment: result.enrollment
+      enrollment: result.enrollment,
     });
 
   } catch (error) {
@@ -94,71 +59,27 @@ export async function POST(request: NextRequest) {
 // Get all gifted courses for admin overview
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { message: 'Du måste vara inloggad' },
-        { status: 401 }
-      );
-    }
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
 
-    // Verify admin access
-    const admin = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
-
-    if (!admin || admin.role !== 'ADMIN') {
-      return NextResponse.json(
-        { message: 'Endast administratörer kan se gåvoöversikt' },
-        { status: 403 }
-      );
-    }
-
-    // Get all gifted enrollments
-    const giftedEnrollments = await prisma.enrollment.findMany({
-      where: {
-        isGift: true
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true
-          }
-        },
-        course: {
-          select: {
-            id: true,
-            title: true,
-            price: true
-          }
-        },
-        giftedByUser: {
-          select: {
-            id: true,
-            email: true,
-            name: true
-          }
-        }
-      },
-      orderBy: {
-        giftedAt: 'desc'
-      }
-    });
+    const supabaseAdmin = createAdminClient();
+    const { data: giftedEnrollments } = await supabaseAdmin
+      .from('enrollments')
+      .select('id, gifted_at, gift_reason, completed_at, passed, user:users!user_id(id, email, name), course:courses!course_id(id, title, price), gifter:users!gifted_by(id, email, name)')
+      .eq('is_gift', true)
+      .order('gifted_at', { ascending: false });
 
     return NextResponse.json({
-      gifts: giftedEnrollments.map(enrollment => ({
-        id: enrollment.id,
-        user: enrollment.user,
-        course: enrollment.course,
-        giftedBy: enrollment.giftedByUser,
-        giftedAt: enrollment.giftedAt,
-        giftReason: enrollment.giftReason,
-        completed: !!enrollment.completedAt,
-        passed: enrollment.passed
-      }))
+      gifts: (giftedEnrollments ?? []).map(e => ({
+        id: e.id,
+        user: e.user,
+        course: e.course,
+        giftedBy: e.gifter,
+        giftedAt: e.gifted_at,
+        giftReason: e.gift_reason,
+        completed: !!e.completed_at,
+        passed: e.passed,
+      })),
     });
 
   } catch (error) {
