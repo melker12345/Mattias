@@ -44,29 +44,30 @@ User must check a box confirming they swear on honor and conscience that:
 
 ### Database Schema
 
-```prisma
-model APVSubmission {
-  id        String   @id @default(cuid())
-  userId    String
-  courseId  String
-  certificateId String
-  
-  // User information for APV
-  fullName  String
-  personalNumber String
-  address   String
-  postalCode String
-  city      String
-  phone     String?
-  
-  // Course completion verification
-  courseTitle String
-  completionDate DateTime
-  finalScore Int
-  passingScore Int
-  
-  // Submission status
-  status    String @default("PENDING") // PENDING, APPROVED, REJECTED, ID06_REGISTERED
+```sql
+-- apv_submissions table (Supabase / PostgreSQL)
+CREATE TABLE apv_submissions (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID REFERENCES users(id),
+  course_id     UUID REFERENCES courses(id),
+  certificate_id UUID REFERENCES certificates(id),
+
+  -- User information for APV
+  full_name      TEXT NOT NULL,
+  personal_number TEXT NOT NULL,
+  address        TEXT NOT NULL,
+  postal_code    TEXT NOT NULL,
+  city           TEXT NOT NULL,
+  phone          TEXT,
+
+  -- Course completion verification
+  course_title    TEXT NOT NULL,
+  completion_date TIMESTAMPTZ NOT NULL,
+  final_score     INTEGER NOT NULL,
+  passing_score   INTEGER NOT NULL,
+
+  -- Submission status
+  status TEXT NOT NULL DEFAULT 'PENDING' -- PENDING, APPROVED, REJECTED, ID06_REGISTERED
   submittedAt DateTime @default(now())
   reviewedAt DateTime?
   reviewedBy String? // Admin who reviewed
@@ -186,27 +187,20 @@ Replace Stripe with Fortnox for invoice-based payments, allowing companies to pa
 
 ### Database Schema Updates
 
-```prisma
-model Company {
-  // ... existing fields ...
-  
-  // Fortnox integration
-  fortnoxCustomerNumber String?
-  fortnoxEnabled Boolean @default(false)
-  
-  // Payment validation
-  lastPaymentCheck DateTime?
-  paymentValidationStatus String @default("PENDING") // PENDING, VALIDATED, FAILED
-}
+```sql
+-- Additional columns for companies table (Supabase / PostgreSQL)
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS fortnox_customer_number TEXT;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS fortnox_enabled BOOLEAN DEFAULT false;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS last_payment_check TIMESTAMPTZ;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS payment_validation_status TEXT DEFAULT 'PENDING';
+-- payment_validation_status: PENDING, VALIDATED, FAILED
 
-model Invoice {
-  // ... existing fields ...
-  
-  // Fortnox integration
-  fortnoxDocumentNumber String? // Fortnox invoice number
-  fortnoxCustomerNumber String?
-  fortnoxStatus String? // DRAFT, SENT, PAID, OVERDUE, CANCELLED
-  lastFortnoxCheck DateTime?
+-- Additional columns for payments table
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS fortnox_document_number TEXT;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS fortnox_customer_number TEXT;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS fortnox_status TEXT;
+-- fortnox_status: DRAFT, SENT, PAID, OVERDUE, CANCELLED
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS last_fortnox_check TIMESTAMPTZ;
 }
 ```
 
@@ -295,12 +289,14 @@ async function validateFortnoxInvoice(invoiceNumber: string, company: any) {
 #### 2.1 Paywall Check
 ```typescript
 async function checkFortnoxPaywallAccess(userId: string, feature: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { company: true }
-  });
-  
-  if (!user?.companyId) return false;
+  const admin = createAdminClient();
+  const { data: user } = await admin
+    .from('users')
+    .select('company_id, companies(payment_status, is_active, plan_end_date)')
+    .eq('id', userId)
+    .single();
+
+  if (!user?.company_id) return false;
   
   const paymentValidation = await validateFortnoxPayment(user.companyId);
   return paymentValidation.isValid && paymentValidation.status === 'PAID';

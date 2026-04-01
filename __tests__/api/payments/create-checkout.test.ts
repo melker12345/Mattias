@@ -1,28 +1,26 @@
 import { NextRequest } from 'next/server'
 
-// Mock all the dependencies
-jest.mock('next-auth', () => ({
-  getServerSession: jest.fn(),
+jest.mock('../../../lib/auth', () => ({
+  requireAuth: jest.fn(),
+  isNextResponse: jest.fn(() => false),
 }))
 
-jest.mock('../../../lib/prisma', () => ({
-  prisma: {
-    user: {
-      findUnique: jest.fn(),
-    },
-    course: {
-      findUnique: jest.fn(),
-    },
-    enrollment: {
-      findUnique: jest.fn(),
-      upsert: jest.fn(),
-    },
-  },
+jest.mock('../../../lib/supabase/admin', () => ({
+  createAdminClient: jest.fn(() => ({
+    from: jest.fn(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      upsert: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: null, error: null }),
+      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    })),
+  })),
 }))
 
-jest.mock('../../../lib/stripe', () => ({
-  createCourseCheckoutSession: jest.fn(),
-  createCompanyCheckoutSession: jest.fn(),
+jest.mock('../../../lib/fortnox', () => ({
+  createFortnoxCustomerFromPayment: jest.fn().mockResolvedValue('CUST-001'),
+  createInvoiceFromPayment: jest.fn().mockResolvedValue('INV-001'),
 }))
 
 describe('/api/payments/create-checkout', () => {

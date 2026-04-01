@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 /**
  * Called after sign-in to ensure ADMIN_EMAIL user has role='ADMIN'
- * in both the Prisma DB and Supabase auth metadata.
+ * in both the Supabase users table and Supabase auth metadata.
  * Safe to call repeatedly — only acts if email matches ADMIN_EMAIL.
  */
 export async function POST() {

@@ -22,18 +22,18 @@ A modern, full-featured online course platform built with Next.js, TypeScript, a
 
 ### Technical Features
 - **Modern Stack**: Next.js 14, TypeScript, Tailwind CSS
-- **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: NextAuth.js with JWT
-- **Payment**: Stripe integration
+- **Database**: PostgreSQL via Supabase
+- **Authentication**: Supabase Auth
+- **Payment**: Fortnox invoice integration
 - **Deployment Ready**: Optimized for production deployment
 
 ## 🛠️ Tech Stack
 
 - **Frontend**: Next.js 14, React 18, TypeScript
 - **Styling**: Tailwind CSS, Headless UI
-- **Database**: PostgreSQL, Prisma ORM
-- **Authentication**: NextAuth.js
-- **Payment**: Stripe
+- **Database**: PostgreSQL, Supabase
+- **Authentication**: Supabase Auth
+- **Payment**: Fortnox
 - **Forms**: React Hook Form, Zod validation
 - **Animations**: Framer Motion
 - **Icons**: Heroicons
@@ -43,8 +43,8 @@ A modern, full-featured online course platform built with Next.js, TypeScript, a
 Before you begin, ensure you have the following installed:
 - Node.js 18+ 
 - npm or yarn
-- PostgreSQL database
-- Stripe account (for payments)
+- Supabase project (database + auth)
+- Fortnox account (for invoicing)
 
 ## 🚀 Quick Start
 
@@ -65,30 +65,23 @@ yarn install
 Create a `.env.local` file in the root directory:
 
 ```env
-# Database
-DATABASE_URL="postgresql://username:password@localhost:5432/utbildningsplattform"
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL="https://<project>.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="..."
+SUPABASE_SERVICE_ROLE_KEY="..."
 
-# NextAuth
-NEXTAUTH_SECRET="your-secret-key"
-NEXTAUTH_URL="http://localhost:3000"
+# Fortnox
+FORTNOX_CLIENT_SECRET="..."
+FORTNOX_ACCESS_TOKEN="..."
 
-# Stripe
-STRIPE_SECRET_KEY="sk_test_..."
-STRIPE_PUBLISHABLE_KEY="pk_test_..."
-STRIPE_WEBHOOK_SECRET="whsec_..."
+# App
+NEXT_PUBLIC_BASE_URL="http://localhost:3000"
+ADMIN_EMAIL="admin@example.com"
 ```
 
 ### 4. Set up the database
-```bash
-# Generate Prisma client
-npx prisma generate
-
-# Run database migrations
-npx prisma db push
-
-# (Optional) Seed the database with sample data
-npx prisma db seed
-```
+Run the SQL migrations in your Supabase project Dashboard → SQL Editor.
+The migration files are located in `supabase/migrations/`.
 
 ### 5. Start the development server
 ```bash
@@ -110,7 +103,7 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 │   └── globals.css        # Global styles
 ├── components/            # Reusable components
 ├── lib/                   # Utility functions and configurations
-├── prisma/                # Database schema and migrations
+├── supabase/              # Database migrations and SQL schema
 ├── public/                # Static assets
 └── types/                 # TypeScript type definitions
 ```
@@ -130,9 +123,9 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 - Progress tracking
 
 ### Payment System
-- Stripe integration for secure payments
+- Fortnox invoice creation for course and company purchases
 - Course enrollment management
-- Invoice generation
+- 30-day payment terms
 
 ### User Dashboard
 - Course progress overview
@@ -142,13 +135,12 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 ## 🔧 Configuration
 
 ### Database Configuration
-The platform uses PostgreSQL with Prisma ORM. Update the `DATABASE_URL` in your environment variables to point to your database.
+The platform uses Supabase (PostgreSQL). Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in your environment variables.
 
-### Stripe Configuration
-1. Create a Stripe account
-2. Get your API keys from the Stripe dashboard
-3. Add them to your environment variables
-4. Set up webhook endpoints for payment processing
+### Fortnox Configuration
+1. Create a Fortnox account and enable API access
+2. Generate a Client Secret and Access Token
+3. Add `FORTNOX_CLIENT_SECRET` and `FORTNOX_ACCESS_TOKEN` to your environment variables
 
 ### Email Configuration
 Configure your email provider for sending notifications and certificates.
@@ -185,7 +177,7 @@ The platform includes the following main entities:
 - JWT token authentication
 - CSRF protection
 - Input validation with Zod
-- SQL injection prevention with Prisma
+- SQL injection prevention via parameterised Supabase queries
 - XSS protection
 
 ## 📱 Responsive Design

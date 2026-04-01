@@ -4,29 +4,42 @@ import {
   validateUserAccess,
   canEnrollInCourse,
 } from '../../lib/payment-validation'
-import { prisma } from '../../lib/prisma'
 
-jest.mock('../../lib/prisma')
+// ── Supabase admin mock ──────────────────────────────────────────────────────
+const mockSingle = jest.fn()
+const mockMaybeSingle = jest.fn()
 
-const mockPrisma = prisma as jest.Mocked<typeof prisma>
+// Build a chainable mock: from().select().eq().eq()...single/maybeSingle
+function makeChain(terminal: { single: jest.Mock; maybeSingle: jest.Mock }): any {
+  const chain: any = {
+    eq: jest.fn(() => chain),
+    select: jest.fn(() => chain),
+    single: terminal.single,
+    maybeSingle: terminal.maybeSingle,
+  }
+  return chain
+}
 
+const mockFrom = jest.fn(() => makeChain({ single: mockSingle, maybeSingle: mockMaybeSingle }))
+
+jest.mock('../../lib/supabase/admin', () => ({
+  createAdminClient: () => ({ from: mockFrom }),
+}))
+
+// ── Tests ────────────────────────────────────────────────────────────────────
 describe('Payment Validation', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockFrom.mockImplementation(() => makeChain({ single: mockSingle, maybeSingle: mockMaybeSingle }))
   })
 
   describe('validateCoursePayment', () => {
     it('should return valid access for paid enrollment', async () => {
-      mockPrisma.enrollment.findUnique.mockResolvedValue({
-        id: 'enrollment-123',
-        userId: 'user-123',
-        courseId: 'course-123',
-        isPaid: true,
-        paidAt: new Date(),
-        isGift: false,
-        course: { id: 'course-123', title: 'Test Course' },
-        payment: { id: 'payment-123', status: 'succeeded' },
-      } as any)
+      mockMaybeSingle.mockResolvedValue({
+        data: { id: 'enrollment-123', user_id: 'user-123', course_id: 'course-123',
+          is_paid: true, paid_at: new Date().toISOString(), is_gift: false },
+        error: null,
+      })
 
       const result = await validateCoursePayment('user-123', 'course-123')
 
@@ -39,15 +52,11 @@ describe('Payment Validation', () => {
     })
 
     it('should return valid access for gift enrollment', async () => {
-      mockPrisma.enrollment.findUnique.mockResolvedValue({
-        id: 'enrollment-123',
-        userId: 'user-123',
-        courseId: 'course-123',
-        isPaid: false,
-        isGift: true,
-        giftedBy: 'admin-123',
-        course: { id: 'course-123', title: 'Test Course' },
-      } as any)
+      mockMaybeSingle.mockResolvedValue({
+        data: { id: 'enrollment-123', user_id: 'user-123', course_id: 'course-123',
+          is_paid: false, paid_at: null, is_gift: true },
+        error: null,
+      })
 
       const result = await validateCoursePayment('user-123', 'course-123')
 
@@ -60,7 +69,7 @@ describe('Payment Validation', () => {
     })
 
     it('should return invalid access for no enrollment', async () => {
-      mockPrisma.enrollment.findUnique.mockResolvedValue(null)
+      mockMaybeSingle.mockResolvedValue({ data: null, error: null })
 
       const result = await validateCoursePayment('user-123', 'course-123')
 
@@ -72,16 +81,12 @@ describe('Payment Validation', () => {
       })
     })
 
-    it('should return pending status for unpaid enrollment with payment intent', async () => {
-      mockPrisma.enrollment.findUnique.mockResolvedValue({
-        id: 'enrollment-123',
-        userId: 'user-123',
-        courseId: 'course-123',
-        isPaid: false,
-        isGift: false,
-        stripePaymentId: 'pi_test_123',
-        course: { id: 'course-123', title: 'Test Course' },
-      } as any)
+    it('should return pending status for unpaid enrollment with fortnox invoice', async () => {
+      mockMaybeSingle.mockResolvedValue({
+        data: { id: 'enrollment-123', user_id: 'user-123', course_id: 'course-123',
+          is_paid: false, paid_at: null, is_gift: false, fortnox_invoice_id: 'INV-001' },
+        error: null,
+      })
 
       const result = await validateCoursePayment('user-123', 'course-123')
 
@@ -89,7 +94,7 @@ describe('Payment Validation', () => {
         isValid: false,
         hasAccess: false,
         paymentStatus: 'pending',
-        message: 'Payment is being processed',
+        message: 'Invoice sent — awaiting payment',
       })
     })
   })
@@ -99,34 +104,27 @@ describe('Payment Validation', () => {
       const futureDate = new Date()
       futureDate.setFullYear(futureDate.getFullYear() + 1)
 
-      mockPrisma.company.findUnique.mockResolvedValue({
-        id: 'company-123',
-        paymentStatus: 'PAID',
-        isActive: true,
-        planEndDate: futureDate,
-      } as any)
+      mockSingle.mockResolvedValue({
+        data: { payment_status: 'PAID', is_active: true, plan_end_date: futureDate.toISOString() },
+        error: null,
+      })
 
       const result = await validateCompanySubscription('company-123')
 
-      expect(result).toEqual({
-        isValid: true,
-        hasAccess: true,
-        paymentStatus: 'paid',
-        expiresAt: futureDate,
-        message: 'Active subscription',
-      })
+      expect(result.isValid).toBe(true)
+      expect(result.hasAccess).toBe(true)
+      expect(result.paymentStatus).toBe('paid')
+      expect(result.message).toBe('Active subscription')
     })
 
     it('should return invalid access for expired subscription', async () => {
       const pastDate = new Date()
       pastDate.setFullYear(pastDate.getFullYear() - 1)
 
-      mockPrisma.company.findUnique.mockResolvedValue({
-        id: 'company-123',
-        paymentStatus: 'PAID',
-        isActive: true,
-        planEndDate: pastDate,
-      } as any)
+      mockSingle.mockResolvedValue({
+        data: { payment_status: 'PAID', is_active: true, plan_end_date: pastDate.toISOString() },
+        error: null,
+      })
 
       const result = await validateCompanySubscription('company-123')
 
@@ -139,11 +137,10 @@ describe('Payment Validation', () => {
     })
 
     it('should return pending status for pending payment', async () => {
-      mockPrisma.company.findUnique.mockResolvedValue({
-        id: 'company-123',
-        paymentStatus: 'PENDING',
-        isActive: false,
-      } as any)
+      mockSingle.mockResolvedValue({
+        data: { payment_status: 'PENDING', is_active: false, plan_end_date: null },
+        error: null,
+      })
 
       const result = await validateCompanySubscription('company-123')
 
@@ -158,11 +155,10 @@ describe('Payment Validation', () => {
 
   describe('validateUserAccess', () => {
     it('should grant admin access to everything', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 'admin-123',
-        role: 'ADMIN',
-        email: 'admin@example.com',
-      } as any)
+      mockSingle.mockResolvedValue({
+        data: { role: 'ADMIN', company_id: null },
+        error: null,
+      })
 
       const result = await validateUserAccess('admin-123', 'course_learning', 'course-123')
 
@@ -175,20 +171,14 @@ describe('Payment Validation', () => {
     })
 
     it('should validate course access for regular users', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 'user-123',
-        role: 'USER',
-        email: 'user@example.com',
-      } as any)
-
-      mockPrisma.enrollment.findUnique.mockResolvedValue({
-        id: 'enrollment-123',
-        userId: 'user-123',
-        courseId: 'course-123',
-        isPaid: true,
-        paidAt: new Date(),
-        isGift: false,
-      } as any)
+      mockSingle.mockResolvedValueOnce({
+        data: { role: 'USER', company_id: null },
+        error: null,
+      })
+      mockMaybeSingle.mockResolvedValue({
+        data: { is_paid: true, paid_at: new Date().toISOString(), is_gift: false },
+        error: null,
+      })
 
       const result = await validateUserAccess('user-123', 'course_learning', 'course-123')
 
@@ -202,14 +192,12 @@ describe('Payment Validation', () => {
   })
 
   describe('canEnrollInCourse', () => {
-    it('should allow enrollment for published course', async () => {
-      mockPrisma.course.findUnique.mockResolvedValue({
-        id: 'course-123',
-        title: 'Test Course',
-        isPublished: true,
-      } as any)
-
-      mockPrisma.enrollment.findUnique.mockResolvedValue(null)
+    it('should allow enrollment for published course with no existing enrollment', async () => {
+      mockSingle.mockResolvedValue({
+        data: { is_published: true },
+        error: null,
+      })
+      mockMaybeSingle.mockResolvedValue({ data: null, error: null })
 
       const result = await canEnrollInCourse('user-123', 'course-123')
 
@@ -221,11 +209,10 @@ describe('Payment Validation', () => {
     })
 
     it('should prevent enrollment for unpublished course', async () => {
-      mockPrisma.course.findUnique.mockResolvedValue({
-        id: 'course-123',
-        title: 'Test Course',
-        isPublished: false,
-      } as any)
+      mockSingle.mockResolvedValue({
+        data: { is_published: false },
+        error: null,
+      })
 
       const result = await canEnrollInCourse('user-123', 'course-123')
 
@@ -237,19 +224,14 @@ describe('Payment Validation', () => {
     })
 
     it('should prevent enrollment if already enrolled and paid', async () => {
-      mockPrisma.course.findUnique.mockResolvedValue({
-        id: 'course-123',
-        title: 'Test Course',
-        isPublished: true,
-      } as any)
-
-      mockPrisma.enrollment.findUnique.mockResolvedValue({
-        id: 'enrollment-123',
-        userId: 'user-123',
-        courseId: 'course-123',
-        isPaid: true,
-        isGift: false,
-      } as any)
+      mockSingle.mockResolvedValue({
+        data: { is_published: true },
+        error: null,
+      })
+      mockMaybeSingle.mockResolvedValue({
+        data: { is_paid: true, is_gift: false },
+        error: null,
+      })
 
       const result = await canEnrollInCourse('user-123', 'course-123')
 

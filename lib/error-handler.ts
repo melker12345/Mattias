@@ -62,11 +62,11 @@ export function handleApiError(
     );
   }
 
-  // Handle Prisma errors
+  // Handle database errors (Postgres error codes)
   if (error && typeof error === 'object' && 'code' in error) {
-    const prismaError = error as any;
+    const dbError = error as any;
     
-    switch (prismaError.code) {
+    switch (dbError.code) {
       case 'P2002':
         return NextResponse.json(
           {
@@ -101,7 +101,7 @@ export function handleApiError(
         );
       
       default:
-        logger.error('Database error', context, prismaError);
+        logger.error('Database error', context, dbError);
         return NextResponse.json(
           {
             error: 'Database error',
