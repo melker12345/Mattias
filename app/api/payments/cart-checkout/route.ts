@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isNextResponse } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { stripe } from '@/lib/stripe';
+import { fortnox } from '@/lib/fortnox';
+import type { CoursePaymentData } from '@/lib/types/payment';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,117 +27,63 @@ export async function POST(request: NextRequest) {
     console.log('User found:', user?.email);
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-    // Separate courses and company accounts
-    const courses = items.filter(item => item.type === 'course');
-    const companyAccounts = items.filter(item => item.type === 'company_account');
+    const courses = items.filter((item: any) => item.type === 'course');
+    const companyAccounts = items.filter((item: any) => item.type === 'company_account');
+    const userName = `${customerData?.firstName ?? ''} ${customerData?.lastName ?? ''}`.trim() || user.name || 'Unknown';
+    const userEmail = customerData?.email || user.email;
 
-    // Create line items for Stripe checkout
-    const lineItems = [] as any[];
-    const metadata: Record<string, string> = {
-      userId: String(user.id),
-      userEmail: String(user.email),
-      userName: String(customerData.firstName + ' ' + customerData.lastName),
-    };
-
-    // Add course items
-    for (const course of courses) {
-      const { data: dbCourse } = await admin.from('courses').select('id, title, description, price, image, is_published').eq('id', course.id).single();
-      if (!dbCourse || !dbCourse.is_published) {
-        return NextResponse.json({ error: `Course ${course.title} is not available` }, { status: 400 });
-      }
-
-      lineItems.push({
-        price_data: {
-          currency: 'sek',
-          product_data: {
-            name: dbCourse.title,
-            description: dbCourse.description,
-            images: dbCourse.image ? [(dbCourse.image as string)] : [],
-          },
-          unit_amount: Math.round(dbCourse.price * 100), // Convert to öre
-        },
-        quantity: 1,
-      });
-
-      // Add course to metadata
-      metadata[`course_${course.id}`] = dbCourse.title;
-    }
-
-    // Add company account items
-    for (const companyAccount of companyAccounts) {
-      lineItems.push({
-        price_data: {
-          currency: 'sek',
-          product_data: {
-            name: companyAccount.title,
-            description: companyAccount.description,
-            images: companyAccount.image ? [companyAccount.image] : [],
-          },
-          unit_amount: Math.round(companyAccount.price * 100),
-        },
-        quantity: 1,
-      });
-
-      metadata[`company_account`] = 'true';
-    }
-
-    // Create Stripe checkout session
-    console.log('Creating Stripe checkout session with line items:', lineItems);
-    console.log('Metadata:', metadata);
-    console.log('Stripe instance:', !!stripe);
-    
-    const checkoutSession = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card', 'klarna'],
-      line_items: lineItems,
-      customer_email: customerData.email,
-      metadata: metadata,
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/checkout?canceled=true`,
-      automatic_tax: {
-        enabled: true,
-      },
-      tax_id_collection: {
-        enabled: true,
-      },
-      billing_address_collection: 'required',
-      shipping_address_collection: {
-        allowed_countries: ['SE', 'NO', 'DK', 'FI'],
-      },
-      locale: 'sv',
-      // Store customer data in Stripe
-      customer_creation: 'always',
-      phone_number_collection: {
-        enabled: true,
-      },
+    // Create Fortnox customer
+    const customerNumber = await fortnox.createOrUpdateCustomer({
+      email: userEmail,
+      name: userName,
+      phone: customerData?.phone,
+      address: customerData?.address,
+      zipCode: customerData?.postalCode,
+      city: customerData?.city,
+      organizationNumber: customerData?.organizationNumber,
     });
 
+    const invoiceNumbers: string[] = [];
+
+    // Create one invoice per course
     for (const course of courses) {
+      const { data: dbCourse } = await admin.from('courses').select('id, title, price, is_published').eq('id', course.id).single();
+      if (!dbCourse || !dbCourse.is_published) {
+        return NextResponse.json({ error: `Course ${course.title || course.id} is not available` }, { status: 400 });
+      }
+
+      const paymentData: CoursePaymentData = {
+        courseId: dbCourse.id, userId: user.id, amount: dbCourse.price,
+        currency: 'SEK', courseName: dbCourse.title, userEmail, userName,
+      };
+      const invoiceNumber = await fortnox.createCourseInvoice(customerNumber, paymentData);
+      invoiceNumbers.push(invoiceNumber);
+
       await admin.from('enrollments').upsert(
-        { user_id: user.id, course_id: course.id, is_paid: false, payment_amount: course.price,
-          stripe_payment_id: checkoutSession.payment_intent as string,
-          stripe_customer_id: checkoutSession.customer as string },
+        { user_id: user.id, course_id: dbCourse.id, is_paid: false,
+          payment_amount: dbCourse.price, fortnox_invoice_id: invoiceNumber },
         { onConflict: 'user_id,course_id' }
       );
     }
 
+    // Handle company account purchase
     if (companyAccounts.length > 0 && customerData?.organizationNumber) {
-      const contactName = `${customerData.firstName} ${customerData.lastName}`;
-      const addr = `${customerData.address}, ${customerData.postalCode} ${customerData.city}`;
+      const contactName = userName;
+      const addr = [customerData.address, customerData.postalCode, customerData.city].filter(Boolean).join(', ');
       await admin.from('companies').upsert(
         { organization_number: customerData.organizationNumber, name: customerData.companyName,
-          contact_person: contactName, email: customerData.email, phone: customerData.phone,
+          contact_person: contactName, email: userEmail, phone: customerData.phone,
           address: addr, payment_status: 'PENDING' },
         { onConflict: 'organization_number' }
       );
     }
 
-    console.log(`Cart checkout session created: ${checkoutSession.id} for ${user.email}`);
+    console.log(`Cart invoices created for ${userEmail}: ${invoiceNumbers.join(', ')}`);
 
     return NextResponse.json({
       success: true,
-      checkoutUrl: checkoutSession.url,
-      sessionId: checkoutSession.id,
+      invoiceNumbers,
+      message: `${invoiceNumbers.length} faktura(or) skapad(e) och skickas till din e-post`,
     });
 
   } catch (error) {

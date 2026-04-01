@@ -80,7 +80,7 @@ export default function CookiesPage() {
             </p>
             <ul>
               <li><strong>Google Analytics:</strong> För webbplatsanalys</li>
-              <li><strong>Stripe:</strong> För betalningshantering</li>
+              <li><strong>Fortnox:</strong> För fakturahantering</li>
               <li><strong>NextAuth.js:</strong> För autentisering</li>
             </ul>
 

@@ -46,13 +46,13 @@ export async function validateCoursePayment(
       };
     }
 
-    // Check if payment is pending
-    if (enrollment.stripe_payment_id && !enrollment.is_paid) {
+    // Check if invoice has been sent but not yet paid
+    if (enrollment.fortnox_invoice_id && !enrollment.is_paid) {
       return {
         isValid: false,
         hasAccess: false,
         paymentStatus: 'pending',
-        message: 'Payment is being processed',
+        message: 'Invoice sent — awaiting payment',
       };
     }
 

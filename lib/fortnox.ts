@@ -127,7 +127,7 @@ class FortnoxAPI {
   async createCourseInvoice(
     customerNumber: string,
     paymentData: CoursePaymentData,
-    stripePaymentId: string
+    referenceId?: string
   ): Promise<string> {
     try {
       const invoiceDate = new Date();
@@ -140,7 +140,7 @@ class FortnoxAPI {
         DueDate: dueDate.toISOString().split('T')[0],
         Currency: paymentData.currency.toUpperCase(),
         Language: 'SV',
-        ExternalInvoiceReference1: stripePaymentId,
+        ExternalInvoiceReference1: referenceId ?? paymentData.courseId,
         ExternalInvoiceReference2: paymentData.courseId,
         YourReference: paymentData.userName,
         OurReference: 'MN Utbildning',
@@ -162,10 +162,6 @@ class FortnoxAPI {
 
       const invoiceNumber = response.data.Invoice.DocumentNumber;
       console.log(`Created Fortnox invoice: ${invoiceNumber}`);
-      
-      // Mark invoice as paid since payment already processed via Stripe
-      await this.markInvoiceAsPaid(invoiceNumber, paymentData.amount, stripePaymentId);
-      
       return invoiceNumber;
     } catch (error) {
       console.error('Failed to create Fortnox invoice:', error);
@@ -183,7 +179,7 @@ class FortnoxAPI {
   async createCompanyInvoice(
     customerNumber: string,
     paymentData: CompanyPaymentData,
-    stripePaymentId: string
+    referenceId?: string
   ): Promise<string> {
     try {
       const invoiceDate = new Date();
@@ -196,7 +192,7 @@ class FortnoxAPI {
         DueDate: dueDate.toISOString().split('T')[0],
         Currency: paymentData.currency.toUpperCase(),
         Language: 'SV',
-        ExternalInvoiceReference1: stripePaymentId,
+        ExternalInvoiceReference1: referenceId ?? paymentData.companyId,
         ExternalInvoiceReference2: paymentData.companyId,
         YourReference: paymentData.companyName,
         OurReference: 'MN Utbildning',
@@ -218,9 +214,6 @@ class FortnoxAPI {
 
       const invoiceNumber = response.data.Invoice.DocumentNumber;
       console.log(`Created Fortnox company invoice: ${invoiceNumber}`);
-      
-      await this.markInvoiceAsPaid(invoiceNumber, paymentData.amount, stripePaymentId);
-      
       return invoiceNumber;
     } catch (error) {
       console.error('Failed to create Fortnox company invoice:', error);
@@ -235,10 +228,10 @@ class FortnoxAPI {
   /**
    * Mark invoice as paid
    */
-  private async markInvoiceAsPaid(
+  async markInvoiceAsPaid(
     documentNumber: string,
     amount: number,
-    paymentReference: string
+    paymentReference?: string
   ): Promise<void> {
     try {
       const paymentData = {
@@ -246,9 +239,9 @@ class FortnoxAPI {
           InvoiceNumber: documentNumber,
           Amount: amount,
           PaymentDate: new Date().toISOString().split('T')[0],
-          ModeOfPayment: 'STRIPE',
-          ModeOfPaymentAccount: '1930', // Default bank account
-          ExternalInvoiceReference1: paymentReference,
+          ModeOfPayment: 'BANK',
+          ModeOfPaymentAccount: '1930',
+          ...(paymentReference ? { ExternalInvoiceReference1: paymentReference } : {}),
         },
       };
 
@@ -256,7 +249,6 @@ class FortnoxAPI {
       console.log(`Marked invoice ${documentNumber} as paid`);
     } catch (error) {
       console.error(`Failed to mark invoice ${documentNumber} as paid:`, error);
-      // Don't throw here - invoice creation was successful, payment marking is optional
     }
   }
 
@@ -326,11 +318,11 @@ export async function createFortnoxCustomerFromPayment(
 export async function createInvoiceFromPayment(
   customerNumber: string,
   paymentData: CoursePaymentData | CompanyPaymentData,
-  stripePaymentId: string
+  referenceId?: string
 ): Promise<string> {
   if ('courseId' in paymentData) {
-    return await fortnox.createCourseInvoice(customerNumber, paymentData, stripePaymentId);
+    return await fortnox.createCourseInvoice(customerNumber, paymentData, referenceId);
   } else {
-    return await fortnox.createCompanyInvoice(customerNumber, paymentData, stripePaymentId);
+    return await fortnox.createCompanyInvoice(customerNumber, paymentData, referenceId);
   }
 }

@@ -9,7 +9,8 @@ import {
   ExclamationTriangleIcon,
   ArrowPathIcon 
 } from '@heroicons/react/24/outline';
-import { formatAmount } from '@/lib/stripe';
+const formatAmount = (amountInOre: number, currency: string = 'SEK') =>
+  new Intl.NumberFormat('sv-SE', { style: 'currency', currency }).format(amountInOre / 100);
 
 interface PaymentButtonProps {
   courseId?: string;
@@ -73,8 +74,7 @@ export default function PaymentButton({
         throw new Error(data.error || 'Payment initiation failed');
       }
 
-      // Redirect to Stripe Checkout
-      window.location.href = data.checkoutUrl;
+      setPaymentStatus({ status: 'success', message: data.message ?? 'Faktura skickas till din e-post' });
 
     } catch (error) {
       console.error('Payment error:', error);
@@ -145,7 +145,7 @@ export default function PaymentButton({
         } else if (companyId && planName) {
           return `Uppgradera till ${planName} - ${formatAmount(amount * 100, currency)}`;
         }
-        return `Betala ${formatAmount(amount * 100, currency)}`;
+        return `Beställ faktura - ${formatAmount(amount * 100, currency)}`;
     }
   };
 
@@ -187,7 +187,7 @@ export default function PaymentButton({
           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
           </svg>
-          <span>Säker betalning via Stripe</span>
+          <span>Säker fakturering via Fortnox</span>
         </div>
         <div className="flex items-center space-x-1">
           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -199,7 +199,7 @@ export default function PaymentButton({
           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm2 6a2 2 0 104 0 2 2 0 00-4 0zm6 0a2 2 0 104 0 2 2 0 00-4 0z" clipRule="evenodd" />
           </svg>
-          <span>Stöder kort, Klarna, Swish</span>
+          <span>Betalning via faktura (30 dagars betalningsvillkor)</span>
         </div>
       </div>
     </div>

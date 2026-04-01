@@ -26,10 +26,6 @@ interface CheckoutForm {
   address: string;
   city: string;
   postalCode: string;
-  cardNumber: string;
-  cardExpiry: string;
-  cardCVC: string;
-  cardholderName: string;
   acceptTerms: boolean;
   acceptMarketing: boolean;
 }
@@ -48,10 +44,6 @@ export default function CheckoutPage() {
     address: '',
     city: '',
     postalCode: '',
-    cardNumber: '',
-    cardExpiry: '',
-    cardCVC: '',
-    cardholderName: '',
     acceptTerms: false,
     acceptMarketing: false
   });
@@ -81,58 +73,23 @@ export default function CheckoutPage() {
       console.log('Processing payment for:', state.items);
       console.log('Form data:', formData);
 
-      // Create Stripe checkout session
       const response = await fetch('/api/payments/cart-checkout', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Include cookies for authentication
-        body: JSON.stringify({
-          items: state.items,
-          customerData: formData,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ items: state.items, customerData: formData }),
       });
 
-      console.log('Response status:', response.status);
       const data = await response.json();
-      console.log('Response data:', data);
+      if (!response.ok) throw new Error(data.error || 'Beställning misslyckades');
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Payment initiation failed');
-      }
-
-      // Redirect to Stripe Checkout
-      window.location.href = data.checkoutUrl;
-
+      clearCart();
+      setIsSuccess(true);
     } catch (error) {
       console.error('Checkout error:', error);
-      alert(error instanceof Error ? error.message : 'Ett fel uppstod vid betalning');
+      alert(error instanceof Error ? error.message : 'Ett fel uppstod vid beställning');
       setIsProcessing(false);
     }
-  };
-
-  const formatCardNumber = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    const matches = v.match(/\d{4,16}/g);
-    const match = matches && matches[0] || '';
-    const parts = [];
-    for (let i = 0, len = match.length; i < len; i += 4) {
-      parts.push(match.substring(i, i + 4));
-    }
-    if (parts.length) {
-      return parts.join(' ');
-    } else {
-      return v;
-    }
-  };
-
-  const formatExpiry = (value: string) => {
-    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-    if (v.length >= 2) {
-      return v.substring(0, 2) + '/' + v.substring(2, 4);
-    }
-    return v;
   };
 
 
@@ -177,7 +134,7 @@ export default function CheckoutPage() {
           </motion.div>
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Tack för din beställning!</h1>
           <p className="text-gray-600 mb-8">
-            Din betalning har behandlats framgångsrikt. Du kommer att få en bekräftelse via e-post inom kort.
+            Din faktura har skapats och skickas till din e-postadress inom kort. Betalningsvillkor: 30 dagar.
           </p>
           <div className="space-y-3">
             <Link href="/dashboard" className="btn-primary w-full">
@@ -416,86 +373,13 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Payment Information */}
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                  <CreditCardIcon className="h-5 w-5 mr-2" />
-                  Betalningsinformation
-                </h2>
-                
-                <div className="space-y-4">
+              {/* Invoice info */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <CreditCardIcon className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
                   <div>
-                    <label htmlFor="cardholderName" className="block text-sm font-medium text-gray-700 mb-1">
-                      Kortinnehavare *
-                    </label>
-                    <input
-                      type="text"
-                      id="cardholderName"
-                      name="cardholderName"
-                      value={formData.cardholderName}
-                      onChange={handleInputChange}
-                      required
-                      className="input-field"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="cardNumber" className="block text-sm font-medium text-gray-700 mb-1">
-                      Kortnummer *
-                    </label>
-                    <input
-                      type="text"
-                      id="cardNumber"
-                      name="cardNumber"
-                      value={formData.cardNumber}
-                      onChange={(e) => {
-                        const formatted = formatCardNumber(e.target.value);
-                        setFormData(prev => ({ ...prev, cardNumber: formatted }));
-                      }}
-                      required
-                      className="input-field"
-                      placeholder="1234 5678 9012 3456"
-                      maxLength={19}
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="cardExpiry" className="block text-sm font-medium text-gray-700 mb-1">
-                        Utgångsdatum *
-                      </label>
-                      <input
-                        type="text"
-                        id="cardExpiry"
-                        name="cardExpiry"
-                        value={formData.cardExpiry}
-                        onChange={(e) => {
-                          const formatted = formatExpiry(e.target.value);
-                          setFormData(prev => ({ ...prev, cardExpiry: formatted }));
-                        }}
-                        required
-                        className="input-field"
-                        placeholder="MM/ÅÅ"
-                        maxLength={5}
-                      />
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="cardCVC" className="block text-sm font-medium text-gray-700 mb-1">
-                        CVC *
-                      </label>
-                      <input
-                        type="text"
-                        id="cardCVC"
-                        name="cardCVC"
-                        value={formData.cardCVC}
-                        onChange={handleInputChange}
-                        required
-                        className="input-field"
-                        placeholder="123"
-                        maxLength={4}
-                      />
-                    </div>
+                    <p className="text-sm font-medium text-blue-800">Betalning via faktura</p>
+                    <p className="text-sm text-blue-700 mt-1">En faktura skickas till din e-postadress efter bekräftad beställning. Betalningsvillkor: 30 dagar netto.</p>
                   </div>
                 </div>
               </div>
@@ -555,7 +439,7 @@ export default function CheckoutPage() {
                 </button>
                 
                 <p className="text-xs text-gray-500 mt-3 text-center">
-                  Din betalning är säker och krypterad
+                  Faktura skickas via Fortnox &mdash; 30 dagars betalningsvillkor
                 </p>
               </div>
             </motion.form>

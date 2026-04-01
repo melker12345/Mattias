@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { logger } from './logger';
-import { PaymentError, FortnoxError, StripeError } from './types/payment';
+import { PaymentError, FortnoxError } from './types/payment';
 
 /**
  * Centralized error handling for the payment system
@@ -42,19 +42,6 @@ export function handleApiError(
       {
         error: error.message,
         code: error.code,
-        timestamp,
-        requestId,
-      },
-      { status: error.statusCode }
-    );
-  }
-
-  if (error instanceof StripeError) {
-    return NextResponse.json(
-      {
-        error: 'Payment processing error',
-        code: error.code,
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
         timestamp,
         requestId,
       },
@@ -300,31 +287,19 @@ class CircuitBreaker {
 }
 
 // Export circuit breakers for external services
-export const stripeCircuitBreaker = new CircuitBreaker(5, 60000);
 export const fortnoxCircuitBreaker = new CircuitBreaker(3, 120000);
 
 /**
  * Health check utilities
  */
 export async function checkServiceHealth(): Promise<{
-  stripe: boolean;
   fortnox: boolean;
   database: boolean;
 }> {
   const results = {
-    stripe: false,
     fortnox: false,
     database: false,
   };
-
-  // Check Stripe
-  try {
-    const { stripe } = await import('./stripe');
-    await stripe.balance.retrieve();
-    results.stripe = true;
-  } catch (error) {
-    logger.error('Stripe health check failed', {}, error instanceof Error ? error : undefined);
-  }
 
   // Check Fortnox
   try {
@@ -336,8 +311,9 @@ export async function checkServiceHealth(): Promise<{
 
   // Check Database
   try {
-    const { prisma } = await import('./prisma');
-    await prisma.$queryRaw`SELECT 1`;
+    const { createAdminClient } = await import('./supabase/admin');
+    const admin = createAdminClient();
+    await admin.from('users').select('id').limit(1);
     results.database = true;
   } catch (error) {
     logger.error('Database health check failed', {}, error instanceof Error ? error : undefined);
@@ -353,12 +329,9 @@ export async function gracefulShutdown(): Promise<void> {
   logger.info('Starting graceful shutdown');
 
   try {
-    // Close database connections
-    const { prisma } = await import('./prisma');
-    await prisma.$disconnect();
-    logger.info('Database connections closed');
+    logger.info('Database connections closed (Supabase manages connection pooling)');
   } catch (error) {
-    logger.error('Error closing database connections', {}, error instanceof Error ? error : undefined);
+    logger.error('Error during shutdown', {}, error instanceof Error ? error : undefined);
   }
 
   logger.info('Graceful shutdown completed');

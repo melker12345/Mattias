@@ -1,35 +1,4 @@
 // Payment system types
-export interface PaymentIntent {
-  id: string;
-  amount: number;
-  currency: string;
-  status: 'pending' | 'succeeded' | 'failed' | 'canceled';
-  paymentMethod?: string;
-  metadata?: Record<string, string>;
-}
-
-export interface CheckoutSession {
-  id: string;
-  url: string;
-  paymentIntentId: string;
-  customerId?: string;
-  metadata: {
-    userId?: string;
-    courseId?: string;
-    companyId?: string;
-    type: 'course' | 'subscription' | 'company_plan';
-  };
-}
-
-export interface PaymentWebhookEvent {
-  id: string;
-  type: string;
-  data: {
-    object: PaymentIntent | CheckoutSession;
-  };
-  created: number;
-}
-
 export interface FortnoxCustomer {
   CustomerNumber?: string;
   Name: string;
@@ -161,13 +130,3 @@ export class FortnoxError extends Error {
   }
 }
 
-export class StripeError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-    public statusCode: number = 500
-  ) {
-    super(message);
-    this.name = 'StripeError';
-  }
-}

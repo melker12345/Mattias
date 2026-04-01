@@ -14,7 +14,6 @@ interface LogContext {
   courseId?: string;
   companyId?: string;
   paymentId?: string;
-  stripeSessionId?: string;
   fortnoxInvoiceId?: string;
   requestId?: string;
   userAgent?: string;
