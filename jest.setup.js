@@ -17,99 +17,57 @@ jest.mock('next/navigation', () => ({
   },
 }))
 
-// Mock Next.js session
-jest.mock('next-auth/react', () => ({
-  useSession() {
-    return {
-      data: {
-        user: {
-          id: 'test-user-id',
-          email: 'test@example.com',
-          name: 'Test User',
-          role: 'USER',
-        },
-      },
-      status: 'authenticated',
-    }
-  },
-  signIn: jest.fn(),
-  signOut: jest.fn(),
-}))
-
 // Mock environment variables
-process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY = 'pk_test_123'
-process.env.STRIPE_SECRET_KEY = 'sk_test_123'
-process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_123'
+process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
 process.env.FORTNOX_CLIENT_SECRET = 'fortnox_secret_123'
 process.env.FORTNOX_ACCESS_TOKEN = 'fortnox_token_123'
 process.env.NEXT_PUBLIC_BASE_URL = 'http://localhost:3000'
-process.env.NEXTAUTH_SECRET = 'test-secret'
+process.env.ADMIN_EMAIL = 'admin@example.com'
 
-// Mock Stripe
-jest.mock('stripe', () => {
-  return jest.fn().mockImplementation(() => ({
-    checkout: {
-      sessions: {
-        create: jest.fn(),
-        retrieve: jest.fn(),
+// Mock Supabase clients
+jest.mock('./lib/supabase/admin', () => ({
+  createAdminClient: jest.fn(() => ({
+    from: jest.fn(() => ({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: null, error: null }),
+      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+      insert: jest.fn().mockResolvedValue({ data: null, error: null }),
+      update: jest.fn().mockReturnThis(),
+      upsert: jest.fn().mockResolvedValue({ data: null, error: null }),
+      delete: jest.fn().mockReturnThis(),
+      order: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+    })),
+    auth: {
+      admin: {
+        getUserById: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
+        updateUserById: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
       },
     },
-    customers: {
-      create: jest.fn(),
-    },
-    webhooks: {
-      constructEvent: jest.fn(),
-    },
-    refunds: {
-      create: jest.fn(),
-    },
-    paymentMethods: {
-      retrieve: jest.fn(),
-    },
-  }))
-})
-
-// Mock @stripe/stripe-js
-jest.mock('@stripe/stripe-js', () => ({
-  loadStripe: jest.fn(() => Promise.resolve(null)),
+  })),
 }))
 
-// Mock Prisma
-jest.mock('./lib/prisma', () => ({
-  prisma: {
-    user: {
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
+jest.mock('./lib/supabase/server', () => ({
+  createClient: jest.fn(() => ({
+    auth: {
+      getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
     },
-    course: {
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-    },
-    enrollment: {
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      upsert: jest.fn(),
-    },
-    payment: {
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn(),
-    },
-    company: {
-      findUnique: jest.fn(),
-      update: jest.fn(),
-    },
-    $transaction: jest.fn(),
+  })),
+}))
+
+// Mock Fortnox
+jest.mock('./lib/fortnox', () => ({
+  fortnox: {
+    createOrUpdateCustomer: jest.fn().mockResolvedValue('CUST-001'),
+    createCourseInvoice: jest.fn().mockResolvedValue('INV-001'),
+    createCompanyInvoice: jest.fn().mockResolvedValue('INV-002'),
+    testConnection: jest.fn().mockResolvedValue(true),
   },
+  createFortnoxCustomerFromPayment: jest.fn().mockResolvedValue('CUST-001'),
+  createInvoiceFromPayment: jest.fn().mockResolvedValue('INV-001'),
 }))
 
 // Mock fetch globally

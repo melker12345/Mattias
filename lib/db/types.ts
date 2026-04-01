@@ -94,8 +94,6 @@ export interface Enrollment {
   gift_reason: string | null
   is_paid: boolean
   paid_at: string | null
-  stripe_payment_id: string | null
-  stripe_customer_id: string | null
   fortnox_invoice_id: string | null
   payment_amount: number | null
   payment_method: string | null
@@ -200,20 +198,16 @@ export interface Payment {
   company_id: string | null
   course_id: string | null
   enrollment_id: string | null
-  stripe_payment_id: string
-  stripe_customer_id: string | null
-  stripe_session_id: string | null
+  fortnox_invoice_id: string | null
+  fortnox_customer_id: string | null
   amount: number
   currency: string
   status: string
   payment_method: string | null
-  fortnox_invoice_id: string | null
-  fortnox_customer_id: string | null
   fortnox_synced: boolean
   fortnox_synced_at: string | null
   metadata: string | null
   failure_reason: string | null
-  refund_reason: string | null
   created_at: string
   updated_at: string
 }

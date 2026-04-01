@@ -172,8 +172,6 @@ CREATE TABLE public.enrollments (
   gift_reason        TEXT,
   is_paid            BOOLEAN NOT NULL DEFAULT FALSE,
   paid_at            TIMESTAMPTZ,
-  stripe_payment_id  TEXT,
-  stripe_customer_id TEXT,
   fortnox_invoice_id TEXT,
   payment_amount     DECIMAL(10,2),
   payment_method     TEXT,
@@ -313,27 +311,23 @@ CREATE TABLE public.invoice_items (
 -- payments
 -- ============================================================
 CREATE TABLE public.payments (
-  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id            UUID REFERENCES public.users(id) ON DELETE CASCADE,
-  company_id         UUID REFERENCES public.companies(id) ON DELETE CASCADE,
-  course_id          UUID REFERENCES public.courses(id) ON DELETE CASCADE,
-  enrollment_id      UUID UNIQUE REFERENCES public.enrollments(id) ON DELETE CASCADE,
-  stripe_payment_id  TEXT UNIQUE NOT NULL,
-  stripe_customer_id TEXT,
-  stripe_session_id  TEXT UNIQUE,
-  amount             DECIMAL(10,2) NOT NULL,
-  currency           TEXT NOT NULL DEFAULT 'SEK',
-  status             TEXT NOT NULL,
-  payment_method     TEXT,
-  fortnox_invoice_id TEXT,
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  company_id          UUID REFERENCES public.companies(id) ON DELETE CASCADE,
+  course_id           UUID REFERENCES public.courses(id) ON DELETE CASCADE,
+  enrollment_id       UUID UNIQUE REFERENCES public.enrollments(id) ON DELETE CASCADE,
+  fortnox_invoice_id  TEXT UNIQUE,
   fortnox_customer_id TEXT,
-  fortnox_synced     BOOLEAN NOT NULL DEFAULT FALSE,
-  fortnox_synced_at  TIMESTAMPTZ,
-  metadata           TEXT,
-  failure_reason     TEXT,
-  refund_reason      TEXT,
-  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  amount              DECIMAL(10,2) NOT NULL,
+  currency            TEXT NOT NULL DEFAULT 'SEK',
+  status              TEXT NOT NULL DEFAULT 'PENDING',
+  payment_method      TEXT DEFAULT 'INVOICE',
+  fortnox_synced      BOOLEAN NOT NULL DEFAULT FALSE,
+  fortnox_synced_at   TIMESTAMPTZ,
+  metadata            TEXT,
+  failure_reason      TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TRIGGER update_payments_updated_at
@@ -344,15 +338,16 @@ CREATE TRIGGER update_payments_updated_at
 -- payment_logs
 -- ============================================================
 CREATE TABLE public.payment_logs (
-  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id        UUID REFERENCES public.companies(id) ON DELETE CASCADE,
-  stripe_payment_id TEXT UNIQUE NOT NULL,
-  amount            DECIMAL(10,2) NOT NULL,
-  currency          TEXT NOT NULL DEFAULT 'SEK',
-  status            TEXT NOT NULL,
-  payment_method    TEXT,
-  metadata          TEXT,
-  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  company_id          UUID REFERENCES public.companies(id) ON DELETE CASCADE,
+  fortnox_invoice_id  TEXT,
+  fortnox_customer_id TEXT,
+  amount              DECIMAL(10,2) NOT NULL,
+  currency            TEXT NOT NULL DEFAULT 'SEK',
+  status              TEXT NOT NULL,
+  payment_method      TEXT DEFAULT 'INVOICE',
+  metadata            TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ============================================================

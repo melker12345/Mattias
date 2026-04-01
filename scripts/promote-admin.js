@@ -1,4 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
+const { createClient } = require('@supabase/supabase-js');
 
 async function main() {
   const email = process.argv[2];
@@ -6,27 +6,40 @@ async function main() {
     console.error('Usage: node scripts/promote-admin.js <email>');
     process.exit(1);
   }
-  if (!process.env.DATABASE_URL) {
-    console.error('Missing DATABASE_URL env. Export it before running.');
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env.');
     process.exit(1);
   }
 
-  const prisma = new PrismaClient();
-  try {
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      console.error(`No user found with email ${email}`);
-      process.exit(2);
-    }
-    const updated = await prisma.user.update({
-      where: { id: user.id },
-      data: { role: 'ADMIN' },
-      select: { id: true, email: true, role: true }
-    });
-    console.log('Updated:', updated);
-  } finally {
-    await prisma.$disconnect();
+  const admin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+
+  const { data: user, error: findError } = await admin
+    .from('users')
+    .select('id, email, role')
+    .eq('email', email)
+    .single();
+
+  if (findError || !user) {
+    console.error(`No user found with email: ${email}`);
+    process.exit(2);
   }
+
+  const { data: updated, error: updateError } = await admin
+    .from('users')
+    .update({ role: 'ADMIN' })
+    .eq('id', user.id)
+    .select('id, email, role')
+    .single();
+
+  if (updateError) {
+    console.error('Failed to update role:', updateError.message);
+    process.exit(1);
+  }
+
+  console.log('Updated:', updated);
 }
 
 main().catch((err) => {
