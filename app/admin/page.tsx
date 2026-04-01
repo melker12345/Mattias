@@ -389,7 +389,7 @@ export default function AdminDashboard() {
   }
 
   // Check if user is admin
-  if (!user || (user as any)?.role !== 'ADMIN') {
+  if (!user || user.user_metadata?.role !== 'ADMIN') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
