@@ -104,7 +104,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const role = invitation ? 'EMPLOYEE' : 'INDIVIDUAL'
+    const adminEmail = process.env.ADMIN_EMAIL
+    const isAdminEmail = adminEmail && email === adminEmail
+    const role = isAdminEmail ? 'ADMIN' : invitation ? 'EMPLOYEE' : 'INDIVIDUAL'
     const displayName = invitation?.name ?? name
 
     // Create Supabase Auth user — Supabase handles password hashing
@@ -129,7 +131,7 @@ export async function POST(request: NextRequest) {
       }
       console.error('Supabase signUp error:', authError)
       return NextResponse.json(
-        { message: 'Auth error', detail: authError.message, code: authError.status },
+        { message: 'Ett fel uppstod vid registrering' },
         { status: 500 }
       )
     }
@@ -165,7 +167,7 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       console.error('User insert error:', insertError)
-      return NextResponse.json({ message: 'DB insert error', detail: insertError.message, code: insertError.code }, { status: 500 })
+      return NextResponse.json({ message: 'Kunde inte skapa användarprofil' }, { status: 500 })
     }
 
     // Mark invitation as used
@@ -195,7 +197,7 @@ export async function POST(request: NextRequest) {
 
     console.error('Registration error:', error)
     return NextResponse.json(
-      { message: 'Unexpected error', detail: error instanceof Error ? error.message : String(error) },
+      { message: 'Ett fel uppstod vid registrering' },
       { status: 500 }
     )
   }

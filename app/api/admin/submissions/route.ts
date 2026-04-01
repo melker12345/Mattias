@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       reviewedAt: s.reviewed_at,
       reviewedBy: s.reviewed_by,
       reviewNotes: s.review_notes,
-      answersData: JSON.parse(s.answers_data),
+      answersData: s.answers_data ? JSON.parse(s.answers_data) : [],
     }));
 
     return NextResponse.json(transformedSubmissions);

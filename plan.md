@@ -225,7 +225,7 @@ TODO:
 - for him to set up Supabase account.
 - Bugs 
 - Remove stripe
-
+- integrate SMTP for email
 
 What is jest.config.js and jest.setup.js for?
 What are we using Zod for?
