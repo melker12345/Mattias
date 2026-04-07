@@ -10,6 +10,23 @@ export async function validateCoursePayment(
 ): Promise<PaymentValidationResult> {
   try {
     const admin = createAdminClient();
+    const { data: profile } = await admin
+      .from('users')
+      .select('role, email')
+      .eq('id', userId)
+      .maybeSingle();
+    const isAdmin =
+      profile?.role === 'ADMIN' ||
+      (!!process.env.ADMIN_EMAIL && profile?.email === process.env.ADMIN_EMAIL);
+    if (isAdmin) {
+      return {
+        isValid: true,
+        hasAccess: true,
+        paymentStatus: 'paid',
+        message: 'Admin access',
+      };
+    }
+
     const { data: enrollment } = await admin
       .from('enrollments')
       .select('*')
@@ -273,6 +290,27 @@ export async function canEnrollInCourse(
 
     if (!course.is_published) {
       return { canEnroll: false, reason: 'Course is not available', requiresPayment: false };
+    }
+
+    const { data: profile } = await admin.from('users').select('role, email').eq('id', userId).maybeSingle();
+    const isAdmin =
+      profile?.role === 'ADMIN' ||
+      (!!process.env.ADMIN_EMAIL && profile?.email === process.env.ADMIN_EMAIL);
+    if (isAdmin) {
+      const { data: existingEnrollment } = await admin
+        .from('enrollments')
+        .select('is_paid, is_gift')
+        .eq('user_id', userId)
+        .eq('course_id', courseId)
+        .maybeSingle();
+      if (existingEnrollment?.is_paid || existingEnrollment?.is_gift) {
+        return { canEnroll: false, reason: 'Already enrolled', requiresPayment: false };
+      }
+      return {
+        canEnroll: true,
+        reason: 'Administratör — ingen betalning krävs',
+        requiresPayment: false,
+      };
     }
 
     const { data: existingEnrollment } = await admin

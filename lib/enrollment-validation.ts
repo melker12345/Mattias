@@ -6,6 +6,8 @@ export interface EnrollmentValidation {
   reason: string
   requiresPayment: boolean
   coursePurchaseId?: string
+  /** Platform admin — no charge; enrollment marked paid for consistency */
+  complimentaryAccess?: boolean
 }
 
 /**
@@ -21,7 +23,7 @@ export async function validateEnrollmentEligibility(
   try {
     const admin = createAdminClient()
     const [{ data: user }, { data: course }] = await Promise.all([
-      admin.from('users').select('id, role, company_id').eq('id', userId).single(),
+      admin.from('users').select('id, email, role, company_id').eq('id', userId).single(),
       admin.from('courses').select('id, price, is_published, passing_score').eq('id', courseId).single(),
     ])
 
@@ -39,6 +41,11 @@ export async function validateEnrollmentEligibility(
         reason: 'Kurs hittades inte',
         requiresPayment: false
       }
+    }
+
+    let userRole = user.role as string
+    if (process.env.ADMIN_EMAIL && user.email === process.env.ADMIN_EMAIL) {
+      userRole = 'ADMIN'
     }
 
     if (!course.is_published) {
@@ -61,8 +68,12 @@ export async function validateEnrollmentEligibility(
     }
 
     if (bypassPayment && adminUserId) {
-      const { data: adminUser } = await admin.from('users').select('role').eq('id', adminUserId).single()
-      if (!adminUser || adminUser.role !== 'ADMIN') {
+      const { data: adminUser } = await admin.from('users').select('role, email').eq('id', adminUserId).single()
+      const gifterIsAdmin =
+        adminUser &&
+        (adminUser.role === 'ADMIN' ||
+          (process.env.ADMIN_EMAIL && adminUser.email === process.env.ADMIN_EMAIL))
+      if (!gifterIsAdmin) {
         return {
           canEnroll: false,
           reason: 'Endast administratörer kan ge bort kurser',
@@ -88,11 +99,12 @@ export async function validateEnrollmentEligibility(
     }
 
     // Check if user is admin (admins get free access)
-    if (user.role === 'ADMIN') {
+    if (userRole === 'ADMIN') {
       return {
         canEnroll: true,
         reason: 'Administratörsbehörighet',
-        requiresPayment: false
+        requiresPayment: false,
+        complimentaryAccess: true,
       }
     }
 
@@ -168,17 +180,22 @@ export async function createSecureEnrollment(
     }
 
     const admin = createAdminClient()
-    const { data: enrollment, error } = await admin
-      .from('enrollments')
-      .insert({
-        user_id: userId,
-        course_id: courseId,
-        course_purchase_id: options.coursePurchaseId ?? validation.coursePurchaseId ?? null,
-        is_gift: options.isGift ?? false,
-        gifted_by: options.giftedBy ?? null,
-        gifted_at: options.isGift ? new Date().toISOString() : null,
-        gift_reason: options.giftReason ?? null,
-      })
+    const row: Record<string, unknown> = {
+      user_id: userId,
+      course_id: courseId,
+      course_purchase_id: options.coursePurchaseId ?? validation.coursePurchaseId ?? null,
+      is_gift: options.isGift ?? false,
+      gifted_by: options.giftedBy ?? null,
+      gifted_at: options.isGift ? new Date().toISOString() : null,
+      gift_reason: options.giftReason ?? null,
+    }
+    if (validation.complimentaryAccess) {
+      row.is_paid = true
+      row.paid_at = new Date().toISOString()
+      row.payment_amount = 0
+      row.payment_method = 'admin_complimentary'
+    }
+    const { data: enrollment, error } = await admin.from('enrollments').insert(row)
       .select()
       .single()
     if (error) throw error
@@ -205,6 +222,12 @@ export async function createSecureEnrollment(
 export async function validateCourseAccess(userId: string, courseId: string): Promise<boolean> {
   try {
     const admin = createAdminClient()
+    const { data: profile } = await admin.from('users').select('role, email').eq('id', userId).maybeSingle()
+    const isAdmin =
+      profile?.role === 'ADMIN' ||
+      (!!process.env.ADMIN_EMAIL && profile?.email === process.env.ADMIN_EMAIL)
+    if (isAdmin) return true
+
     const { data: enrollment } = await admin
       .from('enrollments')
       .select('is_gift, course_purchase_id')

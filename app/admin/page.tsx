@@ -110,7 +110,7 @@ interface APVSubmission {
 }
 
 export default function AdminDashboard() {
-  const { user } = useSupabaseAuth();
+  const { user, loading: authLoading } = useSupabaseAuth();
   const router = useRouter();
   const [courses, setCourses] = useState<Course[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -137,10 +137,8 @@ export default function AdminDashboard() {
   const [isDeletingSubmission, setIsDeletingSubmission] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      fetchAdminData();
-    }
-  }, [user]);
+    fetchAdminData();
+  }, []);
 
   const fetchAdminData = async () => {
     try {
@@ -380,16 +378,8 @@ export default function AdminDashboard() {
     return new Date(dateString).toLocaleDateString('sv-SE');
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
-  // Check if user is admin
-  if (!user || user.user_metadata?.role !== 'ADMIN') {
+  // Check if user is admin (wait for both auth and data to resolve)
+  if (!authLoading && !loading && (!user || user.user_metadata?.role !== 'ADMIN')) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

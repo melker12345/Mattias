@@ -47,6 +47,7 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
   const [enrolled, setEnrolled] = useState(false);
   const [enrolling, setEnrolling] = useState(false);
   const [enrollmentData, setEnrollmentData] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     fetchCourseDetails();
@@ -54,6 +55,27 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
       checkEnrollmentStatus();
     }
   }, [params.id, user]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setIsAdmin(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/profile');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setIsAdmin(data.role === 'ADMIN');
+      } catch {
+        if (!cancelled) setIsAdmin(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const fetchCourseDetails = async () => {
     try {
@@ -293,10 +315,14 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
               ) : (
                 <div className="text-center mb-6">
                   <div className="text-3xl font-bold text-primary-600 mb-2">
-                    {formatPrice(course.price)}
+                    {isAdmin && course.price > 0 ? '—' : formatPrice(course.price)}
                   </div>
                   <p className="text-gray-600">
-                    {course.price === 0 ? 'Gratis kurs' : 'Engångsbetalning'}
+                    {course.price === 0
+                      ? 'Gratis kurs'
+                      : isAdmin
+                        ? 'Ingen avgift som administratör'
+                        : 'Engångsbetalning'}
                   </p>
                 </div>
               )}
@@ -328,7 +354,7 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
                   </div>
                 ) : (
                   <>
-                    {course.price > 0 ? (
+                    {course.price > 0 && !isAdmin ? (
                       <PaymentButton
                         courseId={course.id}
                         amount={course.price}

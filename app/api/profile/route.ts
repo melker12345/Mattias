@@ -20,7 +20,7 @@ export async function GET() {
 
     const company = user.company as unknown as { id: string; name: string } | null;
     const profile = {
-      id: user.id, name: user.name ?? 'Unknown', email: user.email, role: user.role,
+      id: user.id, name: user.name ?? 'Unknown', email: user.email, role: authResult.role,
       createdAt: user.created_at,
       company: company ? { id: company.id, name: company.name, role: 'Employee' } : undefined,
       enrollments: (enrollments ?? []).map((e: any) => ({

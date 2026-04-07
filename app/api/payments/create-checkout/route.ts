@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, isNextResponse } from '@/lib/auth';
+import { requireAuth, isNextResponse, type AuthUser } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createFortnoxCustomerFromPayment, createInvoiceFromPayment } from '@/lib/fortnox';
 import type { CoursePaymentData, CompanyPaymentData } from '@/lib/types/payment';
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const { data: user } = await admin.from('users').select('id, email, name, role, company_id').eq('id', authResult.id).single();
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-    if (type === 'course') return await handleCoursePayment(courseId, user, admin);
+    if (type === 'course') return await handleCoursePayment(courseId, user, admin, authResult);
     if (type === 'company_plan') return await handleCompanyPayment(companyId, user, admin);
 
     return NextResponse.json({ error: 'Invalid payment type' }, { status: 400 });
@@ -31,8 +31,23 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleCoursePayment(courseId: string, user: any, admin: ReturnType<typeof createAdminClient>) {
+async function handleCoursePayment(
+  courseId: string,
+  user: { id: string; email: string; name: string | null; role: string; company_id: string | null },
+  admin: ReturnType<typeof createAdminClient>,
+  authUser: AuthUser
+) {
   if (!courseId) return NextResponse.json({ error: 'Course ID is required' }, { status: 400 });
+
+  if (authUser.role === 'ADMIN') {
+    return NextResponse.json(
+      {
+        error:
+          'Administratörer behöver inte betala. Använd "Registrera dig för kursen" på kursens sida i stället för köp.',
+      },
+      { status: 400 }
+    );
+  }
 
   const { data: course } = await admin.from('courses').select('id, title, price, is_published').eq('id', courseId).single();
   if (!course) return NextResponse.json({ error: 'Course not found' }, { status: 404 });

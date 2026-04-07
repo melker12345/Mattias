@@ -97,6 +97,22 @@ describe('Payment Validation', () => {
         message: 'Invoice sent — awaiting payment',
       })
     })
+
+    it('should grant access for platform admin without checking enrollment', async () => {
+      mockMaybeSingle.mockResolvedValue({
+        data: { role: 'ADMIN', email: 'admin@test.se' },
+        error: null,
+      })
+
+      const result = await validateCoursePayment('admin-123', 'course-123')
+
+      expect(result).toEqual({
+        isValid: true,
+        hasAccess: true,
+        paymentStatus: 'paid',
+        message: 'Admin access',
+      })
+    })
   })
 
   describe('validateCompanySubscription', () => {
@@ -238,6 +254,27 @@ describe('Payment Validation', () => {
       expect(result).toEqual({
         canEnroll: false,
         reason: 'Already enrolled',
+        requiresPayment: false,
+      })
+    })
+
+    it('should allow admin to enroll without payment', async () => {
+      mockSingle.mockResolvedValue({
+        data: { is_published: true },
+        error: null,
+      })
+      mockMaybeSingle
+        .mockResolvedValueOnce({
+          data: { role: 'ADMIN', email: 'admin@test.se' },
+          error: null,
+        })
+        .mockResolvedValueOnce({ data: null, error: null })
+
+      const result = await canEnrollInCourse('admin-123', 'course-123')
+
+      expect(result).toEqual({
+        canEnroll: true,
+        reason: 'Administratör — ingen betalning krävs',
         requiresPayment: false,
       })
     })

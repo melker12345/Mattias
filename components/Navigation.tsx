@@ -136,7 +136,7 @@ export function Navigation() {
                             </Link>
                           )}
                         </Menu.Item>
-                        {(user as any)?.role === 'ADMIN' && (
+                        {user.user_metadata?.role === 'ADMIN' && (
                           <Menu.Item>
                             {({ active }) => (
                               <Link
@@ -227,7 +227,7 @@ export function Navigation() {
               {/* Mobile menu items for logged in users */}
               {user && (
                 <div className="pt-4 space-y-3 border-t border-white/20">
-                  {(user as any)?.role === 'ADMIN' && (
+                  {user.user_metadata?.role === 'ADMIN' && (
                     <Disclosure.Button
                       as={Link}
                       href="/admin"
