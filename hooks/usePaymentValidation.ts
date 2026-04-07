@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { isPaymentsDisabled } from '@/lib/payments-disabled'
 import type { PaymentValidationResult } from '@/lib/types/payment'
 
 interface UsePaymentValidationReturn {
@@ -17,6 +18,18 @@ export function usePaymentValidation(companyId?: string): UsePaymentValidationRe
 
   const fetchValidation = async () => {
     if (!companyId) {
+      setLoading(false)
+      return
+    }
+
+    if (isPaymentsDisabled()) {
+      setValidation({
+        isValid: true,
+        hasAccess: true,
+        paymentStatus: 'paid',
+        message: 'Demo — betalning avstängd',
+      })
+      setError(null)
       setLoading(false)
       return
     }
@@ -68,6 +81,18 @@ export function useSubscriptionDetails(companyId?: string): UseSubscriptionDetai
 
   const fetchSubscription = async () => {
     if (!companyId) {
+      setLoading(false)
+      return
+    }
+
+    if (isPaymentsDisabled()) {
+      setSubscription({
+        isValid: true,
+        hasAccess: true,
+        paymentStatus: 'paid',
+        message: 'Demo — betalning avstängd',
+      })
+      setError(null)
       setLoading(false)
       return
     }

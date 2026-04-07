@@ -16,6 +16,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import PaymentButton from '@/components/PaymentButton';
 import PaymentStatus from '@/components/PaymentStatus';
+import { isPaymentsDisabled } from '@/lib/payments-disabled';
 
 interface Course {
   id: string;
@@ -48,6 +49,7 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
   const [enrolling, setEnrolling] = useState(false);
   const [enrollmentData, setEnrollmentData] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const paymentsDisabled = isPaymentsDisabled();
 
   useEffect(() => {
     fetchCourseDetails();
@@ -315,14 +317,16 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
               ) : (
                 <div className="text-center mb-6">
                   <div className="text-3xl font-bold text-primary-600 mb-2">
-                    {isAdmin && course.price > 0 ? '—' : formatPrice(course.price)}
+                    {(isAdmin || paymentsDisabled) && course.price > 0 ? '—' : formatPrice(course.price)}
                   </div>
                   <p className="text-gray-600">
                     {course.price === 0
                       ? 'Gratis kurs'
-                      : isAdmin
-                        ? 'Ingen avgift som administratör'
-                        : 'Engångsbetalning'}
+                      : paymentsDisabled
+                        ? 'Demo-läge — ingen betalning'
+                        : isAdmin
+                          ? 'Ingen avgift som administratör'
+                          : 'Engångsbetalning'}
                   </p>
                 </div>
               )}
@@ -354,7 +358,7 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
                   </div>
                 ) : (
                   <>
-                    {course.price > 0 && !isAdmin ? (
+                    {course.price > 0 && !isAdmin && !paymentsDisabled ? (
                       <PaymentButton
                         courseId={course.id}
                         amount={course.price}

@@ -1,5 +1,13 @@
 import { createAdminClient } from './supabase/admin';
+import { isPaymentsDisabled } from './payments-disabled';
 import type { PaymentValidationResult } from './types/payment';
+
+const demoPaidResult = (): PaymentValidationResult => ({
+  isValid: true,
+  hasAccess: true,
+  paymentStatus: 'paid',
+  message: 'Demo — betalning avstängd',
+});
 
 /**
  * Validate if a user has paid access to a course
@@ -9,6 +17,10 @@ export async function validateCoursePayment(
   courseId: string
 ): Promise<PaymentValidationResult> {
   try {
+    if (isPaymentsDisabled()) {
+      return demoPaidResult();
+    }
+
     const admin = createAdminClient();
     const { data: profile } = await admin
       .from('users')
@@ -96,6 +108,10 @@ export async function validateCoursePayment(
  */
 export async function validateCompanySubscription(companyId: string): Promise<PaymentValidationResult> {
   try {
+    if (isPaymentsDisabled()) {
+      return demoPaidResult();
+    }
+
     const admin = createAdminClient();
     const { data: company } = await admin
       .from('companies')
@@ -200,6 +216,10 @@ export async function validateUserAccess(
       };
     }
 
+    if (isPaymentsDisabled()) {
+      return demoPaidResult();
+    }
+
     // Admin always has access
     if (user.role === 'ADMIN') {
       return { isValid: true, hasAccess: true, paymentStatus: 'paid', message: 'Admin access' };
@@ -290,6 +310,23 @@ export async function canEnrollInCourse(
 
     if (!course.is_published) {
       return { canEnroll: false, reason: 'Course is not available', requiresPayment: false };
+    }
+
+    if (isPaymentsDisabled()) {
+      const { data: existingEnrollment } = await admin
+        .from('enrollments')
+        .select('is_paid, is_gift')
+        .eq('user_id', userId)
+        .eq('course_id', courseId)
+        .maybeSingle();
+      if (existingEnrollment?.is_paid || existingEnrollment?.is_gift) {
+        return { canEnroll: false, reason: 'Already enrolled', requiresPayment: false };
+      }
+      return {
+        canEnroll: true,
+        reason: 'Demo — betalning avstängd',
+        requiresPayment: false,
+      };
     }
 
     const { data: profile } = await admin.from('users').select('role, email').eq('id', userId).maybeSingle();

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isNextResponse, type AuthUser } from '@/lib/auth';
+import { isPaymentsDisabled } from '@/lib/payments-disabled';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createFortnoxCustomerFromPayment, createInvoiceFromPayment } from '@/lib/fortnox';
 import type { CoursePaymentData, CompanyPaymentData } from '@/lib/types/payment';
@@ -38,6 +39,16 @@ async function handleCoursePayment(
   authUser: AuthUser
 ) {
   if (!courseId) return NextResponse.json({ error: 'Course ID is required' }, { status: 400 });
+
+  if (isPaymentsDisabled()) {
+    return NextResponse.json(
+      {
+        error:
+          'Betalning är avstängd i demo-läge. Registrera dig för kursen på kursens sida i stället (ingen faktura).',
+      },
+      { status: 400 }
+    );
+  }
 
   if (authUser.role === 'ADMIN') {
     return NextResponse.json(
@@ -82,6 +93,13 @@ async function handleCoursePayment(
 }
 
 async function handleCompanyPayment(companyId: string, user: any, admin: ReturnType<typeof createAdminClient>) {
+  if (isPaymentsDisabled()) {
+    return NextResponse.json(
+      { error: 'Betalning är avstängd i demo-läge. Företagsåtkomst behandlas som aktiv utan faktura.' },
+      { status: 400 }
+    );
+  }
+
   if (!user.company_id || user.company_id !== companyId) {
     return NextResponse.json({ error: 'You are not authorized to make payments for this company' }, { status: 403 });
   }

@@ -1,4 +1,5 @@
 import { createAdminClient } from './supabase/admin'
+import { isPaymentsDisabled } from './payments-disabled'
 import { validateCompanySubscription } from './payment-validation'
 
 export interface EnrollmentValidation {
@@ -64,6 +65,15 @@ export async function validateEnrollmentEligibility(
         canEnroll: false,
         reason: 'Användaren är redan registrerad för denna kurs',
         requiresPayment: false
+      }
+    }
+
+    if (isPaymentsDisabled()) {
+      return {
+        canEnroll: true,
+        reason: 'Demo — betalning avstängd',
+        requiresPayment: false,
+        complimentaryAccess: true,
       }
     }
 
@@ -193,7 +203,7 @@ export async function createSecureEnrollment(
       row.is_paid = true
       row.paid_at = new Date().toISOString()
       row.payment_amount = 0
-      row.payment_method = 'admin_complimentary'
+      row.payment_method = isPaymentsDisabled() ? 'payments_disabled_demo' : 'admin_complimentary'
     }
     const { data: enrollment, error } = await admin.from('enrollments').insert(row)
       .select()
@@ -221,6 +231,8 @@ export async function createSecureEnrollment(
  */
 export async function validateCourseAccess(userId: string, courseId: string): Promise<boolean> {
   try {
+    if (isPaymentsDisabled()) return true
+
     const admin = createAdminClient()
     const { data: profile } = await admin.from('users').select('role, email').eq('id', userId).maybeSingle()
     const isAdmin =

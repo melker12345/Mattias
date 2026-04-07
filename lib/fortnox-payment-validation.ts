@@ -1,4 +1,5 @@
 import { createAdminClient } from './supabase/admin';
+import { isPaymentsDisabled } from './payments-disabled';
 import { fortnox } from './fortnox';
 
 export interface FortnoxPaymentValidation {
@@ -340,6 +341,8 @@ export async function checkFortnoxPaywallAccess(
   feature: 'company_registration' | 'course_learning' | 'progress_tracking'
 ): Promise<boolean> {
   try {
+    if (isPaymentsDisabled()) return true;
+
     const admin = createAdminClient();
     const { data: user } = await admin.from('users').select('company_id').eq('id', userId).single();
     if (!user || !user.company_id) return false;

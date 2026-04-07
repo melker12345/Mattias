@@ -19,8 +19,10 @@ interface Question {
   id: string;
   question: string;
   type: string;
-  options: string;
-  correctAnswer: string;
+  /** JSON string or parsed array from API */
+  options: string | unknown;
+  correctAnswer?: string;
+  correct_answer?: string;
   order: number;
 }
 
@@ -53,6 +55,46 @@ interface UserAnswer {
   answer: string;
   selectedIndex?: number;
   isCorrect: boolean;
+}
+
+/** DB JSON/JSONB may be a string or already parsed (Supabase client) */
+function parseQuestionOptions(raw: unknown): string[] {
+  if (raw == null || raw === '') return [];
+  if (Array.isArray(raw)) return raw.map(String);
+  if (typeof raw === 'string') {
+    try {
+      const v = JSON.parse(raw);
+      return Array.isArray(v) ? v.map(String) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function parseCorrectAnswerIndex(raw: unknown): number {
+  if (raw == null || raw === '') return 0;
+  if (typeof raw === 'number' && !Number.isNaN(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      return Number(JSON.parse(raw));
+    } catch {
+      const n = Number(raw);
+      return Number.isNaN(n) ? 0 : n;
+    }
+  }
+  const n = Number(raw);
+  return Number.isNaN(n) ? 0 : n;
+}
+
+function rawQuestionOptions(q: Question | undefined): unknown {
+  return q?.options;
+}
+
+/** Supabase uses correct_answer; older code expected correctAnswer */
+function rawCorrectAnswer(q: Question | undefined): unknown {
+  if (!q) return undefined;
+  return q.correctAnswer ?? q.correct_answer;
 }
 
 export default function CourseLearningPage({ params }: { params: { id: string } }) {
@@ -113,10 +155,9 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
       const currentQuestion = currentLesson?.questions?.[0];
       if (!currentQuestion) return;
 
-      const options = JSON.parse(currentQuestion.options);
-      const correctAnswer = JSON.parse(currentQuestion.correctAnswer);
-      // Ensure both are numbers for comparison
-      const isCorrect = Number(selectedOption) === Number(correctAnswer);
+      const options = parseQuestionOptions(rawQuestionOptions(currentQuestion));
+      const correctAnswer = parseCorrectAnswerIndex(rawCorrectAnswer(currentQuestion));
+      const isCorrect = Number(selectedOption) === correctAnswer;
 
       console.log('Debug question answer:');
       console.log('Selected option:', selectedOption, 'type:', typeof selectedOption);
@@ -568,7 +609,7 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
                         
                         {!answerSubmitted ? (
                           <div className="space-y-3">
-                            {JSON.parse(currentLesson.questions[0]?.options || '[]').map((option: string, index: number) => (
+                            {parseQuestionOptions(rawQuestionOptions(currentLesson.questions[0])).map((option: string, index: number) => (
                               <label key={index} className="flex items-start space-x-3 cursor-pointer p-2 rounded-lg hover:bg-blue-100 transition-colors">
                                 <input
                                   type="radio"
@@ -603,8 +644,8 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
                               
                               if (!currentQuestion || !userAnswer) return null;
                               
-                              const options = JSON.parse(currentQuestion.options);
-                              const correctAnswer = JSON.parse(currentQuestion.correctAnswer);
+                              const options = parseQuestionOptions(rawQuestionOptions(currentQuestion));
+                              const correctAnswer = parseCorrectAnswerIndex(rawCorrectAnswer(currentQuestion));
                               const selectedAnswerText = options[Number(userAnswer.answer) || 0];
                               const correctAnswerText = options[correctAnswer];
                               

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isNextResponse } from '@/lib/auth';
+import { isPaymentsDisabled } from '@/lib/payments-disabled';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { fortnox } from '@/lib/fortnox';
 import type { CoursePaymentData } from '@/lib/types/payment';
@@ -31,6 +32,51 @@ export async function POST(request: NextRequest) {
     const companyAccounts = items.filter((item: any) => item.type === 'company_account');
     const userName = `${customerData?.firstName ?? ''} ${customerData?.lastName ?? ''}`.trim() || user.name || 'Unknown';
     const userEmail = customerData?.email || user.email;
+
+    if (isPaymentsDisabled()) {
+      for (const course of courses) {
+        const { data: dbCourse } = await admin.from('courses').select('id, title, price, is_published').eq('id', course.id).single();
+        if (!dbCourse || !dbCourse.is_published) {
+          return NextResponse.json({ error: `Course ${course.title || course.id} is not available` }, { status: 400 });
+        }
+        await admin.from('enrollments').upsert(
+          {
+            user_id: user.id,
+            course_id: dbCourse.id,
+            is_paid: true,
+            paid_at: new Date().toISOString(),
+            payment_amount: 0,
+            payment_method: 'payments_disabled_demo',
+            fortnox_invoice_id: null,
+          },
+          { onConflict: 'user_id,course_id' }
+        );
+      }
+      if (companyAccounts.length > 0 && customerData?.organizationNumber) {
+        const addr = [customerData.address, customerData.postalCode, customerData.city].filter(Boolean).join(', ');
+        const future = new Date();
+        future.setFullYear(future.getFullYear() + 1);
+        await admin.from('companies').upsert(
+          {
+            organization_number: customerData.organizationNumber,
+            name: customerData.companyName ?? 'Demo företag',
+            contact_person: userName,
+            email: userEmail,
+            phone: customerData.phone ?? '',
+            address: addr || '—',
+            payment_status: 'PAID',
+            is_active: true,
+            plan_end_date: future.toISOString(),
+          },
+          { onConflict: 'organization_number' }
+        );
+      }
+      return NextResponse.json({
+        success: true,
+        invoiceNumbers: [] as string[],
+        message: 'Demo: inga fakturor skapades. Åtkomst aktiverad utan betalning.',
+      });
+    }
 
     // Create Fortnox customer
     const customerNumber = await fortnox.createOrUpdateCustomer({
