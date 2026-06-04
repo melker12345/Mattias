@@ -1,36 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isNextResponse } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { recalculateAndPersistCourseScore } from '@/lib/course-progress';
 
 export const dynamic = 'force-dynamic';
-
-async function updateCourseProgress(userId: string, courseId: string) {
-  try {
-    const admin = createAdminClient();
-    // Get all lesson IDs for this course
-    const { data: lessons } = await admin.from('lessons').select('id').eq('course_id', courseId);
-    const lessonIds = (lessons ?? []).map(l => l.id);
-
-    const [{ data: questions }, { data: userAnswers }, { data: course }] = await Promise.all([
-      admin.from('questions').select('id').in('lesson_id', lessonIds),
-      admin.from('answers').select('is_correct').eq('user_id', userId).in('question_id',
-        lessonIds.length ? (await admin.from('questions').select('id').in('lesson_id', lessonIds)).data?.map(q => q.id) ?? [] : []
-      ),
-      admin.from('courses').select('passing_score').eq('id', courseId).single(),
-    ]);
-
-    const totalQuestions = (questions ?? []).length;
-    const correctAnswers = (userAnswers ?? []).filter(a => a.is_correct).length;
-    const finalScore = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
-    const passed = finalScore >= ((course?.passing_score as number) || 80);
-
-    await admin.from('enrollments')
-      .update({ total_questions: totalQuestions, correct_answers: correctAnswers, final_score: finalScore, passed, completed_at: passed ? new Date().toISOString() : null })
-      .eq('user_id', userId).eq('course_id', courseId);
-  } catch (error) {
-    console.error('Error updating course progress:', error);
-  }
-}
 
 export async function GET(
   request: NextRequest,
@@ -116,7 +89,7 @@ export async function POST(
     }, { onConflict: 'user_id,lesson_id' }).select().single();
 
     if (lesson.type === 'question' && score !== undefined) {
-      await updateCourseProgress(user.id, courseId);
+      await recalculateAndPersistCourseScore(user.id, courseId);
     }
 
     return NextResponse.json({ message: 'Framsteg sparades framgångsrikt', progress });

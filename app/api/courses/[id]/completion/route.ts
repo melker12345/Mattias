@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isNextResponse } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { recalculateAndPersistCourseScore, computeFinalScore } from '@/lib/course-progress';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,10 +38,11 @@ export async function GET(
     const totalQuestions = (allQuestions ?? []).length;
     const answeredQuestions = (userAnswers ?? []).length;
     const correctAnswers = (userAnswers ?? []).filter(a => a.is_correct).length;
-    const finalScore = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
-    const passed = finalScore >= course.passing_score;
+    const passingScore = course.passing_score;
 
-    console.log(`Course completion check for ${user.email}:`, { totalQuestions, answeredQuestions, correctAnswers, finalScore, passingScore: course.passing_score, passed, allQuestionsAnswered: answeredQuestions === totalQuestions });
+    const { finalScore, passed } = computeFinalScore(totalQuestions, correctAnswers, passingScore);
+
+    console.log(`Course completion check for ${user.email}:`, { totalQuestions, answeredQuestions, correctAnswers, finalScore, passingScore, passed, allQuestionsAnswered: answeredQuestions === totalQuestions });
 
     // Check if all questions are answered (course is completed)
     const isCompleted = totalQuestions > 0 && answeredQuestions === totalQuestions;
@@ -58,9 +60,7 @@ export async function GET(
     }
 
     if (!enrollment.completed_at || enrollment.final_score !== finalScore) {
-      await admin.from('enrollments')
-        .update({ total_questions: totalQuestions, correct_answers: correctAnswers, final_score: finalScore, passed, completed_at: passed ? new Date().toISOString() : null })
-        .eq('user_id', user.id).eq('course_id', courseId);
+      await recalculateAndPersistCourseScore(user.id, courseId);
     }
 
     const answersData = (allQuestions ?? []).map(question => {

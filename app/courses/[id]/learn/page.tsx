@@ -14,6 +14,12 @@ import {
   ClockIcon
 } from '@heroicons/react/24/outline';
 import CourseSummary from '@/components/CourseSummary';
+import {
+  parseQuestionOptions,
+  parseCorrectAnswerIndex,
+  rawQuestionOptions,
+  rawCorrectAnswer,
+} from '@/lib/questions';
 
 interface Question {
   id: string;
@@ -55,46 +61,6 @@ interface UserAnswer {
   answer: string;
   selectedIndex?: number;
   isCorrect: boolean;
-}
-
-/** DB JSON/JSONB may be a string or already parsed (Supabase client) */
-function parseQuestionOptions(raw: unknown): string[] {
-  if (raw == null || raw === '') return [];
-  if (Array.isArray(raw)) return raw.map(String);
-  if (typeof raw === 'string') {
-    try {
-      const v = JSON.parse(raw);
-      return Array.isArray(v) ? v.map(String) : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
-
-function parseCorrectAnswerIndex(raw: unknown): number {
-  if (raw == null || raw === '') return 0;
-  if (typeof raw === 'number' && !Number.isNaN(raw)) return raw;
-  if (typeof raw === 'string') {
-    try {
-      return Number(JSON.parse(raw));
-    } catch {
-      const n = Number(raw);
-      return Number.isNaN(n) ? 0 : n;
-    }
-  }
-  const n = Number(raw);
-  return Number.isNaN(n) ? 0 : n;
-}
-
-function rawQuestionOptions(q: Question | undefined): unknown {
-  return q?.options;
-}
-
-/** Supabase uses correct_answer; older code expected correctAnswer */
-function rawCorrectAnswer(q: Question | undefined): unknown {
-  if (!q) return undefined;
-  return q.correctAnswer ?? q.correct_answer;
 }
 
 export default function CourseLearningPage({ params }: { params: { id: string } }) {
@@ -158,14 +124,6 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
       const options = parseQuestionOptions(rawQuestionOptions(currentQuestion));
       const correctAnswer = parseCorrectAnswerIndex(rawCorrectAnswer(currentQuestion));
       const isCorrect = Number(selectedOption) === correctAnswer;
-
-      console.log('Debug question answer:');
-      console.log('Selected option:', selectedOption, 'type:', typeof selectedOption);
-      console.log('Correct answer:', correctAnswer, 'type:', typeof correctAnswer);
-      console.log('Is correct:', isCorrect);
-      console.log('Options:', options);
-      console.log('Selected option text:', options[selectedOption]);
-      console.log('Correct answer text:', options[correctAnswer]);
 
       // Save answer to database
       const response = await fetch(`/api/courses/${params.id}/questions/${questionId}/answer`, {
@@ -350,9 +308,9 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
       });
       
       if (response.ok) {
-        console.log('Course reset successfully');
+        // reset successful
       } else {
-        console.warn('Failed to reset course in database');
+        // non-fatal, still allow local reset
       }
       
       // Refetch course data
@@ -380,16 +338,14 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
     
     if (course && progress.length > 0) {
       const completedLessons = progress.filter(p => p.completed).length;
-      console.log(`Progress check: ${completedLessons}/${course.lessons.length} lessons completed`);
       
       if (completedLessons === course.lessons.length) {
-        console.log('All lessons completed, checking course completion...');
         // All lessons completed, check if course is passed
         setTimeout(() => {
           if (!isResetting && !showCourseSummary) {
             checkCourseCompletion();
           }
-        }, 1500); // Increased delay to ensure all progress is saved
+        }, 1500); // Delay to ensure all progress is saved
       }
     }
   }, [progress, course, checkCourseCompletion, isResetting, showCourseSummary]);
