@@ -251,16 +251,16 @@ export default function LessonEditor({ lesson, onClose, onSave }: LessonEditorPr
               </label>
               <div className="space-y-3">
                 {formData.questionOptions.map((option, index) => (
-                  <div key={index} className="flex items-center space-x-3">
+                  <div key={index} className="flex items-center gap-3">
                     <input
                       type="radio"
                       name="correctAnswer"
                       id={`option-${index}`}
                       checked={formData.correctAnswer === index}
                       onChange={() => setFormData(prev => ({ ...prev, correctAnswer: index }))}
-                      className="w-4 h-4 text-primary-600 border-gray-300 focus:ring-primary-500"
+                      className="w-4 h-4 shrink-0 text-primary-600 border-gray-300 focus:ring-primary-500"
                     />
-                    <label htmlFor={`option-${index}`} className="text-sm font-medium text-gray-700">
+                    <label htmlFor={`option-${index}`} className="shrink-0 text-sm font-medium text-gray-700">
                       Alternativ {index + 1}:
                     </label>
                     <input
@@ -271,7 +271,7 @@ export default function LessonEditor({ lesson, onClose, onSave }: LessonEditorPr
                         newOptions[index] = e.target.value;
                         setFormData(prev => ({ ...prev, questionOptions: newOptions }));
                       }}
-                      className="flex-1 input-field"
+                      className="flex-1 min-w-0 input-field"
                       placeholder={`Alternativ ${index + 1}`}
                       required
                     />
@@ -325,23 +325,23 @@ export default function LessonEditor({ lesson, onClose, onSave }: LessonEditorPr
           className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900">
+          <div className="flex items-center justify-between gap-4 p-4 sm:p-6 border-b border-gray-200">
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
                 Redigera {getContentTypeLabel(lesson.type)}
               </h2>
-              <p className="text-sm text-gray-600">{lesson.title}</p>
+              <p className="text-sm text-gray-600 truncate">{lesson.title}</p>
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 hover:text-gray-600 transition-colors shrink-0"
             >
               <XMarkIcon className="h-6 w-6" />
             </button>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
             <div>
               <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
                 Titel *
@@ -360,7 +360,7 @@ export default function LessonEditor({ lesson, onClose, onSave }: LessonEditorPr
             {renderFormFields()}
 
             {/* Actions */}
-            <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200">
+            <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 pt-6 border-t border-gray-200">
               <button
                 type="button"
                 onClick={onClose}
