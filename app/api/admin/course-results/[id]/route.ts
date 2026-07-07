@@ -16,14 +16,16 @@ export async function GET(
 
     const admin = createAdminClient();
 
-    const { data: enrollment } = await admin.from('enrollments')
+    const { data: enrollment, error } = await admin.from('enrollments')
       .select(`
         id, enrolled_at, completed_at, passed, final_score, total_questions, correct_answers,
-        user:users(id, name, email, company:companies(name)),
+        user:users!enrollments_user_id_fkey(id, name, email, company:companies(name)),
         course:courses(id, title, category, passing_score)
       `)
       .eq('id', params.id)
       .maybeSingle();
+
+    if (error) throw error;
 
     if (!enrollment) {
       return NextResponse.json({ message: 'Anmälan hittades inte' }, { status: 404 });

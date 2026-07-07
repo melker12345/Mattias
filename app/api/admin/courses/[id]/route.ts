@@ -16,7 +16,7 @@ export async function GET(
     const [{ data: course }, { data: lessons }, { data: enrollments }] = await Promise.all([
       admin.from('courses').select('*').eq('id', params.id).single(),
       admin.from('lessons').select('*').eq('course_id', params.id).order('order'),
-      admin.from('enrollments').select('*, user:users(id, name, email)').eq('course_id', params.id),
+      admin.from('enrollments').select('*, user:users!enrollments_user_id_fkey(id, name, email)').eq('course_id', params.id),
     ]);
     if (!course) return NextResponse.json({ message: 'Kurs hittades inte' }, { status: 404 });
     return NextResponse.json({ ...course, lessons: lessons ?? [], enrollments: enrollments ?? [] });

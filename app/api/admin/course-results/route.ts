@@ -13,13 +13,17 @@ export async function GET(request: NextRequest) {
 
     const admin = createAdminClient();
 
-    const { data: enrollments } = await admin.from('enrollments')
+    // enrollments has two FKs to users (user_id + gifted_by), so the users
+    // embed must name the FK explicitly or PostgREST refuses to embed.
+    const { data: enrollments, error } = await admin.from('enrollments')
       .select(`
         id, enrolled_at, completed_at, passed, final_score, total_questions, correct_answers,
-        user:users(id, name, email, company:companies(name)),
+        user:users!enrollments_user_id_fkey(id, name, email, company:companies(name)),
         course:courses(id, title, category, passing_score)
       `)
       .order('enrolled_at', { ascending: false });
+
+    if (error) throw error;
 
     const rows = enrollments ?? [];
 
