@@ -2,7 +2,6 @@ export interface Employee {
   id: string;
   name: string;
   email: string;
-  personalNumber: string;
   bankIdVerified: boolean;
   id06Eligible: boolean;
   enrolledCourses: number;
@@ -15,7 +14,6 @@ export interface EmployeeDetails {
   id: string;
   name: string;
   email: string;
-  personalNumber: string;
   bankIdVerified: boolean;
   bankIdVerifiedAt: string | null;
   id06Eligible: boolean;

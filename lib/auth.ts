@@ -73,6 +73,25 @@ export async function requireAdmin(): Promise<AuthUser | NextResponse> {
   return user
 }
 
+/**
+ * Use in company-scoped API route handlers (e.g. /api/companies/[id]/...).
+ * Returns the user only if they are a platform ADMIN, or a COMPANY_ADMIN whose
+ * own company_id matches the requested company. Otherwise returns a 401/403.
+ * This prevents one company from reading or mutating another company's data
+ * (employee lists, personal details, invitations) by guessing IDs in the URL.
+ */
+export async function requireCompanyAccess(companyId: string): Promise<AuthUser | NextResponse> {
+  const user = await getAuthUser()
+  if (!user) {
+    return NextResponse.json({ message: 'Du måste vara inloggad' }, { status: 401 })
+  }
+  if (user.role === 'ADMIN') return user
+  if (user.role === 'COMPANY_ADMIN' && user.companyId && user.companyId === companyId) {
+    return user
+  }
+  return NextResponse.json({ message: 'Åtkomst nekad' }, { status: 403 })
+}
+
 export function isNextResponse(value: unknown): value is NextResponse {
   return value instanceof NextResponse
 }

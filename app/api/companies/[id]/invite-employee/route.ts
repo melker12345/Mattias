@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireCompanyAccess, isNextResponse } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 import { sendEmail, generateInvitationEmail } from '@/lib/email'
@@ -18,6 +19,8 @@ export async function POST(
 ) {
   try {
     const companyId = params.id
+    const access = await requireCompanyAccess(companyId)
+    if (isNextResponse(access)) return access
     const body = await request.json()
     const { name, email, personnummer, phone } = inviteEmployeeSchema.parse(body)
 

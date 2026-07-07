@@ -62,7 +62,6 @@ export function EmployeeDetailsPanel({
         <div className="bg-white p-4 rounded-lg shadow-sm">
           <h4 className="font-medium text-gray-900 mb-2">Kontaktinformation</h4>
           <p className="text-sm text-gray-600">E-post: {details.email}</p>
-          <p className="text-sm text-gray-600">Personnummer: {details.personalNumber}</p>
           <p className="text-sm text-gray-600">
             Registrerad: {new Date(details.createdAt).toLocaleDateString('sv-SE')}
           </p>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireCompanyAccess, isNextResponse } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function DELETE(
@@ -7,6 +8,8 @@ export async function DELETE(
 ) {
   try {
     const companyId = params.id
+    const access = await requireCompanyAccess(companyId)
+    if (isNextResponse(access)) return access
     const employeeId = params.employeeId
 
     const admin = createAdminClient()
