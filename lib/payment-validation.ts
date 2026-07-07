@@ -1,5 +1,6 @@
 import { createAdminClient } from './supabase/admin';
 import { isPaymentsDisabled } from './payments-disabled';
+import { isPaywallExempt } from './test-accounts';
 import type { PaymentValidationResult } from './types/payment';
 
 const demoPaidResult = (): PaymentValidationResult => ({
@@ -30,12 +31,12 @@ export async function validateCoursePayment(
     const isAdmin =
       profile?.role === 'ADMIN' ||
       (!!process.env.ADMIN_EMAIL && profile?.email === process.env.ADMIN_EMAIL);
-    if (isAdmin) {
+    if (isAdmin || isPaywallExempt(profile?.email)) {
       return {
         isValid: true,
         hasAccess: true,
         paymentStatus: 'paid',
-        message: 'Admin access',
+        message: isAdmin ? 'Admin access' : 'Testkonto',
       };
     }
 
@@ -113,6 +114,18 @@ export async function validateCompanySubscription(companyId: string): Promise<Pa
     }
 
     const admin = createAdminClient();
+
+    // A company whose COMPANY_ADMIN is a paywall-exempt test account is treated
+    // as having a valid subscription (testing convenience only).
+    const { data: companyAdmins } = await admin
+      .from('users')
+      .select('email')
+      .eq('company_id', companyId)
+      .eq('role', 'COMPANY_ADMIN');
+    if ((companyAdmins ?? []).some((u) => isPaywallExempt(u.email))) {
+      return demoPaidResult();
+    }
+
     const { data: company } = await admin
       .from('companies')
       .select('payment_status, is_active, plan_end_date')
@@ -333,7 +346,7 @@ export async function canEnrollInCourse(
     const isAdmin =
       profile?.role === 'ADMIN' ||
       (!!process.env.ADMIN_EMAIL && profile?.email === process.env.ADMIN_EMAIL);
-    if (isAdmin) {
+    if (isAdmin || isPaywallExempt(profile?.email)) {
       const { data: existingEnrollment } = await admin
         .from('enrollments')
         .select('is_paid, is_gift')
@@ -345,7 +358,7 @@ export async function canEnrollInCourse(
       }
       return {
         canEnroll: true,
-        reason: 'Administratör — ingen betalning krävs',
+        reason: isAdmin ? 'Administratör — ingen betalning krävs' : 'Testkonto — ingen betalning krävs',
         requiresPayment: false,
       };
     }
