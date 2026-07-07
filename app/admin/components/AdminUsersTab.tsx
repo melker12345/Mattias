@@ -15,9 +15,35 @@ export function AdminUsersTab({ users }: AdminUsersTabProps) {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      <h2 className="text-2xl font-bold text-gray-900">Användare</h2>
+      <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Användare</h2>
 
-      <div className="overflow-x-auto">
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-3">
+        {users.map((user) => (
+          <div key={user.id} className="bg-white border border-gray-200 rounded-lg p-4 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-gray-900 truncate">{user.name || user.email}</div>
+                <div className="text-xs text-gray-500 truncate">{user.email}</div>
+              </div>
+              <span className={`shrink-0 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
+                {user.role}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+              {user.company && <span>{user.company}</span>}
+              <span>{user.enrolledCourses} anmälda / {user.completedCourses} klara</span>
+              <span className={user.bankIdVerified ? 'text-green-700' : 'text-red-700'}>
+                {user.bankIdVerified ? 'Verifierad' : 'Ej verifierad'}
+              </span>
+              <span>{formatDate(user.createdAt)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>

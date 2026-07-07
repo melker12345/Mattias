@@ -51,7 +51,37 @@ export function AdminCoursesTab({
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        {/* Mobile cards */}
+        <div className="md:hidden space-y-3">
+          {courses.map((course) => (
+            <div key={course.id} className="bg-white border border-gray-200 rounded-lg p-4 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-gray-900">{course.title}</div>
+                  <div className="text-xs text-gray-500">{formatPrice(course.price)} · {course.enrolledUsers} registrerade</div>
+                </div>
+                <span className={`shrink-0 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(course.status)}`}>
+                  {course.isPublished ? 'Publicerad' : 'Utkast'}
+                </span>
+              </div>
+              <div className="flex justify-end gap-3 pt-1 border-t border-gray-100">
+                <button onClick={() => onEditCourse(course)} className="text-primary-600 inline-flex items-center gap-1 text-sm" title="Redigera kursinfo">
+                  <PencilIcon className="h-4 w-4" /> Info
+                </button>
+                <button onClick={() => onEditCourseContent(course.id)} className="text-blue-600 inline-flex items-center gap-1 text-sm" title="Redigera innehåll">
+                  <DocumentTextIcon className="h-4 w-4" /> Innehåll
+                </button>
+                <button onClick={() => onDeleteCourse(course.id)} className="text-red-600 inline-flex items-center gap-1 text-sm" title="Ta bort kurs">
+                  <TrashIcon className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -98,6 +128,7 @@ export function AdminCoursesTab({
             </tbody>
           </table>
         </div>
+        </>
       )}
     </motion.div>
   );

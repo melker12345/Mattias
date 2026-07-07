@@ -4,17 +4,16 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuth } from '@/app/providers';
 import CourseModal, { type Course } from '@/components/CourseModal';
-import SubmissionModal from '@/components/SubmissionModal';
 import GiftCourseModal from '@/components/GiftCourseModal';
 import { AdminTabs } from './components/AdminTabs';
 import { AdminOverviewTab } from './components/AdminOverviewTab';
 import { AdminCoursesTab } from './components/AdminCoursesTab';
 import { AdminUsersTab } from './components/AdminUsersTab';
 import { AdminCompaniesTab } from './components/AdminCompaniesTab';
-import { AdminSubmissionsTab } from './components/AdminSubmissionsTab';
-import { DeleteSubmissionModal } from './components/DeleteSubmissionModal';
+import { AdminCourseResultsTab } from './components/AdminCourseResultsTab';
+import { CourseResultDetailModal } from './components/CourseResultDetailModal';
 import { useAdminData } from './hooks/useAdminData';
-import type { AdminTab, AdminCourse, APVSubmission } from '@/lib/types/admin';
+import type { AdminTab, AdminCourse, CourseResult } from '@/lib/types/admin';
 
 export default function AdminDashboard() {
   const { user, loading: authLoading } = useSupabaseAuth();
@@ -25,7 +24,7 @@ export default function AdminDashboard() {
     courses,
     users,
     companies,
-    submissions,
+    courseResults,
     loading,
     refreshResource,
     refreshAll,
@@ -35,13 +34,8 @@ export default function AdminDashboard() {
   const [editingCourse, setEditingCourse] = useState<AdminCourse | null>(null);
   const [isSavingCourse, setIsSavingCourse] = useState(false);
 
-  const [selectedSubmission, setSelectedSubmission] = useState<APVSubmission | null>(null);
-  const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [showGiftModal, setShowGiftModal] = useState(false);
-
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [submissionToDelete, setSubmissionToDelete] = useState<APVSubmission | null>(null);
-  const [isDeletingSubmission, setIsDeletingSubmission] = useState(false);
+  const [selectedResult, setSelectedResult] = useState<CourseResult | null>(null);
 
   const handleCreateCourse = () => {
     setEditingCourse(null);
@@ -101,68 +95,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleViewSubmission = (submission: APVSubmission) => {
-    setSelectedSubmission(submission);
-    setShowSubmissionModal(true);
-  };
-
-  const handleUpdateSubmissionStatus = async (
-    submissionId: string,
-    status: 'APPROVED' | 'REJECTED',
-    reviewNotes?: string
-  ) => {
-    try {
-      const response = await fetch('/api/admin/submissions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ submissionId, status, reviewNotes }),
-      });
-
-      if (response.ok) {
-        await refreshResource('submissions');
-        setShowSubmissionModal(false);
-        setSelectedSubmission(null);
-      } else {
-        alert('Fel vid uppdatering av inlämningsstatus');
-      }
-    } catch (error) {
-      console.error('Error updating submission status:', error);
-      alert('Fel vid uppdatering av inlämningsstatus');
-    }
-  };
-
-  const handleDeleteSubmission = (submission: APVSubmission) => {
-    setSubmissionToDelete(submission);
-    setShowDeleteConfirm(true);
-  };
-
-  const confirmDeleteSubmission = async () => {
-    if (!submissionToDelete) return;
-
-    setIsDeletingSubmission(true);
-    try {
-      const response = await fetch(`/api/admin/submissions/${submissionToDelete.id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        await refreshResource('submissions');
-        setShowDeleteConfirm(false);
-        setSubmissionToDelete(null);
-        const data = await response.json();
-        alert(data.message || 'Inlämning borttagen');
-      } else {
-        const error = await response.json();
-        alert(error.message || 'Fel vid borttagning av inlämning');
-      }
-    } catch (error) {
-      console.error('Error deleting submission:', error);
-      alert('Ett fel uppstod vid borttagning av inlämning');
-    } finally {
-      setIsDeletingSubmission(false);
-    }
-  };
-
   if (!authLoading && !loading && (!user || user.user_metadata?.role !== 'ADMIN')) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -208,12 +140,10 @@ export default function AdminDashboard() {
           )}
           {activeTab === 'users' && <AdminUsersTab users={users} />}
           {activeTab === 'companies' && <AdminCompaniesTab companies={companies} />}
-          {activeTab === 'apv-submissions' && (
-            <AdminSubmissionsTab
-              submissions={submissions}
-              onViewSubmission={handleViewSubmission}
-              onUpdateStatus={handleUpdateSubmissionStatus}
-              onDeleteSubmission={handleDeleteSubmission}
+          {activeTab === 'course-results' && (
+            <AdminCourseResultsTab
+              results={courseResults}
+              onViewResult={setSelectedResult}
             />
           )}
         </div>
@@ -230,33 +160,16 @@ export default function AdminDashboard() {
         isSaving={isSavingCourse}
       />
 
-      <SubmissionModal
-        isOpen={showSubmissionModal}
-        onClose={() => {
-          setShowSubmissionModal(false);
-          setSelectedSubmission(null);
-        }}
-        submission={selectedSubmission}
-        onUpdateStatus={handleUpdateSubmissionStatus}
-      />
-
       <GiftCourseModal
         isOpen={showGiftModal}
         onClose={() => setShowGiftModal(false)}
         onSuccess={() => refreshAll()}
       />
 
-      {showDeleteConfirm && submissionToDelete && (
-        <DeleteSubmissionModal
-          submission={submissionToDelete}
-          isDeleting={isDeletingSubmission}
-          onCancel={() => {
-            setShowDeleteConfirm(false);
-            setSubmissionToDelete(null);
-          }}
-          onConfirm={confirmDeleteSubmission}
-        />
-      )}
+      <CourseResultDetailModal
+        result={selectedResult}
+        onClose={() => setSelectedResult(null)}
+      />
     </div>
   );
 }

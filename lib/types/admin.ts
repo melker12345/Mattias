@@ -1,4 +1,51 @@
-export type AdminTab = 'overview' | 'courses' | 'users' | 'companies' | 'apv-submissions';
+export type AdminTab = 'overview' | 'courses' | 'users' | 'companies' | 'course-results';
+
+export type CourseResultStatus = 'in_progress' | 'passed' | 'failed';
+
+export interface CourseResult {
+  enrollmentId: string;
+  user: { id: string; name: string | null; email: string; company: string | null };
+  course: { id: string; title: string; category: string; passingScore: number };
+  status: CourseResultStatus;
+  progressPercentage: number;
+  completedLessons: number;
+  totalLessons: number;
+  finalScore: number | null;
+  correctAnswers: number;
+  totalQuestions: number;
+  enrolledAt: string;
+  completedAt: string | null;
+}
+
+export interface CourseResultAnswer {
+  questionId: string;
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  correctAnswerText: string;
+  userAnswer: string;
+  userAnswerText: string;
+  selectedIndex: number;
+  isCorrect: boolean;
+  answered: boolean;
+}
+
+export interface CourseResultDetail {
+  enrollmentId: string;
+  user: { id: string; name: string | null; email: string; company: string | null };
+  course: { id: string; title: string; category: string; passingScore: number };
+  status: CourseResultStatus;
+  finalScore: number | null;
+  correctAnswers: number;
+  totalQuestions: number;
+  enrolledAt: string;
+  completedAt: string | null;
+  totalLessons: number;
+  completedLessons: number;
+  progressPercentage: number;
+  lessons: Array<{ id: string; title: string; order: number; completed: boolean; completedAt: string | null }>;
+  answers: CourseResultAnswer[];
+}
 
 export interface AdminCourse {
   id: string;

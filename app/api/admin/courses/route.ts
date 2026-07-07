@@ -8,19 +8,23 @@ export async function GET(request: NextRequest) {
     const admin = createAdminClient();
     const { data: courses } = await admin.from('courses').select('*').order('created_at', { ascending: false });
 
-    const coursesWithStats = await Promise.all((courses ?? []).map(async (course) => {
-      const [{ count: enrolledUsers }, { data: completed }] = await Promise.all([
-        admin.from('enrollments').select('*', { count: 'exact', head: true }).eq('course_id', course.id),
-        admin.from('enrollments').select('id').eq('course_id', course.id).not('completed_at', 'is', null),
-      ]);
-      return {
-        id: course.id, title: course.title, description: course.description,
-        price: course.price, duration: course.duration, category: course.category,
-        image: course.image, isPublished: course.is_published,
-        enrolledUsers: enrolledUsers ?? 0, completedUsers: completed?.length ?? 0,
-        status: course.is_published ? 'active' : 'draft',
-        createdAt: course.created_at, updatedAt: course.updated_at,
-      };
+    // Aggregate enrollment stats from a single query instead of 2 queries per course.
+    const { data: enrollments } = await admin.from('enrollments').select('course_id, completed_at');
+    const enrolledByCourse = new Map<string, number>();
+    const completedByCourse = new Map<string, number>();
+    for (const e of enrollments ?? []) {
+      enrolledByCourse.set(e.course_id, (enrolledByCourse.get(e.course_id) ?? 0) + 1);
+      if (e.completed_at) completedByCourse.set(e.course_id, (completedByCourse.get(e.course_id) ?? 0) + 1);
+    }
+
+    const coursesWithStats = (courses ?? []).map((course) => ({
+      id: course.id, title: course.title, description: course.description,
+      price: course.price, duration: course.duration, category: course.category,
+      image: course.image, isPublished: course.is_published,
+      enrolledUsers: enrolledByCourse.get(course.id) ?? 0,
+      completedUsers: completedByCourse.get(course.id) ?? 0,
+      status: course.is_published ? 'active' : 'draft',
+      createdAt: course.created_at, updatedAt: course.updated_at,
     }));
 
     return NextResponse.json(coursesWithStats);

@@ -6,14 +6,14 @@ import type {
   AdminCourse,
   AdminUser,
   AdminCompany,
-  APVSubmission,
+  CourseResult,
 } from '@/lib/types/admin';
 
 const ENDPOINTS = {
   courses: '/api/admin/courses',
   users: '/api/admin/users',
   companies: '/api/admin/companies',
-  submissions: '/api/admin/submissions',
+  courseResults: '/api/admin/course-results',
 } as const;
 
 type Resource = keyof typeof ENDPOINTS;
@@ -23,17 +23,17 @@ const TAB_RESOURCES: Record<AdminTab, Resource[]> = {
   courses: ['courses'],
   users: ['users'],
   companies: ['companies'],
-  'apv-submissions': ['submissions'],
+  'course-results': ['courseResults'],
 };
 
 export function useAdminData(activeTab: AdminTab) {
   const [courses, setCourses] = useState<AdminCourse[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
-  const [submissions, setSubmissions] = useState<APVSubmission[]>([]);
+  const [courseResults, setCourseResults] = useState<CourseResult[]>([]);
   const [loading, setLoading] = useState(true);
   const loadedRef = useRef<Set<Resource>>(new Set());
-  const fetchingRef = useRef(false);
+  const inFlightRef = useRef<Map<Resource, Promise<void>>>(new Map());
 
   const applyResource = useCallback((resource: Resource, data: unknown) => {
     switch (resource) {
@@ -46,21 +46,35 @@ export function useAdminData(activeTab: AdminTab) {
       case 'companies':
         setCompanies(data as AdminCompany[]);
         break;
-      case 'submissions':
-        setSubmissions(data as APVSubmission[]);
+      case 'courseResults':
+        setCourseResults(data as CourseResult[]);
         break;
     }
   }, []);
 
-  const fetchResource = useCallback(async (resource: Resource, force = false) => {
-    if (!force && loadedRef.current.has(resource)) return;
+  const fetchResource = useCallback((resource: Resource, force = false): Promise<void> => {
+    if (!force && loadedRef.current.has(resource)) return Promise.resolve();
 
-    const res = await fetch(ENDPOINTS[resource]);
-    if (res.ok) {
-      const data = await res.json();
-      applyResource(resource, data);
-      loadedRef.current.add(resource);
-    }
+    // Dedupe concurrent requests for the same resource (e.g. rapid tab switches
+    // or React strict-mode double invoke) without blocking other resources.
+    const existing = inFlightRef.current.get(resource);
+    if (existing) return existing;
+
+    const request = (async () => {
+      try {
+        const res = await fetch(ENDPOINTS[resource]);
+        if (res.ok) {
+          const data = await res.json();
+          applyResource(resource, data);
+          loadedRef.current.add(resource);
+        }
+      } finally {
+        inFlightRef.current.delete(resource);
+      }
+    })();
+
+    inFlightRef.current.set(resource, request);
+    return request;
   }, [applyResource]);
 
   const fetchResources = useCallback(async (resources: Resource[], force = false) => {
@@ -89,13 +103,13 @@ export function useAdminData(activeTab: AdminTab) {
     let cancelled = false;
 
     (async () => {
-      if (fetchingRef.current) return;
-      fetchingRef.current = true;
-      setLoading(true);
+      // Only show the loading state when this tab still has data to fetch;
+      // already-cached tabs switch instantly.
+      const needsFetch = TAB_RESOURCES[activeTab].some((r) => !loadedRef.current.has(r));
+      if (needsFetch) setLoading(true);
       try {
         await fetchResources(TAB_RESOURCES[activeTab]);
       } finally {
-        fetchingRef.current = false;
         if (!cancelled) setLoading(false);
       }
     })();
@@ -109,7 +123,7 @@ export function useAdminData(activeTab: AdminTab) {
     courses,
     users,
     companies,
-    submissions,
+    courseResults,
     loading,
     refreshResource,
     refreshTab,

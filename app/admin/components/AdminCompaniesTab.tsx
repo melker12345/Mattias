@@ -15,9 +15,36 @@ export function AdminCompaniesTab({ companies }: AdminCompaniesTabProps) {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      <h2 className="text-2xl font-bold text-gray-900">Företag</h2>
+      <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Företag</h2>
 
-      <div className="overflow-x-auto">
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-3">
+        {companies.map((company) => (
+          <div key={company.id} className="bg-white border border-gray-200 rounded-lg p-4 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-gray-900 truncate">{company.name}</div>
+                <div className="text-xs text-gray-500 truncate">{company.organizationNumber}</div>
+              </div>
+              <span className={`shrink-0 inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                company.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              }`}>
+                {company.isActive ? 'Aktivt' : 'Inaktivt'}
+              </span>
+            </div>
+            <div className="text-xs text-gray-500">
+              <div>{company.adminName} · {company.adminEmail}</div>
+              <div className="flex flex-wrap gap-x-4 mt-1">
+                <span>{company.employeeCount} anställda</span>
+                <span>{formatDate(company.createdAt)}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
