@@ -69,7 +69,6 @@ export interface AdminUser {
   email: string;
   role: string;
   company: string | null;
-  personalNumber: string | null;
   bankIdVerified: boolean;
   id06Eligible: boolean;
   enrolledCourses: number;
@@ -95,44 +94,6 @@ export interface AdminCompany {
   invitationCount: number;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface APVSubmission {
-  id: string;
-  user: {
-    id: string;
-    email: string;
-    name: string;
-    personalNumber?: string;
-  };
-  course: {
-    id: string;
-    title: string;
-    category: string;
-  };
-  courseTitle: string;
-  completionDate: string;
-  finalScore: number;
-  passingScore: number;
-  totalQuestions: number;
-  correctAnswers: number;
-  timeTaken?: number;
-  status: string;
-  submittedAt: string;
-  reviewedAt?: string;
-  reviewedBy?: string;
-  reviewNotes?: string;
-  answersData: Array<{
-    questionId: string;
-    question: string;
-    userAnswer: string;
-    correctAnswer: string;
-    isCorrect: boolean;
-    options: string[];
-    selectedIndex: number;
-    correctAnswerText: string;
-    userAnswerText: string;
-  }>;
 }
 
 export function formatPrice(price: number) {

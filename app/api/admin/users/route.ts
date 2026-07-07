@@ -43,7 +43,6 @@ export async function GET(request: NextRequest) {
       return {
         id: user.id, name: user.name, email: user.email, role: user.role,
         company: company?.name ?? null,
-        personalNumber: null,
         bankIdVerified: user.identity_verified,
         id06Eligible: user.id06_eligible,
         enrolledCourses: enrolledByUser.get(user.id) ?? 0,

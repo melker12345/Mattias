@@ -90,10 +90,6 @@ export function useAdminData(activeTab: AdminTab) {
     await fetchResource(resource, true);
   }, [fetchResource]);
 
-  const refreshTab = useCallback(async (tab: AdminTab) => {
-    await fetchResources(TAB_RESOURCES[tab], true);
-  }, [fetchResources]);
-
   const refreshAll = useCallback(async () => {
     loadedRef.current.clear();
     await fetchResources(Object.keys(ENDPOINTS) as Resource[], true);
@@ -126,7 +122,6 @@ export function useAdminData(activeTab: AdminTab) {
     courseResults,
     loading,
     refreshResource,
-    refreshTab,
     refreshAll,
   };
 }
