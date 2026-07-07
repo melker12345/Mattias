@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import {
@@ -34,10 +34,14 @@ export function useCourseLearn(courseId: string, user: User | null) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAlreadySubmitted, setHasAlreadySubmitted] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  // Completed-lesson count observed on (re)load — used to only auto-show the
+  // summary when the learner reaches 100% during this visit, not on arrival.
+  const completedAtLoadRef = useRef<number | null>(null);
 
   const fetchCourseData = useCallback(async () => {
     try {
       setLoading(true);
+      completedAtLoadRef.current = null;
 
       const [courseResponse, progressResponse] = await Promise.all([
         fetch(`/api/courses/${courseId}`),
@@ -241,7 +245,19 @@ export function useCourseLearn(courseId: string, user: User | null) {
     if (isResetting || showCourseSummary || !course || progress.length === 0) return;
 
     const completedLessons = progress.filter((p) => p.completed).length;
-    if (completedLessons === course.lessons.length) {
+
+    // First evaluation after a (re)load: record the baseline and don't show the
+    // summary. This lets a learner revisit an already-completed course and go
+    // through the content again without being sent straight to the result screen.
+    if (completedAtLoadRef.current === null) {
+      completedAtLoadRef.current = completedLessons;
+      return;
+    }
+
+    // Only auto-show the summary if the course was not yet complete on arrival
+    // and the learner has now finished every lesson in this session.
+    const wasIncompleteOnLoad = completedAtLoadRef.current < course.lessons.length;
+    if (wasIncompleteOnLoad && completedLessons === course.lessons.length) {
       const timer = setTimeout(() => {
         if (!isResetting && !showCourseSummary) checkCourseCompletion();
       }, 1500);

@@ -93,6 +93,20 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
 
           <div className="lg:col-span-3 order-1 lg:order-2">
             <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 lg:p-8">
+              {allLessonsCompleted && (
+                <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+                  <p className="text-sm text-green-800">
+                    Du har klarat denna kurs. Du kan gå igenom innehållet igen när du vill.
+                  </p>
+                  <button
+                    onClick={learn.checkCourseCompletion}
+                    className="shrink-0 text-sm font-medium text-green-700 hover:text-green-900 underline"
+                  >
+                    Visa resultat
+                  </button>
+                </div>
+              )}
+
               {currentLesson && (
                 <>
                   <LessonContent
