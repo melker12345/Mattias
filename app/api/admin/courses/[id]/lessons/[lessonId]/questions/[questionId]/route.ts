@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin, isNextResponse } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function PUT(
@@ -6,6 +7,9 @@ export async function PUT(
   { params }: { params: { id: string; lessonId: string; questionId: string } }
 ) {
   try {
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
+
     const body = await request.json();
     const { question, type, options, correctAnswer } = body;
 

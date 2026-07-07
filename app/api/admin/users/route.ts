@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin, isNextResponse } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
+
     const admin = createAdminClient();
     const { data: users } = await admin.from('users')
       .select('id, name, email, role, identity_verified, id06_eligible, created_at, updated_at, company:companies(name)')

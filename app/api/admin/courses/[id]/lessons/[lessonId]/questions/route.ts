@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin, isNextResponse } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
@@ -8,6 +9,9 @@ export async function GET(
   { params }: { params: { id: string; lessonId: string } }
 ) {
   try {
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
+
     const admin = createAdminClient();
     const { data: questions } = await admin.from('questions').select('*').eq('lesson_id', params.lessonId).order('order');
     return NextResponse.json(questions ?? []);

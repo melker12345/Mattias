@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin, isNextResponse } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
@@ -9,6 +10,9 @@ export async function GET(
   { params }: { params: { id: string; lessonId: string } }
 ) {
   try {
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
+
     const admin = createAdminClient();
     const { data: lesson } = await admin.from('lessons').select('*, questions(*)').eq('id', params.lessonId).single();
     if (!lesson) return NextResponse.json({ message: 'Lektion hittades inte' }, { status: 404 });
@@ -28,6 +32,9 @@ export async function PUT(
   { params }: { params: { id: string; lessonId: string } }
 ) {
   try {
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
+
     const body = await request.json();
     const { title, type, content, videoUrl, imageUrl, order } = body;
 
@@ -60,6 +67,9 @@ export async function DELETE(
   { params }: { params: { id: string; lessonId: string } }
 ) {
   try {
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
+
     const admin = createAdminClient();
     await admin.from('lessons').delete().eq('id', params.lessonId);
     return NextResponse.json({ message: 'Lektion borttagen framgångsrikt' });

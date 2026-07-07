@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin, isNextResponse } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
@@ -9,6 +10,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
+
     const admin = createAdminClient();
     const { data: lessons } = await admin.from('lessons').select('*, questions(*).order(order)').eq('course_id', params.id).order('order');
     return NextResponse.json(lessons ?? []);
@@ -27,6 +31,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
+
     const body = await request.json();
     const { title, type, content, videoUrl, imageUrl, questionOptions, correctAnswer } = body;
 

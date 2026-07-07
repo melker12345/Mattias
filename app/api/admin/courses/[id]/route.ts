@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin, isNextResponse } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
@@ -8,6 +9,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
+
     const admin = createAdminClient();
     const [{ data: course }, { data: lessons }, { data: enrollments }] = await Promise.all([
       admin.from('courses').select('*').eq('id', params.id).single(),
@@ -30,6 +34,9 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
+
     const body = await request.json();
     const { title, description, price, duration, category, image, isPublished } = body;
 
@@ -61,6 +68,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const adminResult = await requireAdmin();
+    if (isNextResponse(adminResult)) return adminResult;
+
     const admin = createAdminClient();
     const { count } = await admin.from('enrollments').select('*', { count: 'exact', head: true }).eq('course_id', params.id);
     if (count && count > 0) return NextResponse.json({ message: 'Kan inte ta bort kurs som har registrerade användare' }, { status: 400 });
