@@ -52,10 +52,12 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
   const paymentsDisabled = isPaymentsDisabled();
 
   useEffect(() => {
-    fetchCourseDetails();
+    // These fetches are independent, so run them concurrently.
+    const tasks: Promise<void>[] = [fetchCourseDetails()];
     if (user?.email) {
-      checkEnrollmentStatus();
+      tasks.push(checkEnrollmentStatus());
     }
+    Promise.all(tasks);
   }, [params.id, user]);
 
   useEffect(() => {

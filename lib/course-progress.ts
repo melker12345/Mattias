@@ -57,20 +57,20 @@ export async function recalculateAndPersistCourseScore(
       };
     }
 
-    // Fetch questions + the user's answers + course passing score in parallel
-    const [{ data: questions }, { data: userAnswers }, { data: course }] = await Promise.all([
-      admin.from('questions').select('id').in('lesson_id', lessonIds),
+    // Fetch the question ids for the course once, then reuse them.
+    const { data: questions } = await admin.from('questions').select('id').in('lesson_id', lessonIds);
+    const questionIds = (questions ?? []).map(q => q.id);
+
+    // Fetch the user's answers + course passing score in parallel
+    const [{ data: userAnswers }, { data: course }] = await Promise.all([
       admin.from('answers')
         .select('is_correct')
         .eq('user_id', userId)
-        .in('question_id', lessonIds.length 
-          ? (await admin.from('questions').select('id').in('lesson_id', lessonIds)).data?.map(q => q.id) ?? [] 
-          : []
-        ),
+        .in('question_id', questionIds),
       admin.from('courses').select('passing_score').eq('id', courseId).single(),
     ]);
 
-    const totalQuestions = (questions ?? []).length;
+    const totalQuestions = questionIds.length;
     const correctAnswers = (userAnswers ?? []).filter(a => a.is_correct).length;
     const passingScore = (course?.passing_score as number) || 80;
 

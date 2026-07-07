@@ -29,10 +29,12 @@ export async function POST(
     if (!enrollment) return NextResponse.json({ message: 'Du är inte registrerad för denna kurs' }, { status: 403 });
 
     // Verify question belongs to this course via its lesson
+    const { data: lessons } = await admin.from('lessons').select('id').eq('course_id', courseId);
+    const lessonIds = (lessons ?? []).map(l => l.id);
     const { data: question } = await admin
       .from('questions').select('id')
       .eq('id', questionId)
-      .in('lesson_id', (await admin.from('lessons').select('id').eq('course_id', courseId)).data?.map(l => l.id) ?? [])
+      .in('lesson_id', lessonIds)
       .maybeSingle();
     if (!question) return NextResponse.json({ message: 'Fråga hittades inte i denna kurs' }, { status: 404 });
 

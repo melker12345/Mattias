@@ -15,20 +15,52 @@ export async function GET(request: NextRequest) {
       .select('enrolled_at, course:courses(id, title, description)')
       .eq('user_id', user.id).order('enrolled_at', { ascending: false });
 
-    const enrolledCourses = await Promise.all((enrollments ?? []).map(async (enrollment) => {
+    const enrollmentList = enrollments ?? [];
+    const courseIds = enrollmentList.map((enrollment) => {
       const course = enrollment.course as unknown as { id: string; title: string; description: string };
-      const { data: lessons } = await admin.from('lessons').select('id').eq('course_id', course.id);
-      const lessonIds = (lessons ?? []).map(l => l.id);
-      const { data: progressRecords } = lessonIds.length
-        ? await admin.from('progress').select('completed, completed_at').eq('user_id', user.id).in('lesson_id', lessonIds)
-        : { data: [] };
+      return course.id;
+    });
+
+    // Batch: fetch all lessons for the enrolled courses and all of this user's progress in one query each.
+    const { data: allLessons } = courseIds.length
+      ? await admin.from('lessons').select('id, course_id').in('course_id', courseIds)
+      : { data: [] };
+
+    const lessonIdsByCourse = new Map<string, string[]>();
+    const courseIdByLesson = new Map<string, string>();
+    for (const lesson of allLessons ?? []) {
+      courseIdByLesson.set(lesson.id, lesson.course_id);
+      const list = lessonIdsByCourse.get(lesson.course_id);
+      if (list) list.push(lesson.id);
+      else lessonIdsByCourse.set(lesson.course_id, [lesson.id]);
+    }
+
+    const allLessonIds = (allLessons ?? []).map(l => l.id);
+    const { data: allProgress } = allLessonIds.length
+      ? await admin.from('progress').select('lesson_id, completed, completed_at').eq('user_id', user.id).in('lesson_id', allLessonIds)
+      : { data: [] };
+
+    const progressByCourse = new Map<string, { completed: boolean | null; completed_at: string | null }[]>();
+    for (const record of allProgress ?? []) {
+      const courseId = courseIdByLesson.get(record.lesson_id);
+      if (!courseId) continue;
+      const list = progressByCourse.get(courseId);
+      const entry = { completed: record.completed, completed_at: record.completed_at };
+      if (list) list.push(entry);
+      else progressByCourse.set(courseId, [entry]);
+    }
+
+    const enrolledCourses = enrollmentList.map((enrollment) => {
+      const course = enrollment.course as unknown as { id: string; title: string; description: string };
+      const lessonIds = lessonIdsByCourse.get(course.id) ?? [];
+      const progressRecords = progressByCourse.get(course.id) ?? [];
 
       const totalLessons = lessonIds.length;
-      const completedLessons = (progressRecords ?? []).filter(p => p.completed).length;
+      const completedLessons = progressRecords.filter(p => p.completed).length;
       const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
       const status: 'in-progress' | 'completed' | 'not-started' =
         completedLessons === 0 ? 'not-started' : completedLessons === totalLessons ? 'completed' : 'in-progress';
-      const lastProgress = (progressRecords ?? [])
+      const lastProgress = progressRecords
         .filter(p => p.completed_at)
         .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())[0];
 
@@ -39,7 +71,7 @@ export async function GET(request: NextRequest) {
         lastAccessed: lastProgress?.completed_at ?? enrollment.enrolled_at,
         status, courseId: course.id,
       };
-    }));
+    });
 
     return NextResponse.json(enrolledCourses);
   } catch (error) {

@@ -39,12 +39,14 @@ export function useCourseLearn(courseId: string, user: User | null) {
     try {
       setLoading(true);
 
-      const courseResponse = await fetch(`/api/courses/${courseId}`);
+      const [courseResponse, progressResponse] = await Promise.all([
+        fetch(`/api/courses/${courseId}`),
+        fetch(`/api/courses/${courseId}/progress`),
+      ]);
       if (!courseResponse.ok) throw new Error('Course not found');
       const courseData = await courseResponse.json();
       setCourse(courseData);
 
-      const progressResponse = await fetch(`/api/courses/${courseId}/progress`);
       if (progressResponse.ok) {
         const progressData = await progressResponse.json();
         setProgress(progressData.progress);

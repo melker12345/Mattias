@@ -15,9 +15,20 @@ export async function GET(request: NextRequest) {
     if (search) query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
     const { data: courses } = await query.order('created_at', { ascending: false });
 
-    const transformedCourses = await Promise.all((courses ?? []).map(async (course) => {
-      const { count } = await admin.from('enrollments').select('*', { count: 'exact', head: true }).eq('course_id', course.id);
-      return { ...course, enrolledUsers: count ?? 0 };
+    const courseList = courses ?? [];
+    const courseIds = courseList.map((course) => course.id);
+
+    const enrollmentCounts = new Map<string, number>();
+    if (courseIds.length > 0) {
+      const { data: enrollmentRows } = await admin.from('enrollments').select('course_id').in('course_id', courseIds);
+      for (const row of enrollmentRows ?? []) {
+        enrollmentCounts.set(row.course_id, (enrollmentCounts.get(row.course_id) ?? 0) + 1);
+      }
+    }
+
+    const transformedCourses = courseList.map((course) => ({
+      ...course,
+      enrolledUsers: enrollmentCounts.get(course.id) ?? 0,
     }));
 
     return NextResponse.json(transformedCourses);
