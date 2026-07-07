@@ -12,6 +12,9 @@ dist/
 requirements/
 *.tsbuildinfo
 
+# Vercel
+.vercel/
+
 # Environment variables
 .env
 .env.local

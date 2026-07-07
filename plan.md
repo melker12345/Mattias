@@ -1,5 +1,13 @@
 # Platform Plan
 
+## TODO:
+
+- [] Fix mobile responsiveness for creating courses
+- [] View users completed courses, granual overview of what an employee has done.
+- [] Bugs
+- [] Csv to upload list of all employees.
+
+
 ## Goal
 
 A Swedish accredited course platform where companies buy training courses for their employees. Upon completing a course the employee is registered in the **ID06 database** — Sweden's national system for tracking who is certified to perform specific work (construction, road work, etc.).
