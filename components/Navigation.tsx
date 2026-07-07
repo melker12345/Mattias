@@ -50,7 +50,7 @@ export function Navigation() {
   return (
     <Disclosure as="nav" className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out ${
       isVisible ? 'translate-y-0' : '-translate-y-full'
-    } bg-[#18374c] shadow-soft border-b border-[#18374c]/20`}>
+    } bg-[#0d2a38] shadow-soft border-b border-[#0d2a38]/20`}>
       {({ open }) => (
         <>
           <div className="mn-container">
@@ -111,7 +111,7 @@ export function Navigation() {
                       leaveFrom="transform opacity-100 scale-100"
                       leaveTo="transform opacity-0 scale-95"
                     >
-                      <Menu.Items className="absolute right-0 mt-3 w-48 bg-[#18374c] rounded-xl shadow-strong py-2 z-50 border border-[#18374c]/20">
+                      <Menu.Items className="absolute right-0 mt-3 w-48 bg-[#0d2a38] rounded-xl shadow-strong py-2 z-50 border border-[#0d2a38]/20">
                         <Menu.Item>
                           {({ active }) => (
                             <Link
@@ -178,7 +178,7 @@ export function Navigation() {
                       <button className="px-3 sm:px-4 py-2 rounded-lg font-medium transition-all duration-300 transform hover:scale-105 text-sm bg-white/20 backdrop-blur-md border border-white/30 text-white hover:bg-white hover:text-primary-700">
                         Registrera
                       </button>
-                      <div className="absolute right-0 mt-2 w-48 rounded-xl py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 border bg-[#18374c] border-[#18374c]/20">
+                      <div className="absolute right-0 mt-2 w-48 rounded-xl py-2 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 border bg-[#0d2a38] border-[#0d2a38]/20">
                         <Link
                           href="/auth/signup"
                           className="block px-4 py-3 text-sm font-open-sans transition-colors duration-200 text-white hover:bg-white/10"
@@ -212,7 +212,7 @@ export function Navigation() {
           </div>
 
           <Disclosure.Panel className="lg:hidden">
-            <div className="px-4 pt-4 pb-6 space-y-2 border-t bg-[#18374c] border-white/20">
+            <div className="px-4 pt-4 pb-6 space-y-2 border-t bg-[#0d2a38] border-white/20">
               {navigation.map((item) => (
                 <Disclosure.Button
                   key={item.name}
