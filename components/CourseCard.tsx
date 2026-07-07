@@ -34,14 +34,14 @@ export function CourseCard({ course, onAddToCart }: CourseCardProps) {
   }
 
   return (
-    <div className="group relative bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 h-full flex flex-col overflow-hidden border border-gray-100 transform hover:-translate-y-2">
+    <div className="group relative bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-shadow duration-300 h-full flex flex-col overflow-hidden border border-gray-100">
       {/* Image Section */}
       <div className="relative h-56 overflow-hidden">
         <Image
           src={course.image || '/logos/MN_Utbildning.png'}
           alt={course.title}
           fill
-          className="object-cover group-hover:scale-110 transition-transform duration-700"
+          className="object-cover md:group-hover:scale-110 transition-transform duration-700"
         />
         
         {/* Gradient overlay */}
