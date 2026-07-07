@@ -2,6 +2,7 @@
 
 ## TODO:
 
+
 - [] Fix mobile responsiveness for creating courses
 - [] View users completed courses, granual overview of what an employee has done.
 - [] Bugs
