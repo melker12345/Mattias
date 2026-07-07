@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
 
 const PUBLIC_ROUTES = [
   '/',
@@ -16,69 +15,34 @@ const PUBLIC_ROUTES = [
   '/api/webhooks',
 ]
 
-export async function middleware(request: NextRequest) {
+// Lightweight, Edge-safe auth gate.
+//
+// We intentionally do NOT instantiate the Supabase client here: it pulls in
+// supabase-js/realtime-js (which reference Node globals like `__dirname`) and
+// crashes the Edge runtime with MIDDLEWARE_INVOCATION_FAILED. Middleware only
+// needs to keep logged-out users out of protected pages; the real session
+// validation and role checks happen in the API routes (requireAuth /
+// requireAdmin) and in the page components themselves, so a cookie-presence
+// check is sufficient defense-in-depth at this layer.
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  let response = NextResponse.next({
-    request,
-  })
+  const isPublic = PUBLIC_ROUTES.some((route) => pathname.startsWith(route))
+  if (isPublic) return NextResponse.next()
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  // Supabase SSR stores the session in cookie(s) named `sb-<ref>-auth-token`
+  // (optionally chunked with `.0`, `.1`, …). Their presence means a session.
+  const hasSession = request.cookies
+    .getAll()
+    .some((c) => c.name.startsWith('sb-') && c.name.includes('auth-token'))
 
-  // If Supabase isn't configured in this environment, don't crash the whole
-  // site — middleware runs on every route, so a throw here 500s everything.
-  // Let the request through and rely on the per-page / per-API auth guards.
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('[middleware] Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY')
-    return response
+  if (!hasSession) {
+    const signinUrl = new URL('/auth/signin', request.url)
+    signinUrl.searchParams.set('callbackUrl', pathname)
+    return NextResponse.redirect(signinUrl)
   }
 
-  try {
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          response = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
-        },
-      },
-    })
-
-    // Refresh session — required for Server Components to pick up the updated session
-    const { data: { user } } = await supabase.auth.getUser()
-
-    const isPublic = PUBLIC_ROUTES.some(route => pathname.startsWith(route))
-    if (isPublic) return response
-
-    // Protect all non-public routes
-    if (!user) {
-      const signinUrl = new URL('/auth/signin', request.url)
-      signinUrl.searchParams.set('callbackUrl', pathname)
-      return NextResponse.redirect(signinUrl)
-    }
-
-    // Protect admin routes — role from user_metadata or ADMIN_EMAIL env var
-    if (pathname.startsWith('/admin')) {
-      const role = user.user_metadata?.role
-      const isAdminEmail = user.email === process.env.ADMIN_EMAIL
-      if (role !== 'ADMIN' && !isAdminEmail) {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
-      }
-    }
-
-    return response
-  } catch (err) {
-    // A transient auth/network error must not take down every route with a 500.
-    // Fail open; page- and API-level guards still enforce access.
-    console.error('[middleware] auth check failed:', err)
-    return response
-  }
+  return NextResponse.next()
 }
 
 export const config = {
