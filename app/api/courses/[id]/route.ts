@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-export const revalidate = 300;
+// Always read fresh — a cached course detail caused stale "not found" after
+// publishing/editing. Correctness over the tiny caching win here.
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,

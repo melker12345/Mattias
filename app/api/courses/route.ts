@@ -13,7 +13,8 @@ export async function GET(request: NextRequest) {
     let query = admin.from('courses').select('id, title, description, price, duration, category, image').eq('is_published', true);
     if (category && category !== 'all') query = query.eq('category', category);
     if (search) query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%`);
-    const { data: courses } = await query.order('created_at', { ascending: false });
+    const { data: courses, error: coursesError } = await query.order('created_at', { ascending: false });
+    if (coursesError) throw coursesError;
 
     const courseList = courses ?? [];
     const courseIds = courseList.map((course) => course.id);

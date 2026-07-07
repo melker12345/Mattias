@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isNextResponse, type AuthUser } from '@/lib/auth';
 import { isPaymentsDisabled } from '@/lib/payments-disabled';
+import { isPaywallExempt } from '@/lib/test-accounts';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createFortnoxCustomerFromPayment, createInvoiceFromPayment } from '@/lib/fortnox';
 import type { CoursePaymentData, CompanyPaymentData } from '@/lib/types/payment';
@@ -50,16 +51,6 @@ async function handleCoursePayment(
     );
   }
 
-  if (authUser.role === 'ADMIN') {
-    return NextResponse.json(
-      {
-        error:
-          'Administratörer behöver inte betala. Använd "Registrera dig för kursen" på kursens sida i stället för köp.',
-      },
-      { status: 400 }
-    );
-  }
-
   const { data: course } = await admin.from('courses').select('id, title, price, is_published').eq('id', courseId).single();
   if (!course) return NextResponse.json({ error: 'Course not found' }, { status: 404 });
   if (!course.is_published) return NextResponse.json({ error: 'Course is not available for purchase' }, { status: 400 });
@@ -68,6 +59,18 @@ async function handleCoursePayment(
     .eq('user_id', user.id).eq('course_id', courseId).maybeSingle();
   if (existingEnrollment?.is_paid || existingEnrollment?.is_gift) {
     return NextResponse.json({ error: 'You already have access to this course' }, { status: 400 });
+  }
+
+  // Admins and paywall-exempt test accounts get complimentary access — no invoice.
+  if (authUser.role === 'ADMIN' || isPaywallExempt(user.email)) {
+    await admin.from('enrollments').upsert(
+      {
+        user_id: user.id, course_id: courseId, is_paid: true, paid_at: new Date().toISOString(),
+        payment_amount: 0, payment_method: 'complimentary',
+      },
+      { onConflict: 'user_id,course_id' }
+    );
+    return NextResponse.json({ success: true, complimentary: true, message: 'Åtkomst beviljad utan betalning' });
   }
 
   const paymentData: CoursePaymentData = {
@@ -112,6 +115,12 @@ async function handleCompanyPayment(companyId: string, user: any, admin: ReturnT
 
   if (company.payment_status === 'PAID' && company.plan_end_date && new Date(company.plan_end_date) > new Date()) {
     return NextResponse.json({ error: 'Company already has an active subscription' }, { status: 400 });
+  }
+
+  // Paywall-exempt test company accounts are activated without an invoice.
+  if (isPaywallExempt(user.email)) {
+    await admin.from('companies').update({ payment_status: 'PAID', is_active: true }).eq('id', companyId);
+    return NextResponse.json({ success: true, complimentary: true, message: 'Företagsåtkomst beviljad utan betalning' });
   }
 
   const paymentData: CompanyPaymentData = {
