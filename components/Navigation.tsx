@@ -58,9 +58,9 @@ export function Navigation() {
               {/* Left Side - Logo */}
               <div className="flex-shrink-0 flex items-center">
                 <Link href="/" className="flex items-center group">
-                  <img 
-                    src="/logos/MN_Utbildning.png"
-                    alt="MN Utbildning Logo" 
+                  <img
+                    src="/logos/MN_Utbildning-dark.jpeg"
+                    alt="MN Utbildning Logo"
                     className="h-10 sm:h-16 w-auto transition-all duration-300 group-hover:scale-105"
                   />
                 </Link>

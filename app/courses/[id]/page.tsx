@@ -222,7 +222,7 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
               {/* Course Image */}
               <div className="relative h-64 md:h-80">
                 <Image
-                  src={course.image || '/images/course-placeholder.jpg'}
+                  src={course.image || '/logos/MN_Utbildning.png'}
                   alt={course.title}
                   fill
                   className="object-cover"

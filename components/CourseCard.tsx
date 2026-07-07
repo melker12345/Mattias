@@ -38,7 +38,7 @@ export function CourseCard({ course, onAddToCart }: CourseCardProps) {
       {/* Image Section */}
       <div className="relative h-56 overflow-hidden">
         <Image
-          src={course.image || '/images/course-placeholder.jpg'}
+          src={course.image || '/logos/MN_Utbildning.png'}
           alt={course.title}
           fill
           className="object-cover group-hover:scale-110 transition-transform duration-700"
