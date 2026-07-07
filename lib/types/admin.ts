@@ -57,6 +57,7 @@ export interface AdminCourse {
   image?: string;
   isPublished: boolean;
   enrolledUsers: number;
+  payingEnrolledUsers: number;
   completedUsers: number;
   status: 'active' | 'draft';
   createdAt: string;

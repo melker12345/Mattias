@@ -26,8 +26,9 @@ export function AdminOverviewTab({
   onGiftCourse,
   onCreateCourse,
 }: AdminOverviewTabProps) {
+  // Revenue excludes paywall-exempt test-account enrollments.
   const totalRevenue = courses.reduce(
-    (sum, course) => sum + course.price * course.enrolledUsers,
+    (sum, course) => sum + course.price * (course.payingEnrolledUsers ?? course.enrolledUsers),
     0
   );
 
