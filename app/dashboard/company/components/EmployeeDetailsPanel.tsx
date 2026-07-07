@@ -1,6 +1,19 @@
 'use client';
 
+import { useState } from 'react';
 import type { Employee, EmployeeDetails } from '@/lib/types/company-dashboard';
+
+const STATUS_LABELS: Record<string, string> = {
+  in_progress: 'Pågående',
+  passed: 'Godkänd',
+  failed: 'Underkänd',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  in_progress: 'bg-yellow-100 text-yellow-800',
+  passed: 'bg-green-100 text-green-800',
+  failed: 'bg-red-100 text-red-800',
+};
 
 interface EmployeeDetailsPanelProps {
   employee: Employee;
@@ -15,6 +28,17 @@ export function EmployeeDetailsPanel({
   isLoading,
   onPurchaseForEmployee,
 }: EmployeeDetailsPanelProps) {
+  const [expandedAnswers, setExpandedAnswers] = useState<Set<string>>(new Set());
+
+  const toggleAnswers = (enrollmentId: string) => {
+    setExpandedAnswers((prev) => {
+      const next = new Set(prev);
+      if (next.has(enrollmentId)) next.delete(enrollmentId);
+      else next.add(enrollmentId);
+      return next;
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="text-center py-8">
@@ -158,6 +182,54 @@ export function EmployeeDetailsPanel({
                     </div>
                   ))}
                 </div>
+
+                {/* Result + how they answered */}
+                {enrollment.answers.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[enrollment.status]}`}>
+                        {STATUS_LABELS[enrollment.status]}
+                      </span>
+                      {enrollment.status !== 'in_progress' && (
+                        <span className="text-sm text-gray-600">
+                          {enrollment.finalScore ?? 0}% · {enrollment.correctAnswers}/{enrollment.totalQuestions} rätt
+                          <span className="text-gray-400"> (godkänt {enrollment.course.passingScore}%)</span>
+                        </span>
+                      )}
+                      <button
+                        onClick={() => toggleAnswers(enrollment.id)}
+                        className="ml-auto text-sm text-primary-600 hover:text-primary-800 font-medium"
+                      >
+                        {expandedAnswers.has(enrollment.id) ? 'Dölj svar' : 'Visa svar'}
+                      </button>
+                    </div>
+
+                    {expandedAnswers.has(enrollment.id) && (
+                      <div className="space-y-2">
+                        {enrollment.answers.map((a, i) => (
+                          <div key={a.questionId} className="border border-gray-200 rounded-lg p-3">
+                            <div className="flex items-start gap-2">
+                              <span className={`shrink-0 mt-0.5 inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold ${
+                                a.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                              }`}>
+                                {a.isCorrect ? '✓' : '✗'}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-gray-900">{i + 1}. {a.question}</p>
+                                <p className={`text-sm mt-1 ${a.isCorrect ? 'text-green-700' : 'text-red-700'}`}>
+                                  Svar: {a.answered ? a.userAnswerText : 'Ej besvarad'}
+                                </p>
+                                {!a.isCorrect && (
+                                  <p className="text-sm text-gray-600">Rätt svar: {a.correctAnswerText}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {enrollment.certificates.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-gray-200">

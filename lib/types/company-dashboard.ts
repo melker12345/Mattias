@@ -25,11 +25,16 @@ export interface EmployeeDetails {
     id: string;
     enrolledAt: string;
     completedAt: string | null;
+    status: 'in_progress' | 'passed' | 'failed';
+    finalScore: number | null;
+    correctAnswers: number;
+    totalQuestions: number;
     course: {
       id: string;
       title: string;
       description: string;
       duration: number;
+      passingScore: number;
       totalLessons: number;
       completedLessons: number;
       progressPercentage: number;
@@ -41,6 +46,18 @@ export interface EmployeeDetails {
         completedAt: string | null;
       }>;
     };
+    answers: Array<{
+      questionId: string;
+      question: string;
+      options: string[];
+      correctAnswer: string;
+      correctAnswerText: string;
+      userAnswer: string;
+      userAnswerText: string;
+      selectedIndex: number;
+      isCorrect: boolean;
+      answered: boolean;
+    }>;
     certificates: Array<{
       id: string;
       certificateNumber: string;
