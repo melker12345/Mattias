@@ -71,7 +71,7 @@ export default function CompanyDashboard() {
 
         <CompanyStats
           totalEmployees={stats.totalEmployees}
-          bankIdVerified={stats.bankIdVerified}
+          identityVerified={stats.identityVerified}
           activeEmployees={stats.activeEmployees}
           totalCertificates={stats.totalCertificates}
         />

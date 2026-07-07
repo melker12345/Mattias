@@ -32,7 +32,7 @@ A Swedish accredited course platform where companies buy training courses for th
 |---|---|
 | `ADMIN` | Creates/manages courses, approves submissions, exports data, manages companies |
 | `COMPANY_ADMIN` | Purchases courses, invites/manages their own employees, views their certificates |
-| `EMPLOYEE` | Takes assigned courses, verifies identity via company cross-check (no BankID needed), receives certificate |
+| `EMPLOYEE` | Takes assigned courses, verifies identity via company cross-check, receives certificate |
 | `INDIVIDUAL` | Private person buying a single course (secondary use case) |
 
 ---
@@ -49,7 +49,7 @@ A Swedish accredited course platform where companies buy training courses for th
 - **Admin panel** — manage courses, users, companies, APV submissions
 - **Fortnox invoice creation** — partial integration for generating invoices
 - **Stripe card payments** — secondary payment path, working
-- **Basic ID06 fields** in schema — `bankIdVerified`, `id06Eligible`, `id06Verified`, `id06CertificateId`
+- **Basic ID06 fields** in schema — `identityVerified`, `id06Eligible`, `id06Verified`, `id06CertificateId`
 - **Employee invitation system** — company invites by email, employee accepts and creates account
 
 ---
@@ -118,7 +118,6 @@ A Swedish accredited course platform where companies buy training courses for th
 ├── lib/
 │   ├── supabase/            # client.ts + server.ts (keep)
 │   ├── auth.ts              # requireAuth, requireAdmin (keep)
-│   ├── bankid.ts            # NEW: BankID provider client
 │   ├── id06.ts              # NEW: ID06 API client
 │   ├── fortnox.ts           # Fortnox invoice helpers
 │   ├── stripe.ts            # Stripe helpers
@@ -132,16 +131,16 @@ A Swedish accredited course platform where companies buy training courses for th
 
 ---
 
-## Identity verification model (no BankID)
+## Identity verification model
 
-No BankID is used. Identity is established through a **two-party cross-check**:
+No external e-identification provider is used. Identity is established through a **two-party cross-check**:
 
 - **Company side** — when purchasing, enters: employee name, personnummer, email, phone. The company takes legal responsibility for this data being correct.
 - **Employee side** — when registering via the invitation link, enters: personnummer, phone. Platform checks these against the company-submitted values.
 - **Match → access granted**, `identityVerified = true`, course unlocks.
 - **Mismatch → registration blocked**, company admin is notified to correct the record.
 
-This removes the need for BankID (500 kr/month + 20 öre/transaction) entirely. The employer-employee relationship provides the trust anchor — employers are already legally responsible for registering workers correctly in ID06.
+This avoids the cost and complexity of an external e-identification integration entirely. The employer-employee relationship provides the trust anchor — employers are already legally responsible for registering workers correctly in ID06.
 
 ---
 
@@ -188,10 +187,6 @@ DIRECT_URL=            # Direct URL for migrations
 
 # Encryption
 PERSONNUMMER_ENCRYPTION_KEY=   # 32-byte hex key, never expose
-
-# BankID (choose a provider)
-BANKID_API_URL=
-BANKID_API_KEY=
 
 # ID06 (once approved)
 ID06_API_URL=

@@ -24,7 +24,7 @@ export function Footer() {
             </div>
             <p className="text-mn-light-gray-blue mb-6 max-w-md font-open-sans">
               Sveriges ledande plattform för professionella onlinekurser inom säkerhet, 
-              arbete på väg och kompetensutveckling. ID06-certifierade kurser med BankID-verifiering.
+              arbete på väg och kompetensutveckling. ID06-certifierade kurser med identitetsverifiering.
             </p>
             <div className="flex space-x-4">
               <a href="#" className="text-mn-light-gray-blue hover:text-mn-white transition-colors">

@@ -4,14 +4,14 @@ import { motion } from 'framer-motion';
 
 interface CompanyStatsProps {
   totalEmployees: number;
-  bankIdVerified: number;
+  identityVerified: number;
   activeEmployees: number;
   totalCertificates: number;
 }
 
 export function CompanyStats({
   totalEmployees,
-  bankIdVerified,
+  identityVerified,
   activeEmployees,
   totalCertificates,
 }: CompanyStatsProps) {
@@ -25,8 +25,8 @@ export function CompanyStats({
       ),
     },
     {
-      label: 'BankID-verifierade',
-      value: bankIdVerified,
+      label: 'Identitetsverifierade',
+      value: identityVerified,
       color: 'green',
       icon: (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />

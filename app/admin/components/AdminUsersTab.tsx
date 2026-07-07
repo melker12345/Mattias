@@ -33,8 +33,8 @@ export function AdminUsersTab({ users }: AdminUsersTabProps) {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
               {user.company && <span>{user.company}</span>}
               <span>{user.enrolledCourses} anmälda / {user.completedCourses} klara</span>
-              <span className={user.bankIdVerified ? 'text-green-700' : 'text-red-700'}>
-                {user.bankIdVerified ? 'Verifierad' : 'Ej verifierad'}
+              <span className={user.identityVerified ? 'text-green-700' : 'text-red-700'}>
+                {user.identityVerified ? 'Verifierad' : 'Ej verifierad'}
               </span>
               <span>{formatDate(user.createdAt)}</span>
             </div>
@@ -51,7 +51,7 @@ export function AdminUsersTab({ users }: AdminUsersTabProps) {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Företag</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kurser</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">BankID</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Verifierad</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registrerad</th>
             </tr>
           </thead>
@@ -75,9 +75,9 @@ export function AdminUsersTab({ users }: AdminUsersTabProps) {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    user.bankIdVerified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    user.identityVerified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                   }`}>
-                    {user.bankIdVerified ? 'Verifierad' : 'Ej verifierad'}
+                    {user.identityVerified ? 'Verifierad' : 'Ej verifierad'}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(user.createdAt)}</td>

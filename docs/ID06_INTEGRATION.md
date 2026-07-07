@@ -56,7 +56,7 @@ interface ID06VerificationResponse {
 ```
 
 #### Authentication Flow
-1. **User Authentication**: User logs in with BankID
+1. **User Authentication**: User logs in with their account credentials (identity established via the personnummer + phone cross-check that sets `identity_verified`)
 2. **Course Completion**: User completes course requirements
 3. **ID06 Verification**: System requests ID06 verification
 4. **Certificate Generation**: ID06 generates official certificate
@@ -116,7 +116,7 @@ interface GenerateCertificateRequest {
 
 ### Authentication Flow
 1. **Course Registration**: User registers for ID06-enabled course
-2. **BankID Login**: User authenticates with BankID
+2. **Login**: User authenticates with their account credentials (identity verified via the personnummer + phone cross-check)
 3. **Course Progress**: User completes course requirements
 4. **Verification Request**: System requests ID06 verification
 5. **Certificate Issuance**: User receives ID06-certified certificate

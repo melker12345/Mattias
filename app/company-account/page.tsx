@@ -116,7 +116,7 @@ const CompanyAccountPage: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.2 }}
               >
-                Komplett lösning för företag som vill hantera sina anställdas utbildning och certifiering med <span className="text-accent-300 font-semibold">ID06-certifiering</span> och BankID-verifiering.
+                Komplett lösning för företag som vill hantera sina anställdas utbildning och certifiering med <span className="text-accent-300 font-semibold">ID06-certifiering</span> och identitetsverifiering.
               </motion.p>
               
               <motion.div 

@@ -70,13 +70,13 @@ export function generateInvitationEmail(
             ? '<li>Logga in med dina befintliga uppgifter</li>'
             : '<li>Skapa ditt konto via inbjudningslänken</li>'
           }
-          <li>Verifiera din identitet med BankID</li>
+          <li>Verifiera din identitet</li>
           <li>Börja ta dina tilldelade kurser</li>
           <li>Få ditt ID06-certifikat efter genomförd kurs</li>
         </ol>
         
         <div style="background-color: #dbeafe; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <p style="margin: 0; color: #1e40af;"><strong>Viktigt:</strong> Du måste verifiera din identitet med BankID för att kunna ta kurser och få ID06-certifikat.</p>
+          <p style="margin: 0; color: #1e40af;"><strong>Viktigt:</strong> Du måste verifiera din identitet för att kunna ta kurser och få ID06-certifikat.</p>
         </div>
         
         <p>Om du har frågor, kontakta din företagsadministratör.</p>
@@ -111,11 +111,11 @@ export function generateInvitationEmail(
       ? '1. Logga in med dina befintliga uppgifter'
       : '1. Skapa ditt konto via inbjudningslänken'
     }
-    2. Verifiera din identitet med BankID
+    2. Verifiera din identitet
     3. Börja ta dina tilldelade kurser
     4. Få ditt ID06-certifikat efter genomförd kurs
 
-    Viktigt: Du måste verifiera din identitet med BankID för att kunna ta kurser och få ID06-certifikat.
+    Viktigt: Du måste verifiera din identitet för att kunna ta kurser och få ID06-certifikat.
 
     Om du har frågor, kontakta din företagsadministratör.
 

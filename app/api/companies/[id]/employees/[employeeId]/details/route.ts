@@ -125,7 +125,7 @@ export async function GET(
       }
     })
 
-    return NextResponse.json({ employee: { ...employee, enrollments: enrichedEnrollments, certificates: certificates ?? [] } })
+    return NextResponse.json({ employee: { ...employee, identityVerified: employee.identity_verified, enrollments: enrichedEnrollments, certificates: certificates ?? [] } })
   } catch (error) {
     console.error('Error fetching employee details:', error)
     return NextResponse.json(

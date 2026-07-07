@@ -61,7 +61,7 @@ export function HeroSection() {
               transition={{ duration: 0.8, delay: 0.2 }}
             >
               Sveriges ledande plattform för företagsutbildning inom säkerhet och arbete på väg. 
-              <span className="text-accent-300 font-semibold"> ID06-certifierade kurser</span> med BankID-verifiering för maximal säkerhet och compliance.
+              <span className="text-accent-300 font-semibold"> ID06-certifierade kurser</span> med identitetsverifiering för maximal säkerhet och compliance.
             </motion.p>
             
             <motion.div 

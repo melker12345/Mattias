@@ -69,7 +69,7 @@ export interface AdminUser {
   email: string;
   role: string;
   company: string | null;
-  bankIdVerified: boolean;
+  identityVerified: boolean;
   id06Eligible: boolean;
   enrolledCourses: number;
   completedCourses: number;

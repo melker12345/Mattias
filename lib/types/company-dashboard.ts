@@ -2,7 +2,7 @@ export interface Employee {
   id: string;
   name: string;
   email: string;
-  bankIdVerified: boolean;
+  identityVerified: boolean;
   id06Eligible: boolean;
   enrolledCourses: number;
   completedCourses: number;
@@ -14,8 +14,8 @@ export interface EmployeeDetails {
   id: string;
   name: string;
   email: string;
-  bankIdVerified: boolean;
-  bankIdVerifiedAt: string | null;
+  identityVerified: boolean;
+  identityVerifiedAt: string | null;
   id06Eligible: boolean;
   createdAt: string;
   updatedAt: string;

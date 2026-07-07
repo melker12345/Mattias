@@ -171,14 +171,14 @@ export default function InvitePage({ params }: { params: { token: string } }) {
                   <ol className="text-sm text-gray-700 space-y-1">
                     <li>1. Acceptera inbjudningen</li>
                     <li>2. Logga in med ditt befintliga konto</li>
-                    <li>3. Verifiera din identitet med BankID</li>
+                    <li>3. Verifiera din identitet</li>
                     <li>4. Börja ta dina tilldelade kurser</li>
                   </ol>
                 ) : (
                   <ol className="text-sm text-gray-700 space-y-1">
                     <li>1. Acceptera inbjudningen</li>
                     <li>2. Skapa ditt konto</li>
-                    <li>3. Verifiera din identitet med BankID</li>
+                    <li>3. Verifiera din identitet</li>
                     <li>4. Börja ta dina tilldelade kurser</li>
                   </ol>
                 )}

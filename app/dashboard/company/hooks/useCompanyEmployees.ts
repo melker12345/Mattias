@@ -74,7 +74,7 @@ export function useCompanyEmployees(user: User | null) {
       }
 
       let invitationLink: string | undefined;
-      if (!data.employee.bankIdVerified) {
+      if (!data.employee.identityVerified) {
         try {
           const invitationResponse = await fetch(
             `/api/companies/${companyId}/employees/${employeeId}/invitation-link`
@@ -143,7 +143,7 @@ export function useCompanyEmployees(user: User | null) {
 
   const stats = {
     totalEmployees: employees.length,
-    bankIdVerified: employees.filter((emp) => emp.bankIdVerified).length,
+    identityVerified: employees.filter((emp) => emp.identityVerified).length,
     activeEmployees: employees.filter((emp) => emp.enrolledCourses > 0).length,
     totalCertificates: employees.reduce((sum, emp) => sum + emp.certificates, 0),
   };

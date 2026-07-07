@@ -71,13 +71,13 @@ export function EmployeeDetailsPanel({
           <h4 className="font-medium text-gray-900 mb-2">Verifiering</h4>
           <div className="space-y-1">
             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-              details.bankIdVerified ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+              details.identityVerified ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
             }`}>
-              {details.bankIdVerified ? 'BankID-verifierad' : 'Väntar på BankID'}
+              {details.identityVerified ? 'Identitetsverifierad' : 'Väntar på verifiering'}
             </span>
-            {details.bankIdVerifiedAt && (
+            {details.identityVerifiedAt && (
               <p className="text-xs text-gray-500">
-                Verifierad: {new Date(details.bankIdVerifiedAt).toLocaleDateString('sv-SE')}
+                Verifierad: {new Date(details.identityVerifiedAt).toLocaleDateString('sv-SE')}
               </p>
             )}
             {details.id06Eligible && (
@@ -100,7 +100,7 @@ export function EmployeeDetailsPanel({
         </div>
       </div>
 
-      {!details.bankIdVerified && details.invitationLink && (
+      {!details.identityVerified && details.invitationLink && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <h4 className="font-medium text-yellow-900 mb-2">Inbjudningslänk</h4>
           <p className="text-sm text-yellow-800 mb-3">
