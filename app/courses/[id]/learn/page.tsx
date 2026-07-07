@@ -61,6 +61,9 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
   }
 
   const currentLesson = learn.currentLesson;
+  const allLessonsCompleted =
+    learn.course.lessons.length > 0 &&
+    learn.course.lessons.every((l) => learn.isLessonCompleted(l.id));
   const currentQuestion = currentLesson?.questions?.[0];
   const currentUserAnswer = currentQuestion
     ? learn.userAnswers.find((a) => a.questionId === currentQuestion.id) ?? null
@@ -120,6 +123,7 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
                     currentLessonIndex={learn.currentLessonIndex}
                     totalLessons={learn.course.lessons.length}
                     isCurrentLessonCompleted={learn.isLessonCompleted(currentLesson.id)}
+                    allLessonsCompleted={allLessonsCompleted}
                     savingProgress={learn.savingProgress}
                     onPrevious={learn.goToPreviousLesson}
                     onNext={learn.goToNextLesson}

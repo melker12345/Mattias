@@ -10,6 +10,7 @@ interface LessonNavigationProps {
   currentLessonIndex: number;
   totalLessons: number;
   isCurrentLessonCompleted: boolean;
+  allLessonsCompleted: boolean;
   savingProgress: boolean;
   onPrevious: () => void;
   onNext: () => void;
@@ -21,6 +22,7 @@ export function LessonNavigation({
   currentLessonIndex,
   totalLessons,
   isCurrentLessonCompleted,
+  allLessonsCompleted,
   savingProgress,
   onPrevious,
   onNext,
@@ -64,7 +66,9 @@ export function LessonNavigation({
         {isLastLesson ? (
           <button
             onClick={onFinishCourse}
-            className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+            disabled={!allLessonsCompleted}
+            title={!allLessonsCompleted ? 'Markera alla avsnitt som slutförda innan du slutför kursen' : undefined}
+            className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
           >
             Slutför kurs
             <CheckCircleIcon className="w-4 h-4 ml-2" />

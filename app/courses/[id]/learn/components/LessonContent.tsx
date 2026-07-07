@@ -102,11 +102,13 @@ export function LessonContent({
         )}
 
         {lesson.type === 'image' && lesson.imageUrl && (
-          <div className="aspect-video bg-gray-100 rounded-lg flex items-center justify-center">
-            <div className="text-center">
-              <p className="text-gray-600">Bild: {lesson.title}</p>
-              <p className="text-sm text-gray-500">Bild URL: {lesson.imageUrl}</p>
-            </div>
+          <div className="rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={lesson.imageUrl}
+              alt={lesson.title}
+              className="w-full max-h-[70vh] object-contain"
+            />
           </div>
         )}
 

@@ -60,9 +60,13 @@ export function useCourseLearn(courseId: string, user: User | null) {
     }
   }, [courseId, router]);
 
+  // Depend on the user id, not the user object: Supabase emits a fresh user
+  // object on tab-focus token refresh, which would otherwise re-run this and
+  // reload the whole course.
+  const userId = user?.id;
   useEffect(() => {
-    if (user) fetchCourseData();
-  }, [user, fetchCourseData]);
+    if (userId) fetchCourseData();
+  }, [userId, fetchCourseData]);
 
   const currentLesson = course?.lessons[currentLessonIndex] ?? null;
 
