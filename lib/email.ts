@@ -9,14 +9,16 @@ export interface EmailData {
 }
 
 export async function sendEmail(data: EmailData): Promise<boolean> {
-  // For development, we'll just log the email
-  // In production, this would send an actual email
-  console.log('📧 EMAIL SENT:')
-  console.log('To:', data.to)
-  console.log('Subject:', data.subject)
-  console.log('HTML:', data.html)
-  console.log('---')
-  
+  // For development, log the email so the invite link etc. is visible locally.
+  // Never log recipient/body in production (PII + secrets like invite links).
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('📧 EMAIL SENT:')
+    console.log('To:', data.to)
+    console.log('Subject:', data.subject)
+    console.log('HTML:', data.html)
+    console.log('---')
+  }
+
   // Simulate email sending delay
   await new Promise(resolve => setTimeout(resolve, 100))
   

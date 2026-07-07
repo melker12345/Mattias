@@ -13,10 +13,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { items, customerData } = body;
-    console.log('Request body:', { items, customerData });
 
     if (!items || !Array.isArray(items) || items.length === 0) {
-      console.log('No items in cart');
       return NextResponse.json(
         { error: 'No items in cart' },
         { status: 400 }
@@ -25,7 +23,6 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient();
     const { data: user } = await admin.from('users').select('id, email, name').eq('id', authResult.id).single();
-    console.log('User found:', user?.email);
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
     const courses = items.filter((item: any) => item.type === 'course');

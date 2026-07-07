@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`ADMIN GIFT: ${admin.email} gifted course "${course.title}" to ${targetUser.email}. Reason: ${reason || 'No reason provided'}`);
+    console.log(`ADMIN GIFT: admin ${admin.id} gifted course "${course.title}" to user ${targetUser.id}. Reason: ${reason || 'No reason provided'}`);
 
     return NextResponse.json({
       message: `Kursen "${course.title}" har getts som gåva till ${targetUser.email}`,

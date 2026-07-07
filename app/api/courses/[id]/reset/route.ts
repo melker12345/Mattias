@@ -18,7 +18,7 @@ export async function POST(
     const { data: enrollment } = await admin.from('enrollments').select('id').eq('user_id', user.id).eq('course_id', courseId).maybeSingle();
     if (!enrollment) return NextResponse.json({ message: 'Du är inte registrerad för denna kurs' }, { status: 403 });
 
-    console.log(`Resetting course ${courseId} for user ${user.email}`);
+    console.log(`Resetting course ${courseId} for user ${user.id}`);
 
     // Get lesson + question IDs for this course
     const { data: lessons } = await admin.from('lessons').select('id').eq('course_id', courseId);
@@ -39,7 +39,7 @@ export async function POST(
       .update({ completed_at: null, passed: false, final_score: null, total_questions: 0, correct_answers: 0 })
       .eq('user_id', user.id).eq('course_id', courseId);
 
-    console.log(`Course reset completed for user ${user.email}`);
+    console.log(`Course reset completed for user ${user.id}`);
 
     return NextResponse.json({
       message: 'Kursen har återställts framgångsrikt'

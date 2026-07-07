@@ -42,8 +42,6 @@ export async function GET(
 
     const { finalScore, passed } = computeFinalScore(totalQuestions, correctAnswers, passingScore);
 
-    console.log(`Course completion check for ${user.email}:`, { totalQuestions, answeredQuestions, correctAnswers, finalScore, passingScore, passed, allQuestionsAnswered: answeredQuestions === totalQuestions });
-
     // Check if all questions are answered (course is completed)
     const isCompleted = totalQuestions > 0 && answeredQuestions === totalQuestions;
     

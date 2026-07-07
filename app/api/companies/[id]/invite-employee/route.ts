@@ -73,7 +73,7 @@ export async function POST(
       const emailSent = await sendEmail(emailData)
 
       if (!emailSent) {
-        console.error('Failed to send invitation email to existing user:', existingUser.email)
+        console.error('Failed to send invitation email to existing user:', existingUser.id)
       }
 
       return NextResponse.json(
@@ -132,7 +132,7 @@ export async function POST(
     const emailSent = await sendEmail(emailData)
 
     if (!emailSent) {
-      console.error('Failed to send invitation email:', email)
+      console.error('Failed to send invitation email for a new company invitation')
     }
 
     return NextResponse.json(
