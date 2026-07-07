@@ -1,3 +1,4 @@
+// Edge-safe: no Supabase client here (see note below). Build marker v2.
 import { NextResponse, type NextRequest } from 'next/server'
 
 const PUBLIC_ROUTES = [
