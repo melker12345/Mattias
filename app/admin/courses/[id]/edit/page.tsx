@@ -232,23 +232,21 @@ export default function CourseEditorPage({ params }: { params: { id: string } })
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 pt-24 sm:pt-28">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link
-                href="/admin"
-                className="inline-flex items-center text-primary-600 hover:text-primary-700 transition-colors"
-              >
-                <ArrowLeftIcon className="w-5 h-5 mr-2" />
-                Tillbaka till admin
-              </Link>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Redigera Kurs</h1>
-                <p className="text-gray-600">{course.title}</p>
-              </div>
+          <Link
+            href="/admin"
+            className="inline-flex items-center text-primary-600 hover:text-primary-700 transition-colors mb-4"
+          >
+            <ArrowLeftIcon className="w-5 h-5 mr-2" />
+            Tillbaka till admin
+          </Link>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Redigera Kurs</h1>
+              <p className="text-gray-600 truncate">{course.title}</p>
             </div>
             <button
               onClick={() => setIsAddContentModalOpen(true)}
-              className="btn-primary inline-flex items-center"
+              className="btn-primary inline-flex items-center justify-center w-full sm:w-auto shrink-0"
             >
               <PlusIcon className="w-5 h-5 mr-2" />
               Lägg till innehåll
@@ -257,8 +255,8 @@ export default function CourseEditorPage({ params }: { params: { id: string } })
         </div>
 
         {/* Course Info */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Kursinformation</h2>
+        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-8">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Kursinformation</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">Titel</label>
@@ -285,12 +283,12 @@ export default function CourseEditorPage({ params }: { params: { id: string } })
 
         {/* Course Content */}
         <div className="bg-white rounded-lg shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Kursinnehåll</h2>
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Kursinnehåll</h2>
             <p className="text-gray-600">Hantera lektioner och innehåll för denna kurs</p>
           </div>
 
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {lessons.length === 0 ? (
               <div className="text-center py-12">
                 <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
@@ -318,20 +316,20 @@ export default function CourseEditorPage({ params }: { params: { id: string } })
                     transition={{ delay: index * 0.1 }}
                     className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="flex items-center justify-center w-10 h-10 bg-primary-100 text-primary-600 rounded-full">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center space-x-3 sm:space-x-4 min-w-0">
+                        <div className="flex items-center justify-center w-10 h-10 bg-primary-100 text-primary-600 rounded-full shrink-0">
                           {getContentIcon(lesson.type)}
                         </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900">{lesson.title}</h3>
-                          <p className="text-sm text-gray-500">
+                        <div className="min-w-0">
+                          <h3 className="font-medium text-gray-900 truncate">{lesson.title}</h3>
+                          <p className="text-sm text-gray-500 truncate">
                             {getContentTypeLabel(lesson.type)} • Ordning {lesson.order}
                           </p>
                         </div>
                       </div>
-                      
-                      <div className="flex items-center space-x-2">
+
+                      <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
                         <button
                           onClick={() => moveLesson(lesson.id, 'up')}
                           disabled={index === 0}
