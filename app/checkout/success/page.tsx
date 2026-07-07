@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
@@ -12,6 +12,14 @@ import {
 import Link from 'next/link';
 
 export default function CheckoutSuccessPage() {
+  return (
+    <Suspense fallback={null}>
+      <CheckoutSuccessPageInner />
+    </Suspense>
+  );
+}
+
+function CheckoutSuccessPageInner() {
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
