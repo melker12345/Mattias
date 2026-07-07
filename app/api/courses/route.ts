@@ -35,7 +35,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching courses:', error);
     return NextResponse.json(
-      { message: 'Ett fel uppstod vid hämtning av kurser' },
+      {
+        message: 'Ett fel uppstod vid hämtning av kurser',
+        detail: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
