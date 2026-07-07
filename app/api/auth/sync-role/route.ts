@@ -3,9 +3,11 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 /**
- * Called after sign-in to ensure ADMIN_EMAIL user has role='ADMIN'
- * in both the Supabase users table and Supabase auth metadata.
- * Safe to call repeatedly — only acts if email matches ADMIN_EMAIL.
+ * Called after sign-in to keep the Supabase auth metadata (role + companyId) in
+ * sync with the public.users profile, which is the source of truth. The client
+ * reads role/companyId from user_metadata (e.g. the company dashboard), so this
+ * ensures those are correct after login. ADMIN_EMAIL always resolves to ADMIN.
+ * Safe to call repeatedly.
  */
 export async function POST() {
   try {
@@ -16,26 +18,35 @@ export async function POST() {
       return NextResponse.json({ synced: false }, { status: 401 })
     }
 
-    const adminEmail = process.env.ADMIN_EMAIL
-    if (!adminEmail || user.email !== adminEmail) {
-      return NextResponse.json({ synced: false, reason: 'not admin email' })
-    }
-
-    // Update Supabase auth metadata so middleware JWT check works
     const adminClient = createAdminClient()
+
+    // Profile is the source of truth for role + company association.
+    const { data: profile } = await adminClient
+      .from('users')
+      .select('role, company_id, name')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const isAdminEmail = !!process.env.ADMIN_EMAIL && user.email === process.env.ADMIN_EMAIL
+    const role = isAdminEmail ? 'ADMIN' : (profile?.role ?? user.user_metadata?.role ?? 'INDIVIDUAL')
+    const companyId = profile?.company_id ?? null
+
+    // Keep auth metadata aligned so the client picks up role + companyId.
     await adminClient.auth.admin.updateUserById(user.id, {
-      user_metadata: { ...user.user_metadata, role: 'ADMIN' },
+      user_metadata: { ...user.user_metadata, role, companyId },
     })
 
-    // Upsert profile row so the user always exists in public.users
-    await adminClient
-      .from('users')
-      .upsert(
-        { id: user.id, email: user.email!, name: user.user_metadata?.name ?? null, role: 'ADMIN' },
-        { onConflict: 'id' }
-      )
+    // Ensure the ADMIN_EMAIL user always has a profile row.
+    if (isAdminEmail) {
+      await adminClient
+        .from('users')
+        .upsert(
+          { id: user.id, email: user.email!, name: user.user_metadata?.name ?? profile?.name ?? null, role: 'ADMIN' },
+          { onConflict: 'id' }
+        )
+    }
 
-    return NextResponse.json({ synced: true })
+    return NextResponse.json({ synced: true, role, companyId })
   } catch (err) {
     console.error('[sync-role]', err)
     return NextResponse.json({ synced: false, error: 'Internal error' }, { status: 500 })

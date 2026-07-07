@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     const { data: authData, error: authError } = await admin.auth.admin.createUser({
       email,
       password,
-      user_metadata: { name: contactPerson, role: 'COMPANY_ADMIN' },
+      user_metadata: { name: contactPerson, role: 'COMPANY_ADMIN', companyId: company.id },
       email_confirm: true,
     })
 
