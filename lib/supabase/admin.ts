@@ -12,5 +12,12 @@ export function createAdminClient() {
   }
   return createClient(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
+    global: {
+      // Bypass Next.js's fetch Data Cache — supabase-js uses fetch under the
+      // hood, and Next caches those by default, which served stale/empty course
+      // lists even on force-dynamic routes. Server reads must always be live.
+      fetch: (input: RequestInfo | URL, init?: RequestInit) =>
+        fetch(input, { ...init, cache: 'no-store' }),
+    },
   })
 }
