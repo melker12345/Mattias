@@ -78,6 +78,25 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleToggleBypass = async (userId: string, active: boolean) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paywallBypassActive: active }),
+      });
+      if (response.ok) {
+        await refreshResource('users');
+      } else {
+        const error = await response.json().catch(() => ({}));
+        alert(error.message || 'Kunde inte uppdatera testkontots status');
+      }
+    } catch (error) {
+      console.error('Error toggling test account bypass:', error);
+      alert('Kunde inte uppdatera testkontots status');
+    }
+  };
+
   const handleDeleteCourse = async (courseId: string) => {
     if (!confirm('Är du säker på att du vill ta bort denna kurs?')) return;
 
@@ -138,7 +157,7 @@ export default function AdminDashboard() {
               onDeleteCourse={handleDeleteCourse}
             />
           )}
-          {activeTab === 'users' && <AdminUsersTab users={users} />}
+          {activeTab === 'users' && <AdminUsersTab users={users} onToggleBypass={handleToggleBypass} />}
           {activeTab === 'companies' && <AdminCompaniesTab companies={companies} />}
           {activeTab === 'course-results' && (
             <AdminCourseResultsTab

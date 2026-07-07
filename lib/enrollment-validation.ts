@@ -1,6 +1,6 @@
 import { createAdminClient } from './supabase/admin'
 import { isPaymentsDisabled } from './payments-disabled'
-import { isPaywallExempt } from './test-accounts'
+import { isPaywallExempt, isBypassActiveForUser } from './test-accounts'
 import { validateCompanySubscription } from './payment-validation'
 
 export interface EnrollmentValidation {
@@ -78,8 +78,9 @@ export async function validateEnrollmentEligibility(
       }
     }
 
-    // Paywall-exempt test accounts enroll for free (testing convenience only).
-    if (isPaywallExempt(user.email)) {
+    // Paywall-exempt test accounts enroll for free (testing convenience only),
+    // unless an admin has toggled the account inactive.
+    if (isPaywallExempt(user.email) && await isBypassActiveForUser(admin, user.id)) {
       return {
         canEnroll: true,
         reason: 'Testkonto — ingen betalning krävs',
@@ -249,7 +250,7 @@ export async function validateCourseAccess(userId: string, courseId: string): Pr
     const isAdmin =
       profile?.role === 'ADMIN' ||
       (!!process.env.ADMIN_EMAIL && profile?.email === process.env.ADMIN_EMAIL)
-    if (isAdmin || isPaywallExempt(profile?.email)) return true
+    if (isAdmin || (isPaywallExempt(profile?.email) && await isBypassActiveForUser(admin, userId))) return true
 
     const { data: enrollment } = await admin
       .from('enrollments')

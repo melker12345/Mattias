@@ -72,6 +72,8 @@ export interface AdminUser {
   company: string | null;
   identityVerified: boolean;
   id06Eligible: boolean;
+  isTestAccount: boolean;
+  paywallBypassActive: boolean;
   enrolledCourses: number;
   completedCourses: number;
   certificates: number;

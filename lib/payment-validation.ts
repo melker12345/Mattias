@@ -1,6 +1,6 @@
 import { createAdminClient } from './supabase/admin';
 import { isPaymentsDisabled } from './payments-disabled';
-import { isPaywallExempt } from './test-accounts';
+import { isPaywallExempt, isBypassActiveForUser } from './test-accounts';
 import type { PaymentValidationResult } from './types/payment';
 
 const demoPaidResult = (): PaymentValidationResult => ({
@@ -31,7 +31,7 @@ export async function validateCoursePayment(
     const isAdmin =
       profile?.role === 'ADMIN' ||
       (!!process.env.ADMIN_EMAIL && profile?.email === process.env.ADMIN_EMAIL);
-    if (isAdmin || isPaywallExempt(profile?.email)) {
+    if (isAdmin || (isPaywallExempt(profile?.email) && await isBypassActiveForUser(admin, userId))) {
       return {
         isValid: true,
         hasAccess: true,
@@ -119,11 +119,12 @@ export async function validateCompanySubscription(companyId: string): Promise<Pa
     // as having a valid subscription (testing convenience only).
     const { data: companyAdmins } = await admin
       .from('users')
-      .select('email')
+      .select('id, email')
       .eq('company_id', companyId)
       .eq('role', 'COMPANY_ADMIN');
-    if ((companyAdmins ?? []).some((u) => isPaywallExempt(u.email))) {
-      return demoPaidResult();
+    const exemptAdmins = (companyAdmins ?? []).filter((u) => isPaywallExempt(u.email));
+    for (const a of exemptAdmins) {
+      if (await isBypassActiveForUser(admin, a.id)) return demoPaidResult();
     }
 
     const { data: company } = await admin
@@ -346,7 +347,7 @@ export async function canEnrollInCourse(
     const isAdmin =
       profile?.role === 'ADMIN' ||
       (!!process.env.ADMIN_EMAIL && profile?.email === process.env.ADMIN_EMAIL);
-    if (isAdmin || isPaywallExempt(profile?.email)) {
+    if (isAdmin || (isPaywallExempt(profile?.email) && await isBypassActiveForUser(admin, userId))) {
       const { data: existingEnrollment } = await admin
         .from('enrollments')
         .select('is_paid, is_gift')

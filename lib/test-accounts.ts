@@ -27,3 +27,28 @@ export function isPaywallExempt(email: string | null | undefined): boolean {
   if (!email) return false;
   return paywallExemptEmails().includes(email.toLowerCase());
 }
+
+/**
+ * Whether an exempt test account currently has its bypass enabled (admin can
+ * toggle this per account in the Users tab). Fail-open: if the
+ * `paywall_bypass_active` column doesn't exist yet (migration not run) or the
+ * lookup fails, returns true so existing test accounts keep working.
+ * Call only after isPaywallExempt(email) is true to avoid an extra query for
+ * normal users.
+ */
+export async function isBypassActiveForUser(
+  admin: { from: (t: string) => any },
+  userId: string
+): Promise<boolean> {
+  try {
+    const { data, error } = await admin
+      .from('users')
+      .select('paywall_bypass_active')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error || !data) return true;
+    return data.paywall_bypass_active !== false;
+  } catch {
+    return true;
+  }
+}
