@@ -36,69 +36,55 @@ function formatPrice(price: number) {
   }).format(price);
 }
 
-function BundlesSection({ bundles }: { bundles: Bundle[] }) {
+function BundleCard({ bundle }: { bundle: Bundle }) {
   const { addItem, openCart } = useCart();
-
-  if (bundles.length === 0) return null;
+  const saving = bundle.coursesTotal - bundle.price;
 
   return (
-    <div className="mn-container pt-12">
-      <div className="mb-8 text-center">
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 font-montserrat">Paket</h2>
-        <p className="text-gray-600 mt-1 max-w-2xl mx-auto">Köp flera kurser tillsammans till ett rabatterat pris — alla kurser låses upp direkt.</p>
+    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 flex flex-col overflow-hidden h-full">
+      <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-6">
+        <span className="inline-block text-xs font-bold uppercase tracking-wide bg-white/20 px-3 py-1 rounded-full mb-3">Paket</span>
+        <h3 className="text-xl font-bold font-montserrat leading-tight">{bundle.title}</h3>
       </div>
-      <div className="flex flex-wrap justify-center gap-8">
-        {bundles.map((bundle) => {
-          const saving = bundle.coursesTotal - bundle.price;
-          return (
-            <div key={bundle.id} className="w-full sm:w-[22rem] bg-white rounded-2xl shadow-lg border border-gray-100 flex flex-col overflow-hidden">
-              <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-6">
-                <span className="inline-block text-xs font-bold uppercase tracking-wide bg-white/20 px-3 py-1 rounded-full mb-3">Paket</span>
-                <h3 className="text-xl font-bold font-montserrat leading-tight">{bundle.title}</h3>
-              </div>
-              <div className="flex-1 flex flex-col p-6">
-                {bundle.description && (
-                  <p className="text-gray-600 text-sm leading-relaxed mb-4 whitespace-pre-line">{bundle.description}</p>
-                )}
-                <ul className="space-y-2 mb-6">
-                  {bundle.courses.map((c) => (
-                    <li key={c.id} className="flex items-start text-sm text-gray-700">
-                      <CheckIcon className="w-5 h-5 text-green-500 mr-2 flex-shrink-0" />
-                      <span>{c.title}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-auto pt-4 border-t border-gray-100">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-2xl font-bold text-primary-700 font-montserrat">{formatPrice(bundle.price)}</span>
-                    {saving > 0 && (
-                      <span className="text-sm text-gray-400 line-through">{formatPrice(bundle.coursesTotal)}</span>
-                    )}
-                  </div>
-                  {saving > 0 && (
-                    <p className="text-sm text-green-600 font-medium mb-4">Spara {formatPrice(saving)}</p>
-                  )}
-                  <button
-                    onClick={() => {
-                      addItem({
-                        id: bundle.id,
-                        type: 'bundle',
-                        title: bundle.title,
-                        price: bundle.price,
-                        description: bundle.courses.map((c) => c.title).join(', '),
-                        image: bundle.image,
-                      });
-                      openCart();
-                    }}
-                    className="w-full bg-gradient-to-r from-primary-600 to-primary-700 text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-300 text-sm font-semibold"
-                  >
-                    Lägg i kundvagn
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+      <div className="flex-1 flex flex-col p-6">
+        {bundle.description && (
+          <p className="text-gray-600 text-sm leading-relaxed mb-4 whitespace-pre-line">{bundle.description}</p>
+        )}
+        <ul className="space-y-2 mb-6">
+          {bundle.courses.map((c) => (
+            <li key={c.id} className="flex items-start text-sm text-gray-700">
+              <CheckIcon className="w-5 h-5 text-green-500 mr-2 flex-shrink-0" />
+              <span>{c.title}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-auto pt-4 border-t border-gray-100">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-2xl font-bold text-primary-700 font-montserrat">{formatPrice(bundle.price)}</span>
+            {saving > 0 && (
+              <span className="text-sm text-gray-400 line-through">{formatPrice(bundle.coursesTotal)}</span>
+            )}
+          </div>
+          {saving > 0 && (
+            <p className="text-sm text-green-600 font-medium mb-4">Spara {formatPrice(saving)}</p>
+          )}
+          <button
+            onClick={() => {
+              addItem({
+                id: bundle.id,
+                type: 'bundle',
+                title: bundle.title,
+                price: bundle.price,
+                description: bundle.courses.map((c) => c.title).join(', '),
+                image: bundle.image,
+              });
+              openCart();
+            }}
+            className="w-full bg-gradient-to-r from-primary-600 to-primary-700 text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-300 text-sm font-semibold"
+          >
+            Lägg i kundvagn
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -121,6 +107,10 @@ export function CoursesClient({ initialCourses, initialBundles = [] }: { initial
     if (q && !course.title.toLowerCase().includes(q) && !course.description.toLowerCase().includes(q)) return false;
     return true;
   });
+
+  // Packages have no category/search metadata, so only surface them on the
+  // default (unfiltered) view — leading the grid so it never feels empty.
+  const showBundles = initialBundles.length > 0 && !q && selectedCategory === 'all';
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -211,9 +201,6 @@ export function CoursesClient({ initialCourses, initialBundles = [] }: { initial
         </div>
       </section>
 
-      {/* Bundles / packages */}
-      <BundlesSection bundles={initialBundles} />
-
       {/* Search and Filter Section */}
       <div className="bg-white border-b border-gray-200">
         <div className="mn-container py-8">
@@ -260,14 +247,14 @@ export function CoursesClient({ initialCourses, initialBundles = [] }: { initial
         </div>
       </div>
 
-      {/* Courses Grid */}
+      {/* Courses Grid — packages lead the default (unfiltered) view */}
       <div id="courses-grid" className="mn-container py-12">
-        {initialCourses.length === 0 ? (
+        {initialCourses.length === 0 && (!showBundles || initialBundles.length === 0) ? (
           <div className="text-center py-12">
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Inga kurser tillgängliga än</h3>
             <p className="text-gray-600">Nya kurser publiceras löpande — kom tillbaka snart.</p>
           </div>
-        ) : filteredCourses.length === 0 ? (
+        ) : filteredCourses.length === 0 && !showBundles ? (
           <div className="text-center py-12">
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Inga kurser hittades</h3>
             <p className="text-gray-600 mb-4">Prova att ändra dina sökfilter</p>
@@ -280,6 +267,9 @@ export function CoursesClient({ initialCourses, initialBundles = [] }: { initial
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {showBundles && initialBundles.map((bundle) => (
+              <BundleCard key={bundle.id} bundle={bundle} />
+            ))}
             {filteredCourses.map((course) => (
               <CourseCard key={course.id} course={course} />
             ))}
