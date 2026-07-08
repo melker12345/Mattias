@@ -64,6 +64,18 @@ export interface AdminCourse {
   updatedAt: string;
 }
 
+export interface AdminBundle {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  image?: string;
+  isPublished: boolean;
+  courses: Array<{ id: string; title: string; price: number }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AdminUser {
   id: string;
   name: string;

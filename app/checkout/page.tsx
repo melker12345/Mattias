@@ -186,7 +186,7 @@ export default function CheckoutPage() {
                         {item.title}
                       </h3>
                       <p className="text-xs text-gray-500 mt-1">
-                        {item.type === 'course' ? 'Kurs' : 'Företagskonto'}
+                        {item.type === 'course' ? 'Kurs' : item.type === 'bundle' ? 'Paket' : 'Företagskonto'}
                       </p>
                     </div>
                     <div className="text-sm font-semibold text-gray-900">

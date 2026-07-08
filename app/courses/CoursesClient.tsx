@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MagnifyingGlassIcon, FunnelIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, FunnelIcon, AcademicCapIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { CourseCard } from '@/components/CourseCard';
+import { useCart } from '@/contexts/CartContext';
 
 export interface Course {
   id: string;
@@ -16,6 +17,93 @@ export interface Course {
   enrolledUsers?: number;
 }
 
+export interface Bundle {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  image?: string;
+  courses: Array<{ id: string; title: string; price: number }>;
+  coursesTotal: number;
+}
+
+function formatPrice(price: number) {
+  return new Intl.NumberFormat('sv-SE', {
+    style: 'currency',
+    currency: 'SEK',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(price);
+}
+
+function BundlesSection({ bundles }: { bundles: Bundle[] }) {
+  const { addItem, openCart } = useCart();
+
+  if (bundles.length === 0) return null;
+
+  return (
+    <div className="mn-container pt-12">
+      <div className="mb-6">
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 font-montserrat">Paket</h2>
+        <p className="text-gray-600 mt-1">Köp flera kurser tillsammans till ett rabatterat pris — alla kurser låses upp direkt.</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {bundles.map((bundle) => {
+          const saving = bundle.coursesTotal - bundle.price;
+          return (
+            <div key={bundle.id} className="bg-white rounded-2xl shadow-lg border border-gray-100 flex flex-col overflow-hidden">
+              <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-6">
+                <span className="inline-block text-xs font-bold uppercase tracking-wide bg-white/20 px-3 py-1 rounded-full mb-3">Paket</span>
+                <h3 className="text-xl font-bold font-montserrat leading-tight">{bundle.title}</h3>
+              </div>
+              <div className="flex-1 flex flex-col p-6">
+                {bundle.description && (
+                  <p className="text-gray-600 text-sm leading-relaxed mb-4 whitespace-pre-line">{bundle.description}</p>
+                )}
+                <ul className="space-y-2 mb-6">
+                  {bundle.courses.map((c) => (
+                    <li key={c.id} className="flex items-start text-sm text-gray-700">
+                      <CheckIcon className="w-5 h-5 text-green-500 mr-2 flex-shrink-0" />
+                      <span>{c.title}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-auto pt-4 border-t border-gray-100">
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span className="text-2xl font-bold text-primary-700 font-montserrat">{formatPrice(bundle.price)}</span>
+                    {saving > 0 && (
+                      <span className="text-sm text-gray-400 line-through">{formatPrice(bundle.coursesTotal)}</span>
+                    )}
+                  </div>
+                  {saving > 0 && (
+                    <p className="text-sm text-green-600 font-medium mb-4">Spara {formatPrice(saving)}</p>
+                  )}
+                  <button
+                    onClick={() => {
+                      addItem({
+                        id: bundle.id,
+                        type: 'bundle',
+                        title: bundle.title,
+                        price: bundle.price,
+                        description: bundle.courses.map((c) => c.title).join(', '),
+                        image: bundle.image,
+                      });
+                      openCart();
+                    }}
+                    className="w-full bg-gradient-to-r from-primary-600 to-primary-700 text-white px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-300 text-sm font-semibold"
+                  >
+                    Lägg i kundvagn
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const categories = [
   { id: 'all', name: 'Alla kategorier' },
   { id: 'arbete-pa-vag', name: 'Arbete på Väg' },
@@ -23,7 +111,7 @@ const categories = [
   { id: 'kompetensutveckling', name: 'Kompetensutveckling' },
 ];
 
-export function CoursesClient({ initialCourses }: { initialCourses: Course[] }) {
+export function CoursesClient({ initialCourses, initialBundles = [] }: { initialCourses: Course[]; initialBundles?: Bundle[] }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
@@ -42,7 +130,7 @@ export function CoursesClient({ initialCourses }: { initialCourses: Course[] }) 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <section className="relative bg-cover bg-center bg-no-repeat text-white overflow-hidden" style={{
+      <section className="relative pt-16 sm:pt-20 bg-cover bg-center bg-no-repeat text-white overflow-hidden" style={{
         background: `
           linear-gradient(135deg, #0c283b 0%, #1a3a4f 25%, #27404f 50%, #20313e 75%, #19222d 100%),
           radial-gradient(circle at 20% 80%, rgba(249, 115, 22, 0.3) 0%, transparent 50%),
@@ -122,6 +210,9 @@ export function CoursesClient({ initialCourses }: { initialCourses: Course[] }) 
           </div>
         </div>
       </section>
+
+      {/* Bundles / packages */}
+      <BundlesSection bundles={initialBundles} />
 
       {/* Search and Filter Section */}
       <div className="bg-white border-b border-gray-200">

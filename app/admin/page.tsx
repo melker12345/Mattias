@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseAuth } from '@/app/providers';
 import CourseModal, { type Course } from '@/components/CourseModal';
+import BundleModal, { type BundleFormData } from '@/components/BundleModal';
 import GiftCourseModal from '@/components/GiftCourseModal';
 import { AdminTabs } from './components/AdminTabs';
 import { AdminOverviewTab } from './components/AdminOverviewTab';
@@ -13,7 +14,7 @@ import { AdminCompaniesTab } from './components/AdminCompaniesTab';
 import { AdminCourseResultsTab } from './components/AdminCourseResultsTab';
 import { CourseResultDetailModal } from './components/CourseResultDetailModal';
 import { useAdminData } from './hooks/useAdminData';
-import type { AdminTab, AdminCourse, CourseResult } from '@/lib/types/admin';
+import type { AdminTab, AdminCourse, AdminBundle, CourseResult } from '@/lib/types/admin';
 
 export default function AdminDashboard() {
   const { user, loading: authLoading } = useSupabaseAuth();
@@ -22,6 +23,7 @@ export default function AdminDashboard() {
 
   const {
     courses,
+    bundles,
     users,
     companies,
     courseResults,
@@ -33,6 +35,10 @@ export default function AdminDashboard() {
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<AdminCourse | null>(null);
   const [isSavingCourse, setIsSavingCourse] = useState(false);
+
+  const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
+  const [editingBundle, setEditingBundle] = useState<AdminBundle | null>(null);
+  const [isSavingBundle, setIsSavingBundle] = useState(false);
 
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [selectedResult, setSelectedResult] = useState<CourseResult | null>(null);
@@ -114,6 +120,62 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleCreateBundle = () => {
+    setEditingBundle(null);
+    setIsBundleModalOpen(true);
+  };
+
+  const handleEditBundle = (bundle: AdminBundle) => {
+    setEditingBundle(bundle);
+    setIsBundleModalOpen(true);
+  };
+
+  const handleSaveBundle = async (bundleData: BundleFormData) => {
+    try {
+      setIsSavingBundle(true);
+
+      const url = editingBundle ? `/api/admin/bundles/${editingBundle.id}` : '/api/admin/bundles';
+      const method = editingBundle ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bundleData),
+      });
+
+      if (response.ok) {
+        setIsBundleModalOpen(false);
+        setEditingBundle(null);
+        await refreshResource('bundles');
+      } else {
+        const error = await response.json().catch(() => ({}));
+        alert(error.message || 'Ett fel uppstod');
+      }
+    } catch (error) {
+      console.error('Error saving bundle:', error);
+      alert('Ett fel uppstod vid sparande av paket');
+    } finally {
+      setIsSavingBundle(false);
+    }
+  };
+
+  const handleDeleteBundle = async (bundleId: string) => {
+    if (!confirm('Är du säker på att du vill ta bort detta paket?')) return;
+
+    try {
+      const response = await fetch(`/api/admin/bundles/${bundleId}`, { method: 'DELETE' });
+      if (response.ok) {
+        await refreshResource('bundles');
+      } else {
+        const error = await response.json().catch(() => ({}));
+        alert(error.message || 'Ett fel uppstod');
+      }
+    } catch (error) {
+      console.error('Error deleting bundle:', error);
+      alert('Ett fel uppstod vid borttagning av paket');
+    }
+  };
+
   if (!authLoading && !loading && (!user || user.user_metadata?.role !== 'ADMIN')) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -151,10 +213,14 @@ export default function AdminDashboard() {
           {activeTab === 'courses' && (
             <AdminCoursesTab
               courses={courses}
+              bundles={bundles}
               onCreateCourse={handleCreateCourse}
               onEditCourse={handleEditCourse}
               onEditCourseContent={(courseId) => router.push(`/admin/courses/${courseId}/edit`)}
               onDeleteCourse={handleDeleteCourse}
+              onCreateBundle={handleCreateBundle}
+              onEditBundle={handleEditBundle}
+              onDeleteBundle={handleDeleteBundle}
             />
           )}
           {activeTab === 'users' && <AdminUsersTab users={users} onToggleBypass={handleToggleBypass} />}
@@ -177,6 +243,18 @@ export default function AdminDashboard() {
         course={editingCourse}
         onSave={handleSaveCourse}
         isSaving={isSavingCourse}
+      />
+
+      <BundleModal
+        isOpen={isBundleModalOpen}
+        onClose={() => {
+          setIsBundleModalOpen(false);
+          setEditingBundle(null);
+        }}
+        bundle={editingBundle}
+        courses={courses}
+        onSave={handleSaveBundle}
+        isSaving={isSavingBundle}
       />
 
       <GiftCourseModal

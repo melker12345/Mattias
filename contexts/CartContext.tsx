@@ -4,7 +4,7 @@ import React, { createContext, useContext, useReducer, useEffect, useState } fro
 
 export interface CartItem {
   id: string;
-  type: 'course' | 'company_account';
+  type: 'course' | 'company_account' | 'bundle';
   title: string;
   price: number;
   description: string;
@@ -21,6 +21,7 @@ type CartAction =
   | { type: 'REMOVE_ITEM'; payload: string }
   | { type: 'CLEAR_CART' }
   | { type: 'TOGGLE_CART' }
+  | { type: 'OPEN_CART' }
   | { type: 'CLOSE_CART' }
   | { type: 'LOAD_CART'; payload: CartItem[] };
 
@@ -30,6 +31,7 @@ const CartContext = createContext<{
   removeItem: (id: string) => void;
   clearCart: () => void;
   toggleCart: () => void;
+  openCart: () => void;
   closeCart: () => void;
   getTotalPrice: () => number;
   getItemCount: () => number;
@@ -67,6 +69,12 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         isOpen: !state.isOpen
       };
     
+    case 'OPEN_CART':
+      return {
+        ...state,
+        isOpen: true
+      };
+
     case 'CLOSE_CART':
       return {
         ...state,
@@ -126,6 +134,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     dispatch({ type: 'TOGGLE_CART' });
   };
 
+  const openCart = () => {
+    dispatch({ type: 'OPEN_CART' });
+  };
+
   const closeCart = () => {
     dispatch({ type: 'CLOSE_CART' });
   };
@@ -145,6 +157,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       removeItem,
       clearCart,
       toggleCart,
+      openCart,
       closeCart,
       getTotalPrice,
       getItemCount,

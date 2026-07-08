@@ -94,7 +94,7 @@ const Cart: React.FC = () => {
                             </p>
                             <div className="flex items-center mt-2">
                               <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                                {item.type === 'course' ? 'Kurs' : 'Företagskonto'}
+                                {item.type === 'course' ? 'Kurs' : item.type === 'bundle' ? 'Paket' : 'Företagskonto'}
                               </span>
                             </div>
                           </div>

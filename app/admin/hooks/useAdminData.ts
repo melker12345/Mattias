@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type {
   AdminTab,
   AdminCourse,
+  AdminBundle,
   AdminUser,
   AdminCompany,
   CourseResult,
@@ -11,6 +12,7 @@ import type {
 
 const ENDPOINTS = {
   courses: '/api/admin/courses',
+  bundles: '/api/admin/bundles',
   users: '/api/admin/users',
   companies: '/api/admin/companies',
   courseResults: '/api/admin/course-results',
@@ -20,7 +22,7 @@ type Resource = keyof typeof ENDPOINTS;
 
 const TAB_RESOURCES: Record<AdminTab, Resource[]> = {
   overview: ['courses', 'users', 'companies'],
-  courses: ['courses'],
+  courses: ['courses', 'bundles'],
   users: ['users'],
   companies: ['companies'],
   'course-results': ['courseResults'],
@@ -28,6 +30,7 @@ const TAB_RESOURCES: Record<AdminTab, Resource[]> = {
 
 export function useAdminData(activeTab: AdminTab) {
   const [courses, setCourses] = useState<AdminCourse[]>([]);
+  const [bundles, setBundles] = useState<AdminBundle[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [companies, setCompanies] = useState<AdminCompany[]>([]);
   const [courseResults, setCourseResults] = useState<CourseResult[]>([]);
@@ -39,6 +42,9 @@ export function useAdminData(activeTab: AdminTab) {
     switch (resource) {
       case 'courses':
         setCourses(data as AdminCourse[]);
+        break;
+      case 'bundles':
+        setBundles(data as AdminBundle[]);
         break;
       case 'users':
         setUsers(data as AdminUser[]);
@@ -117,6 +123,7 @@ export function useAdminData(activeTab: AdminTab) {
 
   return {
     courses,
+    bundles,
     users,
     companies,
     courseResults,

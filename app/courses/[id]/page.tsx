@@ -250,7 +250,7 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
                 </div>
 
                 <div className="prose max-w-none mb-8">
-                  <p className="text-gray-700 leading-relaxed">
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-line">
                     {course.description}
                   </p>
                 </div>

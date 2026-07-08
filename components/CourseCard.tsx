@@ -69,7 +69,7 @@ export function CourseCard({ course, onAddToCart }: CourseCardProps) {
         </h3>
         
         {/* Description */}
-        <p className="text-gray-600 text-sm line-clamp-3 font-open-sans leading-relaxed mb-6 flex-1">
+        <p className="text-gray-600 text-sm line-clamp-3 font-open-sans leading-relaxed mb-6 flex-1 whitespace-pre-line">
           {course.description}
         </p>
         

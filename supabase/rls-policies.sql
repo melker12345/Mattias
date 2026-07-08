@@ -330,3 +330,33 @@ ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "audit_logs: admin reads all"
   ON public.audit_logs FOR SELECT
   USING (get_my_role() = 'ADMIN');
+
+-- ============================================================
+-- course_bundles / bundle_courses  (packages)
+-- Same convention as courses: anyone reads published, admin full access.
+-- ============================================================
+ALTER TABLE public.course_bundles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "course_bundles: anyone reads published"
+  ON public.course_bundles FOR SELECT
+  USING (is_published = TRUE OR get_my_role() = 'ADMIN');
+
+CREATE POLICY "course_bundles: admin full access"
+  ON public.course_bundles FOR ALL
+  USING (get_my_role() = 'ADMIN');
+
+ALTER TABLE public.bundle_courses ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "bundle_courses: anyone reads for published bundles"
+  ON public.bundle_courses FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.course_bundles b
+      WHERE b.id = bundle_courses.bundle_id
+        AND (b.is_published = TRUE OR get_my_role() = 'ADMIN')
+    )
+  );
+
+CREATE POLICY "bundle_courses: admin full access"
+  ON public.bundle_courses FOR ALL
+  USING (get_my_role() = 'ADMIN');

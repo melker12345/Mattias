@@ -1,24 +1,32 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { BookOpenIcon, PlusIcon, PencilIcon, TrashIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
-import type { AdminCourse } from '@/lib/types/admin';
+import { BookOpenIcon, PlusIcon, PencilIcon, TrashIcon, DocumentTextIcon, RectangleStackIcon } from '@heroicons/react/24/outline';
+import type { AdminCourse, AdminBundle } from '@/lib/types/admin';
 import { formatDate, formatPrice, getStatusColor } from '@/lib/types/admin';
 
 interface AdminCoursesTabProps {
   courses: AdminCourse[];
+  bundles: AdminBundle[];
   onCreateCourse: () => void;
   onEditCourse: (course: AdminCourse) => void;
   onEditCourseContent: (courseId: string) => void;
   onDeleteCourse: (courseId: string) => void;
+  onCreateBundle: () => void;
+  onEditBundle: (bundle: AdminBundle) => void;
+  onDeleteBundle: (bundleId: string) => void;
 }
 
 export function AdminCoursesTab({
   courses,
+  bundles,
   onCreateCourse,
   onEditCourse,
   onEditCourseContent,
   onDeleteCourse,
+  onCreateBundle,
+  onEditBundle,
+  onDeleteBundle,
 }: AdminCoursesTabProps) {
   return (
     <motion.div
@@ -130,6 +138,62 @@ export function AdminCoursesTab({
         </div>
         </>
       )}
+
+      {/* ============================ Bundles / packages ============================ */}
+      <div className="pt-8 mt-8 border-t border-gray-200">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0 mb-4">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Paket</h2>
+            <p className="text-sm text-gray-500 mt-1">Sälj flera kurser tillsammans till ett paketpris. Vid köp låses alla ingående kurser upp.</p>
+          </div>
+          <button
+            onClick={onCreateBundle}
+            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors inline-flex items-center justify-center text-sm font-medium w-full sm:w-auto"
+          >
+            <PlusIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+            Skapa Paket
+          </button>
+        </div>
+
+        {bundles.length === 0 ? (
+          <div className="text-center py-10 border border-dashed border-gray-200 rounded-lg">
+            <RectangleStackIcon className="mx-auto h-10 w-10 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">Inga paket</h3>
+            <p className="mt-1 text-sm text-gray-500">Skapa ett paket för att sälja flera kurser tillsammans.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {bundles.map((bundle) => (
+              <div key={bundle.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium text-gray-900">{bundle.title}</span>
+                      <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusColor(bundle.isPublished ? 'active' : 'draft')}`}>
+                        {bundle.isPublished ? 'Publicerad' : 'Utkast'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {formatPrice(bundle.price)} · {bundle.courses.length} kurser
+                    </div>
+                    <div className="text-xs text-gray-600 mt-2">
+                      {bundle.courses.map((c) => c.title).join(', ')}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={() => onEditBundle(bundle)} className="text-primary-600 hover:text-primary-900" title="Redigera paket">
+                      <PencilIcon className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => onDeleteBundle(bundle.id)} className="text-red-600 hover:text-red-900" title="Ta bort paket">
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </motion.div>
   );
 }

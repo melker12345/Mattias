@@ -5,6 +5,25 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { fortnox } from '@/lib/fortnox';
 import type { CoursePaymentData } from '@/lib/types/payment';
 
+// Load a bundle and the published courses it unlocks. Returns null if the
+// bundle doesn't exist or isn't published.
+async function resolveBundle(admin: ReturnType<typeof createAdminClient>, bundleId: string) {
+  const { data } = await admin
+    .from('course_bundles')
+    .select('id, title, price, is_published, bundle_courses(courses(id, title, is_published))')
+    .eq('id', bundleId)
+    .single();
+
+  if (!data || !data.is_published) return null;
+
+  const courses = ((data.bundle_courses ?? []) as any[])
+    .map((bc) => bc.courses)
+    .filter((c) => c && c.is_published)
+    .map((c) => ({ id: c.id as string, title: c.title as string }));
+
+  return { id: data.id as string, title: data.title as string, price: data.price as number, courses };
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log('Cart checkout API called');
@@ -26,6 +45,7 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
     const courses = items.filter((item: any) => item.type === 'course');
+    const bundles = items.filter((item: any) => item.type === 'bundle');
     const companyAccounts = items.filter((item: any) => item.type === 'company_account');
     const userName = `${customerData?.firstName ?? ''} ${customerData?.lastName ?? ''}`.trim() || user.name || 'Unknown';
     const userEmail = customerData?.email || user.email;
@@ -48,6 +68,26 @@ export async function POST(request: NextRequest) {
           },
           { onConflict: 'user_id,course_id' }
         );
+      }
+      for (const bundle of bundles) {
+        const resolved = await resolveBundle(admin, bundle.id);
+        if (!resolved) {
+          return NextResponse.json({ error: `Paket ${bundle.title || bundle.id} är inte tillgängligt` }, { status: 400 });
+        }
+        for (const course of resolved.courses) {
+          await admin.from('enrollments').upsert(
+            {
+              user_id: user.id,
+              course_id: course.id,
+              is_paid: true,
+              paid_at: new Date().toISOString(),
+              payment_amount: 0,
+              payment_method: 'payments_disabled_demo',
+              fortnox_invoice_id: null,
+            },
+            { onConflict: 'user_id,course_id' }
+          );
+        }
       }
       if (companyAccounts.length > 0 && customerData?.organizationNumber) {
         const addr = [customerData.address, customerData.postalCode, customerData.city].filter(Boolean).join(', ');
@@ -107,6 +147,29 @@ export async function POST(request: NextRequest) {
           payment_amount: dbCourse.price, fortnox_invoice_id: invoiceNumber },
         { onConflict: 'user_id,course_id' }
       );
+    }
+
+    // Create one invoice per bundle; unlock (enrol in) each of its courses.
+    for (const bundle of bundles) {
+      const resolved = await resolveBundle(admin, bundle.id);
+      if (!resolved) {
+        return NextResponse.json({ error: `Paket ${bundle.title || bundle.id} är inte tillgängligt` }, { status: 400 });
+      }
+
+      const paymentData: CoursePaymentData = {
+        courseId: resolved.id, userId: user.id, amount: resolved.price,
+        currency: 'SEK', courseName: `Paket: ${resolved.title}`, userEmail, userName,
+      };
+      const invoiceNumber = await fortnox.createCourseInvoice(customerNumber, paymentData);
+      invoiceNumbers.push(invoiceNumber);
+
+      for (const course of resolved.courses) {
+        await admin.from('enrollments').upsert(
+          { user_id: user.id, course_id: course.id, is_paid: false,
+            payment_amount: null, fortnox_invoice_id: invoiceNumber },
+          { onConflict: 'user_id,course_id' }
+        );
+      }
     }
 
     // Handle company account purchase
