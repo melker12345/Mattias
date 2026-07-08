@@ -63,7 +63,7 @@ const CompanyAccountPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-mn-very-light-gray">
       {/* Hero Section */}
-      <section className="relative bg-cover bg-center bg-no-repeat text-white overflow-hidden" style={{
+      <section className="relative pt-16 sm:pt-20 bg-cover bg-center bg-no-repeat text-white overflow-hidden" style={{
         background: `
           linear-gradient(135deg, #0c283b 0%, #1a3a4f 25%, #27404f 50%, #20313e 75%, #19222d 100%),
           radial-gradient(circle at 20% 80%, rgba(249, 115, 22, 0.3) 0%, transparent 50%),
