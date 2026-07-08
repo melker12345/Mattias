@@ -43,15 +43,15 @@ function BundlesSection({ bundles }: { bundles: Bundle[] }) {
 
   return (
     <div className="mn-container pt-12">
-      <div className="mb-6">
+      <div className="mb-8 text-center">
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 font-montserrat">Paket</h2>
-        <p className="text-gray-600 mt-1">Köp flera kurser tillsammans till ett rabatterat pris — alla kurser låses upp direkt.</p>
+        <p className="text-gray-600 mt-1 max-w-2xl mx-auto">Köp flera kurser tillsammans till ett rabatterat pris — alla kurser låses upp direkt.</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="flex flex-wrap justify-center gap-8">
         {bundles.map((bundle) => {
           const saving = bundle.coursesTotal - bundle.price;
           return (
-            <div key={bundle.id} className="bg-white rounded-2xl shadow-lg border border-gray-100 flex flex-col overflow-hidden">
+            <div key={bundle.id} className="w-full sm:w-[22rem] bg-white rounded-2xl shadow-lg border border-gray-100 flex flex-col overflow-hidden">
               <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-6">
                 <span className="inline-block text-xs font-bold uppercase tracking-wide bg-white/20 px-3 py-1 rounded-full mb-3">Paket</span>
                 <h3 className="text-xl font-bold font-montserrat leading-tight">{bundle.title}</h3>
