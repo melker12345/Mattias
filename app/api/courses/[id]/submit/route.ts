@@ -17,15 +17,22 @@ export async function POST(
     const admin = createAdminClient();
     const userId = authResult.id;
 
+    // NOTE: enrolled_at lives on enrollments, not courses — selecting it inside
+    // the nested courses(...) made PostgREST error out and return null, which
+    // this route then reported as "not enrolled" (403) for everyone.
     const { data: enrollment } = await admin
-      .from('enrollments').select('*, course:courses(id, title, passing_score, enrolled_at)')
+      .from('enrollments').select('*, course:courses(id, title, passing_score)')
       .eq('user_id', userId).eq('course_id', courseId).maybeSingle();
 
     if (!enrollment) return NextResponse.json({ message: 'Du är inte registrerad för denna kurs' }, { status: 403 });
     if (!enrollment.passed) return NextResponse.json({ message: 'Du måste klara kursen innan du kan skicka in den för granskning' }, { status: 400 });
 
-    const { data: existingSubmission } = await admin.from('apv_submissions').select('id').eq('user_id', userId).eq('course_id', courseId).maybeSingle();
-    if (existingSubmission) return NextResponse.json({ message: 'Du har redan skickat in denna kurs för granskning' }, { status: 400 });
+    // A previously-reviewed submission that has already been registered with
+    // ID06 is final and must not be silently overwritten.
+    const { data: existingSubmission } = await admin.from('apv_submissions').select('id, status').eq('user_id', userId).eq('course_id', courseId).maybeSingle();
+    if (existingSubmission?.status === 'ID06_REGISTERED') {
+      return NextResponse.json({ message: 'Denna kurs är redan registrerad hos ID06 och kan inte skickas in igen' }, { status: 400 });
+    }
 
     const { data: lessons } = await admin.from('lessons').select('id, order').eq('course_id', courseId).order('order');
     const lessonIds = (lessons ?? []).map(l => l.id);
@@ -57,7 +64,10 @@ export async function POST(
       ? Math.round((new Date(enrollment.completed_at).getTime() - new Date(enrollment.enrolled_at).getTime()) / 60000)
       : null;
 
-    const { data: submission } = await admin.from('apv_submissions').insert({
+    // Upsert on (user_id, course_id): re-submitting after a retake replaces the
+    // previous attempt with the newer result and puts it back in the review
+    // queue (status PENDING) so an admin sees the improved score.
+    const { data: submission } = await admin.from('apv_submissions').upsert({
       user_id: userId, course_id: courseId,
       full_name: authResult.name ?? authResult.email,
       course_title: courseData.title,
@@ -69,9 +79,18 @@ export async function POST(
       time_taken: timeTaken,
       answers_data: JSON.stringify(answersData),
       status: 'PENDING',
-    }).select('id').single();
+      submitted_at: new Date().toISOString(),
+      reviewed_at: null,
+      reviewed_by: null,
+      review_notes: null,
+    }, { onConflict: 'user_id,course_id' }).select('id').single();
 
-    return NextResponse.json({ message: 'Kursen har skickats in för granskning', submissionId: submission?.id });
+    const resubmitted = !!existingSubmission;
+    return NextResponse.json({
+      message: resubmitted ? 'Ditt uppdaterade resultat har skickats in för granskning' : 'Kursen har skickats in för granskning',
+      submissionId: submission?.id,
+      resubmitted,
+    });
 
   } catch (error) {
     console.error('Error submitting course for review:', error);

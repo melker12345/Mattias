@@ -260,8 +260,9 @@ export function useCourseLearn(courseId: string, user: User | null, authLoading:
       const response = await fetch(`/api/courses/${courseId}/submit`, { method: 'POST' });
 
       if (response.ok) {
+        const data = await response.json().catch(() => ({}));
         setHasAlreadySubmitted(true);
-        alert('Kursen har skickats in för granskning!');
+        alert(data.message || 'Kursen har skickats in för granskning!');
       } else {
         const error = await response.json();
         alert(error.message || 'Ett fel uppstod vid inskickning');

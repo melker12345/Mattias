@@ -153,35 +153,35 @@ export default function CourseSummary({
           <div className="px-6 py-6">
             {passed ? (
               <div className="space-y-4">
-                {hasAlreadySubmitted ? (
+                {hasAlreadySubmitted && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-center">
                       <DocumentTextIcon className="w-5 h-5 text-blue-600 mr-2" />
                       <p className="text-blue-800 font-medium">
-                        Du har redan skickat in denna kurs för granskning.
+                        Du har redan skickat in denna kurs för granskning. Gjorde du om provet kan du skicka in ditt uppdaterade resultat.
                       </p>
                     </div>
                   </div>
-                ) : (
-                  <button
-                    onClick={onSubmitForReview}
-                    disabled={isSubmitting}
-                    className="w-full bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center font-medium"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                        Skickar in för granskning...
-                      </>
-                    ) : (
-                      <>
-                        <DocumentTextIcon className="w-5 h-5 mr-2" />
-                        Skicka in för granskning
-                      </>
-                    )}
-                  </button>
                 )}
-                
+
+                <button
+                  onClick={onSubmitForReview}
+                  disabled={isSubmitting}
+                  className="w-full bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center font-medium"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      Skickar in för granskning...
+                    </>
+                  ) : (
+                    <>
+                      <DocumentTextIcon className="w-5 h-5 mr-2" />
+                      {hasAlreadySubmitted ? 'Skicka in uppdaterat resultat' : 'Skicka in för granskning'}
+                    </>
+                  )}
+                </button>
+
                 <p className="text-sm text-gray-600 text-center">
                   Genom att skicka in för granskning kommer dina svar och resultat att granskas av en administratör.
                 </p>

@@ -38,7 +38,8 @@ export default function UserDashboard() {
 
   const fetchUserCourses = async () => {
     try {
-      const response = await fetch('/api/user/courses');
+      // Always read live so admin edits (new lessons, renamed courses) show up.
+      const response = await fetch('/api/user/courses', { cache: 'no-store' });
       
       if (response.ok) {
         const courses = await response.json();
