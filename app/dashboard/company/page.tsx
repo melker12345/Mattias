@@ -21,6 +21,7 @@ export default function CompanyDashboard() {
     removingEmployee,
     companyId,
     refreshEmployees,
+    refreshEmployeeDetails,
     toggleEmployeeDetails,
     removeEmployee,
   } = useCompanyEmployees(user);
@@ -163,9 +164,14 @@ export default function CompanyDashboard() {
           employeeDetails={employeeDetails}
           loadingDetails={loadingDetails}
           removingEmployee={removingEmployee}
+          companyId={companyId ?? null}
           onToggleDetails={toggleEmployeeDetails}
           onRemoveEmployee={removeEmployee}
           onPurchaseForEmployee={openCoursePurchaseModal}
+          onEmployeeUpdated={() => {
+            refreshEmployees();
+            if (expandedEmployee) refreshEmployeeDetails(expandedEmployee);
+          }}
         />
       </div>
 

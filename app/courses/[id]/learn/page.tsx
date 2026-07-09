@@ -52,6 +52,20 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
     );
   }
 
+  // Enrolled but hasn't filled in the identity required before a course starts.
+  if (learn.access === 'needs_identity') {
+    return (
+      <LearnAccessNotice
+        title="Komplettera dina uppgifter först"
+        message="Innan du börjar kursen behöver du fylla i ditt namn och personnummer på din profil. Certifikatet kopplas till dessa uppgifter."
+        primaryLabel="Till min profil"
+        onPrimary={() => router.push('/profile')}
+        secondaryLabel="Tillbaka"
+        onSecondary={() => router.push('/dashboard')}
+      />
+    );
+  }
+
   if (learn.access === 'notfound' || !learn.course) {
     return (
       <LearnAccessNotice

@@ -19,16 +19,55 @@ interface EmployeeDetailsPanelProps {
   employee: Employee;
   details: EmployeeDetails | undefined;
   isLoading: boolean;
+  companyId: string | null;
   onPurchaseForEmployee: (employeeId: string, employeeName: string) => void;
+  onUpdated: () => void;
 }
 
 export function EmployeeDetailsPanel({
   employee,
   details,
   isLoading,
+  companyId,
   onPurchaseForEmployee,
+  onUpdated,
 }: EmployeeDetailsPanelProps) {
   const [expandedAnswers, setExpandedAnswers] = useState<Set<string>>(new Set());
+  const [editingIdentity, setEditingIdentity] = useState(false);
+  const [idName, setIdName] = useState('');
+  const [idPersonnummer, setIdPersonnummer] = useState('');
+  const [idPhone, setIdPhone] = useState('');
+  const [savingId, setSavingId] = useState(false);
+  const [idMsg, setIdMsg] = useState<string | null>(null);
+
+  const startEditIdentity = () => {
+    setIdName(details?.name ?? '');
+    setIdPhone(details?.phone ?? '');
+    setIdPersonnummer('');
+    setIdMsg(null);
+    setEditingIdentity(true);
+  };
+
+  const saveIdentity = async () => {
+    if (!companyId) return;
+    setSavingId(true);
+    setIdMsg(null);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/employees/${employee.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: idName, personnummer: idPersonnummer || undefined, phone: idPhone }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setIdMsg(data.message || 'Kunde inte spara'); return; }
+      setEditingIdentity(false);
+      onUpdated();
+    } catch {
+      setIdMsg('Kunde inte spara');
+    } finally {
+      setSavingId(false);
+    }
+  };
 
   const toggleAnswers = (enrollmentId: string) => {
     setExpandedAnswers((prev) => {
@@ -98,6 +137,59 @@ export function EmployeeDetailsPanel({
             Certifikat: {details.enrollments.reduce((sum, e) => sum + e.certificates.length, 0)}
           </p>
         </div>
+      </div>
+
+      {/* Identity — the company can fill these in on the employee's behalf. */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="font-medium text-gray-900">Personuppgifter</h4>
+          {!editingIdentity && (
+            <button onClick={startEditIdentity} className="text-sm text-primary-600 hover:text-primary-700 font-medium">
+              Redigera uppgifter
+            </button>
+          )}
+        </div>
+
+        {!editingIdentity ? (
+          <div className="text-sm text-gray-600 space-y-1">
+            <p>Namn: {details.name || '—'}</p>
+            <p>Personnummer: {details.hasPersonnummer ? 'Ifyllt' : 'Saknas'}</p>
+            <p>Telefon: {details.phone || '—'}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              Genom att fylla i namn och personnummer intygar företaget den anställdes identitet.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input
+                value={idName}
+                onChange={(e) => setIdName(e.target.value)}
+                placeholder="Namn"
+                className="px-3 py-2 text-sm border border-gray-300 rounded"
+              />
+              <input
+                value={idPersonnummer}
+                onChange={(e) => setIdPersonnummer(e.target.value)}
+                placeholder={details.hasPersonnummer ? 'Nytt personnummer (ersätter)' : 'ÅÅÅÅMMDD-XXXX'}
+                className="px-3 py-2 text-sm border border-gray-300 rounded"
+              />
+              <input
+                value={idPhone}
+                onChange={(e) => setIdPhone(e.target.value)}
+                placeholder="Telefon"
+                className="px-3 py-2 text-sm border border-gray-300 rounded"
+              />
+            </div>
+            {idMsg && <p className="text-sm text-red-600">{idMsg}</p>}
+            <div className="flex gap-2">
+              <button onClick={saveIdentity} disabled={savingId} className="btn-primary text-sm disabled:opacity-50">
+                {savingId ? 'Sparar…' : 'Spara'}
+              </button>
+              <button onClick={() => setEditingIdentity(false)} className="btn-secondary text-sm">Avbryt</button>
+            </div>
+          </div>
+        )}
       </div>
 
       {!details.identityVerified && details.invitationLink && (

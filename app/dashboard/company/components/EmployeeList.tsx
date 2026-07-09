@@ -11,9 +11,11 @@ interface EmployeeListProps {
   employeeDetails: Record<string, EmployeeDetails>;
   loadingDetails: Record<string, boolean>;
   removingEmployee: string | null;
+  companyId: string | null;
   onToggleDetails: (employeeId: string) => void;
   onRemoveEmployee: (employeeId: string) => void;
   onPurchaseForEmployee: (employeeId: string, employeeName: string) => void;
+  onEmployeeUpdated: () => void;
 }
 
 export function EmployeeList({
@@ -22,9 +24,11 @@ export function EmployeeList({
   employeeDetails,
   loadingDetails,
   removingEmployee,
+  companyId,
   onToggleDetails,
   onRemoveEmployee,
   onPurchaseForEmployee,
+  onEmployeeUpdated,
 }: EmployeeListProps) {
   return (
     <div className="bg-white rounded-lg shadow">
@@ -73,9 +77,13 @@ export function EmployeeList({
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                           Identitetsverifierad
                         </span>
-                      ) : (
+                      ) : employee.status === 'NEEDS_INFO' ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                          Väntar på inloggning
+                          Uppgifter saknas
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                          Ej verifierad
                         </span>
                       )}
                       {employee.id06Eligible && (
@@ -120,7 +128,9 @@ export function EmployeeList({
                         employee={employee}
                         details={employeeDetails[employee.id]}
                         isLoading={!!loadingDetails[employee.id]}
+                        companyId={companyId}
                         onPurchaseForEmployee={onPurchaseForEmployee}
+                        onUpdated={onEmployeeUpdated}
                       />
                     </td>
                   </motion.tr>

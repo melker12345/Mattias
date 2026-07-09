@@ -8,12 +8,16 @@ export interface Employee {
   completedCourses: number;
   certificates: number;
   lastActivity: string;
+  status?: 'VERIFIED' | 'UNVERIFIED' | 'NEEDS_INFO';
+  hasPersonnummer?: boolean;
 }
 
 export interface EmployeeDetails {
   id: string;
   name: string;
   email: string;
+  phone?: string | null;
+  hasPersonnummer?: boolean;
   identityVerified: boolean;
   identityVerifiedAt: string | null;
   id06Eligible: boolean;

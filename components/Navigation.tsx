@@ -140,7 +140,7 @@ export function Navigation() {
                         <Menu.Item>
                           {({ active }) => (
                             <Link
-                              href="/dashboard"
+                              href={role === 'COMPANY_ADMIN' ? '/dashboard/company' : '/dashboard'}
                               className={`${
                                 active ? 'bg-white/10 text-white' : 'text-white'
                               } block px-4 py-3 text-sm font-open-sans transition-colors duration-200`}
@@ -161,20 +161,6 @@ export function Navigation() {
                             </Link>
                           )}
                         </Menu.Item>
-                        {role === 'COMPANY_ADMIN' && (
-                          <Menu.Item>
-                            {({ active }) => (
-                              <Link
-                                href="/dashboard/company"
-                                className={`${
-                                  active ? 'bg-white/10 text-white' : 'text-white'
-                                } block px-4 py-3 text-sm font-open-sans transition-colors duration-200`}
-                              >
-                                Företagsdashboard
-                              </Link>
-                            )}
-                          </Menu.Item>
-                        )}
                         {role === 'ADMIN' && (
                           <Menu.Item>
                             {({ active }) => (
@@ -268,20 +254,11 @@ export function Navigation() {
                 <div className="pt-4 space-y-3 border-t border-white/20">
                   <Disclosure.Button
                     as={Link}
-                    href="/dashboard"
+                    href={role === 'COMPANY_ADMIN' ? '/dashboard/company' : '/dashboard'}
                     className="block w-full px-4 py-3 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans text-center bg-white/20 text-white hover:bg-white hover:text-primary-700 border border-white/30"
                   >
                     Dashboard
                   </Disclosure.Button>
-                  {role === 'COMPANY_ADMIN' && (
-                    <Disclosure.Button
-                      as={Link}
-                      href="/dashboard/company"
-                      className="block w-full px-4 py-3 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans text-center bg-white/20 text-white hover:bg-white hover:text-primary-700 border border-white/30"
-                    >
-                      Företagsdashboard
-                    </Disclosure.Button>
-                  )}
                   {role === 'ADMIN' && (
                     <Disclosure.Button
                       as={Link}

@@ -159,6 +159,7 @@ export function useCompanyEmployees(user: User | null) {
     removingEmployee,
     companyId,
     refreshEmployees: fetchEmployees,
+    refreshEmployeeDetails: fetchEmployeeDetails,
     toggleEmployeeDetails,
     removeEmployee,
   };

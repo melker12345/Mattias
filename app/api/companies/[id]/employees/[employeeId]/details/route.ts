@@ -21,7 +21,7 @@ export async function GET(
 
     // Scope: the employee must belong to this company.
     const { data: employee } = await admin.from('users')
-      .select('id, name, email, identity_verified, created_at, updated_at')
+      .select('id, name, email, phone, personnummer_encrypted, identity_verified, created_at, updated_at')
       .eq('id', employeeId).eq('company_id', companyId).eq('role', 'EMPLOYEE').maybeSingle()
     if (!employee) return NextResponse.json({ message: 'Anställd hittades inte' }, { status: 404 })
 
@@ -154,7 +154,18 @@ export async function GET(
       }
     })
 
-    return NextResponse.json({ employee: { ...employee, identityVerified: employee.identity_verified, enrollments: enrichedEnrollments, certificates: certificates ?? [] } })
+    // Never expose the encrypted personnummer ciphertext to the client — only
+    // whether one is on file.
+    const { personnummer_encrypted, ...employeeSafe } = employee
+    return NextResponse.json({
+      employee: {
+        ...employeeSafe,
+        identityVerified: employee.identity_verified,
+        hasPersonnummer: !!personnummer_encrypted,
+        enrollments: enrichedEnrollments,
+        certificates: certificates ?? [],
+      },
+    })
   } catch (error) {
     console.error('Error fetching employee details:', error)
     return NextResponse.json(

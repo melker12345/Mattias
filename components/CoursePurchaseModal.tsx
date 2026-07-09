@@ -33,17 +33,39 @@ export default function CoursePurchaseModal({
 }: CoursePurchaseModalProps) {
   const [courses, setCourses] = useState<Course[]>([])
   const [selectedCourses, setSelectedCourses] = useState<string[]>([])
-  const [purchaseType, setPurchaseType] = useState<'individual' | 'bulk'>('individual')
+  // 'individual' = the one preselected employee, 'select' = pick employees,
+  // 'bulk' = everyone in the company.
+  const [purchaseType, setPurchaseType] = useState<'individual' | 'select' | 'bulk'>(employeeId ? 'individual' : 'select')
+  const [employees, setEmployees] = useState<{ id: string; name: string; email: string }[]>([])
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  // Fetch available courses
+  // Fetch available courses + employees
   useEffect(() => {
     if (isOpen) {
       fetchCourses()
+      fetchEmployees()
+      setPurchaseType(employeeId ? 'individual' : 'select')
+      setSelectedEmployees([])
     }
-  }, [isOpen])
+  }, [isOpen, employeeId])
+
+  const fetchEmployees = async () => {
+    if (!companyId) return
+    try {
+      const response = await fetch(`/api/companies/${companyId}/employees`, { cache: 'no-store' })
+      const data = await response.json()
+      if (response.ok) setEmployees(data.employees ?? [])
+    } catch {
+      /* non-fatal — the "all employees" option still works */
+    }
+  }
+
+  const toggleEmployee = (id: string) => {
+    setSelectedEmployees(prev => (prev.includes(id) ? prev.filter(e => e !== id) : [...prev, id]))
+  }
 
   const fetchCourses = async () => {
     try {
@@ -74,6 +96,10 @@ export default function CoursePurchaseModal({
       setError('Välj minst en kurs att köpa')
       return
     }
+    if (purchaseType === 'select' && selectedEmployees.length === 0) {
+      setError('Välj minst en anställd')
+      return
+    }
 
     setIsLoading(true)
     setError('')
@@ -88,8 +114,10 @@ export default function CoursePurchaseModal({
         body: JSON.stringify({
           companyId,
           employeeId: purchaseType === 'individual' ? employeeId : undefined,
+          employeeIds: purchaseType === 'select' ? selectedEmployees : undefined,
           courseIds: selectedCourses,
-          purchaseType
+          // The backend treats anything non-bulk as an assignment to specific users.
+          purchaseType: purchaseType === 'bulk' ? 'bulk' : 'individual',
         }),
       })
 
@@ -98,9 +126,12 @@ export default function CoursePurchaseModal({
       if (!response.ok) {
         setError(data.message || 'Ett fel uppstod vid köp av kurser')
       } else {
-        setSuccess(purchaseType === 'individual' 
-          ? `Kurser köpta för ${employeeName}!` 
-          : 'Kurser köpta för alla anställda!'
+        setSuccess(
+          purchaseType === 'bulk'
+            ? 'Kurser köpta för alla anställda!'
+            : purchaseType === 'individual'
+              ? `Kurser köpta för ${employeeName}!`
+              : `Kurser köpta för ${selectedEmployees.length} anställda!`
         )
         setSelectedCourses([])
         onPurchaseSuccess()
@@ -196,10 +227,11 @@ export default function CoursePurchaseModal({
                     </h3>
                     <div className="mt-2">
                       <p className="text-sm text-mn-dark-blue-green font-open-sans">
-                        {purchaseType === 'individual' 
+                        {purchaseType === 'individual'
                           ? `Välj kurser för ${employeeName}`
-                          : 'Välj kurser för alla anställda'
-                        }
+                          : purchaseType === 'bulk'
+                            ? 'Välj kurser för alla anställda'
+                            : 'Välj anställda och kurser'}
                       </p>
                     </div>
                   </div>
@@ -207,25 +239,37 @@ export default function CoursePurchaseModal({
 
                 {/* Purchase Type Selection */}
                 <div className="mt-6">
-                  <div className="flex space-x-4">
+                  <div className="flex flex-wrap gap-4">
+                    {employeeId ? (
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          checked={purchaseType === 'individual'}
+                          onChange={() => setPurchaseType('individual')}
+                          className="h-4 w-4 text-mn-dark-blue-green focus:ring-mn-dark-blue-green border-mn-light-gray-blue"
+                        />
+                        <span className="ml-2 text-sm text-mn-dark-blue-green font-open-sans">
+                          Köp för {employeeName}
+                        </span>
+                      </label>
+                    ) : (
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          checked={purchaseType === 'select'}
+                          onChange={() => setPurchaseType('select')}
+                          className="h-4 w-4 text-mn-dark-blue-green focus:ring-mn-dark-blue-green border-mn-light-gray-blue"
+                        />
+                        <span className="ml-2 text-sm text-mn-dark-blue-green font-open-sans">
+                          Välj anställda
+                        </span>
+                      </label>
+                    )}
                     <label className="flex items-center">
                       <input
                         type="radio"
-                        value="individual"
-                        checked={purchaseType === 'individual'}
-                        onChange={(e) => setPurchaseType(e.target.value as 'individual' | 'bulk')}
-                        className="h-4 w-4 text-mn-dark-blue-green focus:ring-mn-dark-blue-green border-mn-light-gray-blue"
-                      />
-                      <span className="ml-2 text-sm text-mn-dark-blue-green font-open-sans">
-                        Individuellt köp {employeeName && `för ${employeeName}`}
-                      </span>
-                    </label>
-                    <label className="flex items-center">
-                      <input
-                        type="radio"
-                        value="bulk"
                         checked={purchaseType === 'bulk'}
-                        onChange={(e) => setPurchaseType(e.target.value as 'individual' | 'bulk')}
+                        onChange={() => setPurchaseType('bulk')}
                         className="h-4 w-4 text-mn-dark-blue-green focus:ring-mn-dark-blue-green border-mn-light-gray-blue"
                       />
                       <span className="ml-2 text-sm text-mn-dark-blue-green font-open-sans">
@@ -234,6 +278,37 @@ export default function CoursePurchaseModal({
                     </label>
                   </div>
                 </div>
+
+                {/* Employee picker (specific-employees mode) */}
+                {purchaseType === 'select' && (
+                  <div className="mt-4">
+                    <h4 className="text-md font-medium text-mn-dark-blue-green mb-2 font-montserrat">Välj anställda</h4>
+                    {employees.length === 0 ? (
+                      <p className="text-sm text-gray-500">Inga anställda att välja.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                        {employees.map((emp) => (
+                          <label
+                            key={emp.id}
+                            className={`flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer ${
+                              selectedEmployees.includes(emp.id)
+                                ? 'border-mn-dark-blue-green bg-mn-very-light-gray'
+                                : 'border-mn-light-gray-blue'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedEmployees.includes(emp.id)}
+                              onChange={() => toggleEmployee(emp.id)}
+                              className="h-4 w-4 text-mn-dark-blue-green"
+                            />
+                            <span className="text-sm text-mn-dark-blue-green truncate">{emp.name || emp.email}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Course Selection */}
                 <div className="mt-6">

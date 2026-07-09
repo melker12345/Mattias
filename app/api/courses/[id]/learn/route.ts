@@ -42,6 +42,19 @@ export async function GET(
       );
     }
 
+    // Identity gate: a learner must have their name + personnummer on file
+    // before starting a course, so the resulting certificate is bound to a
+    // fixed identity. Admins previewing are exempt. We return without any
+    // course content so paid material isn't sent before this is satisfied.
+    if (enrollment) {
+      const { data: profile } = await admin
+        .from('users').select('name, personnummer_encrypted').eq('id', user.id).maybeSingle();
+      const hasIdentity = !!(profile?.name && profile.name.trim() && profile.personnummer_encrypted);
+      if (!hasIdentity) {
+        return NextResponse.json({ needsIdentity: true }, { status: 200 });
+      }
+    }
+
     const { data: lessons } = await admin
       .from('lessons')
       .select('*, questions(*)')

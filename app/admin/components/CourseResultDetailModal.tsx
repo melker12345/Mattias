@@ -52,6 +52,30 @@ export function CourseResultDetailModal({ result, onClose }: CourseResultDetailM
   const [detail, setDetail] = useState<CourseResultDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [issuing, setIssuing] = useState(false);
+  const [issueMsg, setIssueMsg] = useState<string | null>(null);
+
+  const issueCertificate = async () => {
+    if (!result) return;
+    setIssuing(true);
+    setIssueMsg(null);
+    try {
+      const res = await fetch(`/api/admin/course-results/${result.enrollmentId}/certificate`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        setIssueMsg(data.message || 'Kunde inte utfärda certifikat');
+        return;
+      }
+      // Refresh the detail so the certificate now shows as issued.
+      const refreshed = await fetch(`/api/admin/course-results/${result.enrollmentId}`);
+      if (refreshed.ok) setDetail(await refreshed.json());
+      setIssueMsg(data.message || 'Certifikat utfärdat');
+    } catch {
+      setIssueMsg('Kunde inte utfärda certifikat');
+    } finally {
+      setIssuing(false);
+    }
+  };
 
   useEffect(() => {
     if (!result) {
@@ -146,6 +170,39 @@ export function CourseResultDetailModal({ result, onClose }: CourseResultDetailM
                         <div className="text-sm font-semibold text-gray-900">{detail.course.passingScore}%</div>
                       </div>
                     )}
+                  </div>
+
+                  {/* Certificate — admin-granted */}
+                  <div className="rounded-lg border border-gray-200 p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900">Certifikat</h4>
+                        {detail.certificate ? (
+                          <p className="text-sm text-green-700 mt-1">
+                            Utfärdat · {detail.certificate.certificateNumber}
+                          </p>
+                        ) : detail.status === 'passed' ? (
+                          <p className="text-sm text-gray-600 mt-1">
+                            {detail.identityComplete
+                              ? 'Godkänd — inget certifikat utfärdat ännu.'
+                              : 'Godkänd, men deltagaren saknar namn/personnummer. Fyll i uppgifterna innan certifikat kan utfärdas.'}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-gray-600 mt-1">Deltagaren har inte klarat kursen ännu.</p>
+                        )}
+                        {issueMsg && <p className="text-sm text-gray-700 mt-1">{issueMsg}</p>}
+                      </div>
+                      {!detail.certificate && detail.status === 'passed' && (
+                        <button
+                          onClick={issueCertificate}
+                          disabled={issuing || !detail.identityComplete}
+                          className="shrink-0 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
+                          title={!detail.identityComplete ? 'Deltagaren saknar namn/personnummer' : undefined}
+                        >
+                          {issuing ? 'Utfärdar…' : 'Utfärda certifikat'}
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Lesson progression */}

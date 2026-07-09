@@ -56,6 +56,8 @@ export interface CourseResultDetail {
   hasTest?: boolean;
   testScore?: CourseResultQuestionSetScore;
   learningScore?: CourseResultQuestionSetScore;
+  certificate?: { id: string; certificateNumber: string; issuedAt: string } | null;
+  identityComplete?: boolean;
 }
 
 export interface AdminCourse {

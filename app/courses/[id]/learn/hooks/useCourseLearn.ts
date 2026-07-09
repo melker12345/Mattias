@@ -27,7 +27,7 @@ const TEST_INTRO_TYPE = 'test_intro';
 //  - 'forbidden'       signed in but not enrolled — show the paywall
 //  - 'notfound'        course does not exist
 //  - 'error'           unexpected failure
-export type LearnAccess = 'loading' | 'ok' | 'unauthenticated' | 'forbidden' | 'notfound' | 'error';
+export type LearnAccess = 'loading' | 'ok' | 'unauthenticated' | 'forbidden' | 'needs_identity' | 'notfound' | 'error';
 
 export function useCourseLearn(courseId: string, user: User | null, authLoading: boolean) {
   const router = useRouter();
@@ -72,6 +72,9 @@ export function useCourseLearn(courseId: string, user: User | null, authLoading:
       if (!response.ok) throw new Error('Failed to load course');
 
       const data = await response.json();
+
+      // Learner hasn't filled in the identity required before starting a course.
+      if (data.needsIdentity) { setAccess('needs_identity'); return; }
 
       // Split the lessons into content (+ divider) and the graded test. The
       // test = question lessons ordered after the 'test_intro' divider.

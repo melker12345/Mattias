@@ -97,6 +97,18 @@ export async function GET(
     const testScore = scoreFor((a) => a.isTest);
     const learningScore = scoreFor((a) => !a.isTest);
 
+    // Certificate status + whether the learner's identity is on file (required
+    // before a certificate can be issued).
+    const [{ data: certificate }, { data: learner }] = await Promise.all([
+      userId && courseId
+        ? admin.from('certificates').select('id, certificate_number, issued_at').eq('user_id', userId).eq('course_id', courseId).maybeSingle()
+        : Promise.resolve({ data: null }),
+      userId
+        ? admin.from('users').select('name, personnummer_encrypted').eq('id', userId).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    const identityComplete = !!(learner?.name && learner.name.trim() && learner?.personnummer_encrypted);
+
     const lessonProgress = (lessons ?? []).map((l) => {
       const p = (progress ?? []).find((r) => r.lesson_id === l.id);
       return {
@@ -137,6 +149,10 @@ export async function GET(
       hasTest: partition.hasTest,
       testScore,
       learningScore,
+      certificate: certificate
+        ? { id: certificate.id, certificateNumber: certificate.certificate_number, issuedAt: certificate.issued_at }
+        : null,
+      identityComplete,
     });
   } catch (error) {
     console.error('Error fetching course result detail:', error);
