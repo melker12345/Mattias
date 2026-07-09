@@ -10,11 +10,12 @@ import { LessonContent } from './components/LessonContent';
 import { LessonNavigation } from './components/LessonNavigation';
 
 export default function CourseLearningPage({ params }: { params: { id: string } }) {
-  const { user } = useSupabaseAuth();
+  const { user, loading: authLoading } = useSupabaseAuth();
   const router = useRouter();
-  const learn = useCourseLearn(params.id, user);
+  const learn = useCourseLearn(params.id, user, authLoading);
 
-  if (learn.loading) {
+  // Still resolving auth or fetching the course.
+  if (authLoading || learn.access === 'loading' || (learn.access === 'ok' && learn.loading)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
@@ -22,19 +23,54 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
     );
   }
 
-  if (!learn.course) {
+  // Not signed in — send them to sign in and back here afterwards.
+  if (learn.access === 'unauthenticated') {
+    const callbackUrl = encodeURIComponent(`/courses/${params.id}/learn`);
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Kurs hittades inte</h1>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            Tillbaka till dashboard
-          </button>
-        </div>
-      </div>
+      <LearnAccessNotice
+        title="Logga in för att fortsätta"
+        message="Du behöver vara inloggad för att gå kursen. Logga in så tar vi dig tillbaka hit."
+        primaryLabel="Logga in"
+        onPrimary={() => router.push(`/auth/signin?callbackUrl=${callbackUrl}`)}
+      />
+    );
+  }
+
+  // Signed in but not enrolled — professional paywall, not a dead spinner.
+  if (learn.access === 'forbidden') {
+    return (
+      <LearnAccessNotice
+        title="Du har inte tillgång till den här kursen"
+        message="Den här kursen ligger bakom en betalvägg. Registrera dig för kursen för att få tillgång till allt innehåll."
+        primaryLabel="Till kurssidan"
+        onPrimary={() => router.push(`/courses/${params.id}`)}
+        secondaryLabel="Mina kurser"
+        onSecondary={() => router.push('/dashboard')}
+      />
+    );
+  }
+
+  if (learn.access === 'notfound' || !learn.course) {
+    return (
+      <LearnAccessNotice
+        title="Kurs hittades inte"
+        message="Kursen du letar efter finns inte eller har tagits bort."
+        primaryLabel="Tillbaka till dashboard"
+        onPrimary={() => router.push('/dashboard')}
+      />
+    );
+  }
+
+  if (learn.access === 'error') {
+    return (
+      <LearnAccessNotice
+        title="Något gick fel"
+        message="Vi kunde inte ladda kursen just nu. Försök igen om en liten stund."
+        primaryLabel="Försök igen"
+        onPrimary={() => window.location.reload()}
+        secondaryLabel="Till dashboard"
+        onSecondary={() => router.push('/dashboard')}
+      />
     );
   }
 
@@ -148,6 +184,47 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
               )}
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LearnAccessNotice({
+  title,
+  message,
+  primaryLabel,
+  onPrimary,
+  secondaryLabel,
+  onSecondary,
+}: {
+  title: string;
+  message: string;
+  primaryLabel: string;
+  onPrimary: () => void;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
+}) {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="bg-white rounded-lg shadow-sm p-8 max-w-md w-full text-center">
+        <h1 className="text-2xl font-bold text-gray-900 mb-3">{title}</h1>
+        <p className="text-gray-600 mb-6">{message}</p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <button
+            onClick={onPrimary}
+            className="bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors font-medium"
+          >
+            {primaryLabel}
+          </button>
+          {secondaryLabel && onSecondary && (
+            <button
+              onClick={onSecondary}
+              className="bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+            >
+              {secondaryLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>

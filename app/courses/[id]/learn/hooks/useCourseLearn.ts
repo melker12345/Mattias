@@ -17,13 +17,24 @@ import type {
   LearnLesson,
 } from '@/lib/types/course-learn';
 
-export function useCourseLearn(courseId: string, user: User | null) {
+// Access state for the course player. Drives which screen the page renders
+// instead of an infinite spinner:
+//  - 'loading'         auth or data still resolving
+//  - 'ok'              enrolled (or admin preview) — show the course
+//  - 'unauthenticated' no session — prompt sign in
+//  - 'forbidden'       signed in but not enrolled — show the paywall
+//  - 'notfound'        course does not exist
+//  - 'error'           unexpected failure
+export type LearnAccess = 'loading' | 'ok' | 'unauthenticated' | 'forbidden' | 'notfound' | 'error';
+
+export function useCourseLearn(courseId: string, user: User | null, authLoading: boolean) {
   const router = useRouter();
   const [course, setCourse] = useState<LearnCourse | null>(null);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [progress, setProgress] = useState<LessonProgress[]>([]);
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [access, setAccess] = useState<LearnAccess>('loading');
   const [savingProgress, setSavingProgress] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
@@ -43,34 +54,42 @@ export function useCourseLearn(courseId: string, user: User | null) {
       setLoading(true);
       completedAtLoadRef.current = null;
 
-      const [courseResponse, progressResponse] = await Promise.all([
-        fetch(`/api/courses/${courseId}`),
-        fetch(`/api/courses/${courseId}/progress`),
-      ]);
-      if (!courseResponse.ok) throw new Error('Course not found');
-      const courseData = await courseResponse.json();
-      setCourse(courseData);
+      // Single gated round-trip: course content + progress + answers.
+      const response = await fetch(`/api/courses/${courseId}/learn`);
 
-      if (progressResponse.ok) {
-        const progressData = await progressResponse.json();
-        setProgress(progressData.progress);
-        setUserAnswers(progressData.answers);
-      }
+      if (response.status === 401) { setAccess('unauthenticated'); return; }
+      if (response.status === 403) { setAccess('forbidden'); return; }
+      if (response.status === 404) { setAccess('notfound'); return; }
+      if (!response.ok) throw new Error('Failed to load course');
+
+      const data = await response.json();
+      setCourse(data.course);
+      setProgress(data.progress ?? []);
+      setUserAnswers(data.answers ?? []);
+      setAccess('ok');
     } catch (error) {
       console.error('Error fetching course data:', error);
-      router.push('/dashboard');
+      setAccess('error');
     } finally {
       setLoading(false);
     }
-  }, [courseId, router]);
+  }, [courseId]);
 
   // Depend on the user id, not the user object: Supabase emits a fresh user
   // object on tab-focus token refresh, which would otherwise re-run this and
   // reload the whole course.
   const userId = user?.id;
   useEffect(() => {
-    if (userId) fetchCourseData();
-  }, [userId, fetchCourseData]);
+    // Wait for auth to resolve before deciding anything — otherwise a
+    // logged-out (or still-resolving) visitor would spin forever.
+    if (authLoading) return;
+    if (!userId) {
+      setAccess('unauthenticated');
+      setLoading(false);
+      return;
+    }
+    fetchCourseData();
+  }, [authLoading, userId, fetchCourseData]);
 
   const currentLesson = course?.lessons[currentLessonIndex] ?? null;
 
@@ -115,19 +134,16 @@ export function useCourseLearn(courseId: string, user: User | null) {
       const currentQuestion = lesson.questions?.[0];
       if (!currentQuestion) return;
 
-      const correctAnswer = parseCorrectAnswerIndex(rawCorrectAnswer(currentQuestion));
-      const isCorrect = Number(selectedOption) === correctAnswer;
-
       const response = await fetch(`/api/courses/${courseId}/questions/${questionId}/answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          answer: selectedOption.toString(),
-          isCorrect,
-        }),
+        body: JSON.stringify({ answer: selectedOption.toString() }),
       });
 
       if (response.ok) {
+        // Trust the server's grading, not a locally computed value.
+        const data = await response.json();
+        const isCorrect = !!data.isCorrect;
         setUserAnswers((prev) => [
           ...prev,
           {
@@ -279,6 +295,7 @@ export function useCourseLearn(courseId: string, user: User | null) {
 
   return {
     course,
+    access,
     currentLesson,
     currentLessonIndex,
     progress,

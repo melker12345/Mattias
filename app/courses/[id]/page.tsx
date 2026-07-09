@@ -34,8 +34,7 @@ interface Course {
 interface Lesson {
   id: string;
   title: string;
-  content: string;
-  videoUrl?: string;
+  type: string;
   order: number;
 }
 
@@ -274,7 +273,7 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
                             <h3 className="font-medium text-gray-900">
                               {lesson.title}
                             </h3>
-                            {lesson.videoUrl && (
+                            {lesson.type === 'video' && (
                               <div className="flex items-center text-sm text-gray-500 mt-1">
                                 <PlayIcon className="w-4 h-4 mr-1" />
                                 Video
