@@ -8,6 +8,8 @@ import { LearnHeader } from './components/LearnHeader';
 import { LessonSidebar } from './components/LessonSidebar';
 import { LessonContent } from './components/LessonContent';
 import { LessonNavigation } from './components/LessonNavigation';
+import { TestIntro } from './components/TestIntro';
+import { TestRunner } from './components/TestRunner';
 
 export default function CourseLearningPage({ params }: { params: { id: string } }) {
   const { user, loading: authLoading } = useSupabaseAuth();
@@ -87,8 +89,10 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
         timeTaken={learn.completionData.timeTaken}
         answers={learn.completionData.answers}
         userEmail={learn.completionData.userEmail}
+        hasTest={learn.completionData.hasTest ?? learn.hasTest}
+        learningScore={learn.completionData.learningScore}
         onSubmitForReview={learn.handleSubmitForReview}
-        onRetakeCourse={learn.handleRetakeCourse}
+        onRetakeCourse={learn.hasTest ? learn.handleRetakeTest : learn.handleRetakeCourse}
         isSubmitting={learn.isSubmitting}
         hasAlreadySubmitted={learn.hasAlreadySubmitted}
         isRetaking={learn.isResetting}
@@ -96,10 +100,32 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
     );
   }
 
+  // Full-screen graded test.
+  if (learn.testMode && learn.course) {
+    return (
+      <TestRunner
+        courseTitle={learn.course.title}
+        questions={learn.testLessons}
+        passingScore={learn.course.passingScore}
+        parseQuestionOptions={learn.parseQuestionOptions}
+        rawQuestionOptions={learn.rawQuestionOptions}
+        isSubmitting={learn.testSubmitting}
+        onSubmit={learn.submitTest}
+        onCancel={learn.exitTest}
+      />
+    );
+  }
+
   const currentLesson = learn.currentLesson;
+  const isTestIntro = currentLesson?.type === 'test_intro';
+  // "Course completed" banner only applies to plain (no-test) courses; for test
+  // courses the result screen is reached via the test. The divider itself never
+  // counts as a completable lesson.
+  const contentLessons = learn.course.lessons.filter((l) => l.type !== 'test_intro');
   const allLessonsCompleted =
-    learn.course.lessons.length > 0 &&
-    learn.course.lessons.every((l) => learn.isLessonCompleted(l.id));
+    !learn.hasTest &&
+    contentLessons.length > 0 &&
+    contentLessons.every((l) => learn.isLessonCompleted(l.id));
   const currentQuestion = currentLesson?.questions?.[0];
   const currentUserAnswer = currentQuestion
     ? learn.userAnswers.find((a) => a.questionId === currentQuestion.id) ?? null
@@ -143,7 +169,22 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
                 </div>
               )}
 
-              {currentLesson && (
+              {currentLesson && isTestIntro && (
+                <TestIntro
+                  title={currentLesson.title}
+                  instructions={currentLesson.content}
+                  questionCount={learn.testLessons.length}
+                  passingScore={learn.course.passingScore}
+                  contentComplete={learn.contentComplete}
+                  testCompleted={learn.testCompleted}
+                  isBusy={learn.testSubmitting || learn.isResetting}
+                  onStart={learn.startTest}
+                  onViewResults={learn.checkCourseCompletion}
+                  onRetake={learn.handleRetakeTest}
+                />
+              )}
+
+              {currentLesson && !isTestIntro && (
                 <>
                   <LessonContent
                     lesson={currentLesson}

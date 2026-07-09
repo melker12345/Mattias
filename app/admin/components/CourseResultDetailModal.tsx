@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XMarkIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
-import type { CourseResult, CourseResultDetail } from '@/lib/types/admin';
+import type { CourseResult, CourseResultDetail, CourseResultAnswer } from '@/lib/types/admin';
 
 interface CourseResultDetailModalProps {
   result: CourseResult | null;
@@ -15,6 +15,38 @@ const STATUS_LABELS: Record<string, string> = {
   passed: 'Godkänd',
   failed: 'Underkänd',
 };
+
+function AnswerGroup({ heading, answers }: { heading: string; answers: CourseResultAnswer[] }) {
+  if (answers.length === 0) return null;
+  const correct = answers.filter((a) => a.isCorrect).length;
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-gray-900 mb-2">
+        {heading} ({correct}/{answers.length} rätt)
+      </h4>
+      <div className="space-y-3">
+        {answers.map((a, i) => (
+          <div key={a.questionId} className="border border-gray-200 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              {a.isCorrect
+                ? <CheckCircleIcon className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+                : <XCircleIcon className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />}
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900">{i + 1}. {a.question}</p>
+                <p className={`text-sm mt-1 ${a.isCorrect ? 'text-green-700' : 'text-red-700'}`}>
+                  Svar: {a.answered ? a.userAnswerText : 'Ej besvarad'}
+                </p>
+                {!a.isCorrect && (
+                  <p className="text-sm text-gray-600">Rätt svar: {a.correctAnswerText}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function CourseResultDetailModal({ result, onClose }: CourseResultDetailModalProps) {
   const [detail, setDetail] = useState<CourseResultDetail | null>(null);
@@ -94,16 +126,26 @@ export function CourseResultDetailModal({ result, onClose }: CourseResultDetailM
                       <div className="text-xs text-gray-400">{detail.completedLessons}/{detail.totalLessons} lektioner</div>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500">Resultat</div>
+                      <div className="text-xs text-gray-500">{detail.hasTest ? 'Provresultat' : 'Resultat'}</div>
                       <div className="text-sm font-semibold text-gray-900">
                         {detail.status === 'in_progress' ? '—' : `${detail.finalScore ?? 0}%`}
                       </div>
                       <div className="text-xs text-gray-400">{detail.correctAnswers}/{detail.totalQuestions} rätt</div>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-500">Godkäntgräns</div>
-                      <div className="text-sm font-semibold text-gray-900">{detail.course.passingScore}%</div>
-                    </div>
+                    {detail.hasTest && detail.learningScore ? (
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <div className="text-xs text-gray-500">Övningsfrågor</div>
+                        <div className="text-sm font-semibold text-gray-900">
+                          {detail.learningScore.total ? `${detail.learningScore.score}%` : '—'}
+                        </div>
+                        <div className="text-xs text-gray-400">{detail.learningScore.correct}/{detail.learningScore.total} rätt</div>
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <div className="text-xs text-gray-500">Godkäntgräns</div>
+                        <div className="text-sm font-semibold text-gray-900">{detail.course.passingScore}%</div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Lesson progression */}
@@ -123,31 +165,16 @@ export function CourseResultDetailModal({ result, onClose }: CourseResultDetailM
                     </div>
                   )}
 
-                  {/* Answers */}
+                  {/* Answers — grouped into test vs. practice when the course has a test. */}
                   {detail.answers.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-2">Svar ({detail.answers.filter((a) => a.isCorrect).length}/{detail.answers.length} rätt)</h4>
-                      <div className="space-y-3">
-                        {detail.answers.map((a, i) => (
-                          <div key={a.questionId} className="border border-gray-200 rounded-lg p-3">
-                            <div className="flex items-start gap-2">
-                              {a.isCorrect
-                                ? <CheckCircleIcon className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
-                                : <XCircleIcon className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />}
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-gray-900">{i + 1}. {a.question}</p>
-                                <p className={`text-sm mt-1 ${a.isCorrect ? 'text-green-700' : 'text-red-700'}`}>
-                                  Svar: {a.answered ? a.userAnswerText : 'Ej besvarad'}
-                                </p>
-                                {!a.isCorrect && (
-                                  <p className="text-sm text-gray-600">Rätt svar: {a.correctAnswerText}</p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    detail.hasTest ? (
+                      <>
+                        <AnswerGroup heading="Prov" answers={detail.answers.filter((a) => a.isTest)} />
+                        <AnswerGroup heading="Övningsfrågor" answers={detail.answers.filter((a) => !a.isTest)} />
+                      </>
+                    ) : (
+                      <AnswerGroup heading="Svar" answers={detail.answers} />
+                    )
                   )}
                 </div>
               )}

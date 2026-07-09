@@ -41,7 +41,7 @@ export async function GET(
     // course at once, then group in memory (avoids per-enrollment N+1 queries).
     const [{ data: lessons }, { data: progressRecords }] = await Promise.all([
       courseIds.length
-        ? admin.from('lessons').select('id, title, "order", course_id').in('course_id', courseIds).order('order')
+        ? admin.from('lessons').select('id, title, type, "order", course_id').in('course_id', courseIds).order('order')
         : Promise.resolve({ data: [] as any[] }),
       courseIds.length
         ? admin.from('progress').select('lesson_id, completed, completed_at').eq('user_id', employeeId)
@@ -51,7 +51,17 @@ export async function GET(
     const lessonRows = lessons ?? []
     const lessonIds = lessonRows.map((l) => l.id)
     const lessonToCourse = new Map<string, string>()
-    for (const l of lessonRows) lessonToCourse.set(l.id, l.course_id)
+    const lessonOrderById = new Map<string, number>()
+    for (const l of lessonRows) {
+      lessonToCourse.set(l.id, l.course_id)
+      lessonOrderById.set(l.id, l.order)
+    }
+    // Per course: the order of the 'test_intro' divider (if any). Question
+    // lessons ordered after it make up the graded test.
+    const dividerOrderByCourse = new Map<string, number>()
+    for (const l of lessonRows) {
+      if (l.type === 'test_intro') dividerOrderByCourse.set(l.course_id, l.order)
+    }
 
     const [{ data: questions }, { data: answers }] = await Promise.all([
       lessonIds.length
@@ -75,6 +85,9 @@ export async function GET(
       const ua = answerByQuestion.get(q.id)
       const selectedIndex = ua ? parseInt(ua.answer) : -1
       const correctIndex = parseInt(q.correct_answer)
+      const dividerOrder = dividerOrderByCourse.get(courseId)
+      const lessonOrder = lessonOrderById.get(q.lesson_id) ?? 0
+      const isTest = dividerOrder !== undefined && lessonOrder > dividerOrder
       const entry = {
         questionId: q.id,
         question: q.question,
@@ -86,6 +99,7 @@ export async function GET(
         selectedIndex,
         isCorrect: ua?.is_correct ?? false,
         answered: !!ua,
+        isTest,
       }
       if (!answersByCourse.has(courseId)) answersByCourse.set(courseId, [])
       answersByCourse.get(courseId)!.push(entry)
@@ -97,6 +111,18 @@ export async function GET(
       const totalLessons = courseLessons.length
       const completedLessons = courseLessons.filter((l) => (progressRecords ?? []).find((p) => p.lesson_id === l.id && p.completed)).length
       const courseAnswers = answersByCourse.get(course.id) ?? []
+      const hasTest = dividerOrderByCourse.has(course.id)
+      const scoreOf = (set: typeof courseAnswers) => {
+        const correct = set.filter((a) => a.isCorrect).length
+        return {
+          total: set.length,
+          answered: set.filter((a) => a.answered).length,
+          correct,
+          score: set.length ? Math.round((correct / set.length) * 100) : 0,
+        }
+      }
+      const testScore = scoreOf(courseAnswers.filter((a) => a.isTest))
+      const learningScore = scoreOf(courseAnswers.filter((a) => !a.isTest))
       const status: 'in_progress' | 'passed' | 'failed' = enrollment.completed_at
         ? (enrollment.passed ? 'passed' : 'failed')
         : 'in_progress'
@@ -108,6 +134,9 @@ export async function GET(
         finalScore: enrollment.final_score,
         correctAnswers: enrollment.correct_answers,
         totalQuestions: enrollment.total_questions,
+        hasTest,
+        testScore,
+        learningScore,
         course: {
           id: course.id, title: course.title, description: course.description, duration: course.duration,
           passingScore: course.passing_score,

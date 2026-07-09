@@ -17,6 +17,8 @@ import type {
   LearnLesson,
 } from '@/lib/types/course-learn';
 
+const TEST_INTRO_TYPE = 'test_intro';
+
 // Access state for the course player. Drives which screen the page renders
 // instead of an infinite spinner:
 //  - 'loading'         auth or data still resolving
@@ -45,6 +47,13 @@ export function useCourseLearn(courseId: string, user: User | null, authLoading:
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAlreadySubmitted, setHasAlreadySubmitted] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  // Lessons that make up the graded test (question lessons after the
+  // 'test_intro' divider). Kept separate from course.lessons, which holds only
+  // the content + the divider so the existing lesson stepper is untouched.
+  const [testLessons, setTestLessons] = useState<LearnLesson[]>([]);
+  const [hasTest, setHasTest] = useState(false);
+  const [testMode, setTestMode] = useState(false);
+  const [testSubmitting, setTestSubmitting] = useState(false);
   // Completed-lesson count observed on (re)load — used to only auto-show the
   // summary when the learner reaches 100% during this visit, not on arrival.
   const completedAtLoadRef = useRef<number | null>(null);
@@ -63,7 +72,22 @@ export function useCourseLearn(courseId: string, user: User | null, authLoading:
       if (!response.ok) throw new Error('Failed to load course');
 
       const data = await response.json();
-      setCourse(data.course);
+
+      // Split the lessons into content (+ divider) and the graded test. The
+      // test = question lessons ordered after the 'test_intro' divider.
+      const allLessons: LearnLesson[] = data.course.lessons ?? [];
+      const introIdx = allLessons.findIndex((l) => l.type === TEST_INTRO_TYPE);
+      const courseHasTest = introIdx >= 0;
+      const testOnly = courseHasTest
+        ? allLessons.filter((l, i) => i > introIdx && l.type === 'question')
+        : [];
+      const contentOnly = courseHasTest
+        ? allLessons.filter((l, i) => !(i > introIdx && l.type === 'question'))
+        : allLessons;
+
+      setCourse({ ...data.course, lessons: contentOnly });
+      setTestLessons(testOnly);
+      setHasTest(courseHasTest);
       setProgress(data.progress ?? []);
       setUserAnswers(data.answers ?? []);
       setAccess('ok');
@@ -186,11 +210,28 @@ export function useCourseLearn(courseId: string, user: User | null, authLoading:
     [progress]
   );
 
+  // The 'test_intro' divider is a gateway screen, not a completable lesson, so
+  // it never counts toward content progress.
+  const contentLessons = (course?.lessons ?? []).filter((l) => l.type !== TEST_INTRO_TYPE);
+
   const getProgressPercentage = useCallback(() => {
     if (!course) return 0;
-    const completedLessons = progress.filter((p) => p.completed).length;
-    return Math.round((completedLessons / course.lessons.length) * 100);
+    const denom = course.lessons.filter((l) => l.type !== TEST_INTRO_TYPE).length;
+    if (denom === 0) return 0;
+    const completedLessons = course.lessons
+      .filter((l) => l.type !== TEST_INTRO_TYPE)
+      .filter((l) => progress.some((p) => p.lessonId === l.id && p.completed)).length;
+    return Math.round((completedLessons / denom) * 100);
   }, [course, progress]);
+
+  // Whether all learning content (everything except the test) is done — used to
+  // gate starting the test.
+  const contentComplete =
+    contentLessons.length > 0 && contentLessons.every((l) => progress.some((p) => p.lessonId === l.id && p.completed));
+
+  // Whether the learner has already submitted the test (every test lesson done).
+  const testCompleted =
+    testLessons.length > 0 && testLessons.every((l) => progress.some((p) => p.lessonId === l.id && p.completed));
 
   const checkCourseCompletion = useCallback(async () => {
     try {
@@ -258,6 +299,9 @@ export function useCourseLearn(courseId: string, user: User | null, authLoading:
   }, [courseId, fetchCourseData]);
 
   useEffect(() => {
+    // For test courses the result screen is reached by submitting the test,
+    // never automatically from finishing the content.
+    if (hasTest) return;
     if (isResetting || showCourseSummary || !course || progress.length === 0) return;
 
     const completedLessons = progress.filter((p) => p.completed).length;
@@ -279,7 +323,7 @@ export function useCourseLearn(courseId: string, user: User | null, authLoading:
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [progress, course, checkCourseCompletion, isResetting, showCourseSummary]);
+  }, [progress, course, checkCourseCompletion, isResetting, showCourseSummary, hasTest]);
 
   const getCurrentQuestionAnswer = useCallback(() => {
     const currentQuestion = currentLesson?.questions?.[0];
@@ -292,6 +336,56 @@ export function useCourseLearn(courseId: string, user: User | null, authLoading:
     setAnswerSubmitted(false);
     setSelectedAnswer(null);
   }, []);
+
+  const startTest = useCallback(() => setTestMode(true), []);
+  const exitTest = useCallback(() => setTestMode(false), []);
+
+  // Submit the whole test at once. `answers` maps each test question id to the
+  // selected option index. Grading happens server-side.
+  const submitTest = useCallback(
+    async (answers: { questionId: string; answer: number }[]) => {
+      try {
+        setTestSubmitting(true);
+        const response = await fetch(`/api/courses/${courseId}/test/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers }),
+        });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          alert(err.message || 'Ett fel uppstod vid inlämning av provet');
+          return;
+        }
+        setTestMode(false);
+        // Refresh progress/answers so the sidebar + state reflect the test, then
+        // show the result screen.
+        await fetchCourseData();
+        await checkCourseCompletion();
+      } catch (error) {
+        console.error('Error submitting test:', error);
+        alert('Ett fel uppstod vid inlämning av provet');
+      } finally {
+        setTestSubmitting(false);
+      }
+    },
+    [courseId, fetchCourseData, checkCourseCompletion]
+  );
+
+  // Retake the test only: clears test answers/progress, keeps content progress.
+  const handleRetakeTest = useCallback(async () => {
+    try {
+      setIsResetting(true);
+      setShowCourseSummary(false);
+      setCompletionData(null);
+      setTestMode(false);
+      await fetch(`/api/courses/${courseId}/test/reset`, { method: 'POST' });
+      await fetchCourseData();
+    } catch (error) {
+      console.error('Error resetting test:', error);
+    } finally {
+      setIsResetting(false);
+    }
+  }, [courseId, fetchCourseData]);
 
   return {
     course,
@@ -326,6 +420,17 @@ export function useCourseLearn(courseId: string, user: User | null, authLoading:
     handleRetakeCourse,
     getCurrentQuestionAnswer,
     retryQuestion,
+    // Test feature
+    hasTest,
+    testLessons,
+    testMode,
+    testSubmitting,
+    contentComplete,
+    testCompleted,
+    startTest,
+    exitTest,
+    submitTest,
+    handleRetakeTest,
     parseQuestionOptions,
     rawQuestionOptions,
     rawCorrectAnswer,

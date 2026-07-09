@@ -14,7 +14,8 @@ import {
   PlayIcon,
   PhotoIcon,
   DocumentTextIcon,
-  QuestionMarkCircleIcon
+  QuestionMarkCircleIcon,
+  AcademicCapIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import AddContentModal from '@/components/AddContentModal';
@@ -34,7 +35,7 @@ interface Course {
 interface Lesson {
   id: string;
   title: string;
-  type: 'video' | 'image' | 'text' | 'question';
+  type: 'video' | 'image' | 'text' | 'question' | 'test_intro';
   content?: string;
   videoUrl?: string;
   imageUrl?: string;
@@ -186,6 +187,8 @@ export default function CourseEditorPage({ params }: { params: { id: string } })
         return <DocumentTextIcon className="w-5 h-5" />;
       case 'question':
         return <QuestionMarkCircleIcon className="w-5 h-5" />;
+      case 'test_intro':
+        return <AcademicCapIcon className="w-5 h-5" />;
       default:
         return <DocumentTextIcon className="w-5 h-5" />;
     }
@@ -201,6 +204,8 @@ export default function CourseEditorPage({ params }: { params: { id: string } })
         return 'Text';
       case 'question':
         return 'Fråga';
+      case 'test_intro':
+        return 'Kunskapstest (provstart)';
       default:
         return type;
     }

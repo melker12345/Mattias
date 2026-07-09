@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, isNextResponse } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getCoursePartition } from '@/lib/course-progress';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,6 +56,13 @@ export async function GET(
       ? await admin.from('answers').select('question_id, answer, is_correct').eq('user_id', userId).in('question_id', qIds)
       : { data: [] as { question_id: string; answer: string; is_correct: boolean }[] };
 
+    // Split questions into the graded test vs. practice ("learning") so the
+    // reviewer sees each performance separately.
+    const partition = courseId
+      ? await getCoursePartition(courseId, admin)
+      : { hasTest: false, testQuestionIds: [], learningQuestionIds: [], testLessonIds: [] };
+    const testQuestionSet = new Set(partition.testQuestionIds);
+
     const answersData = (questions ?? []).map((q) => {
       const ua = (userAnswers ?? []).find((a) => a.question_id === q.id);
       let options: string[] = [];
@@ -72,8 +80,22 @@ export async function GET(
         selectedIndex,
         isCorrect: ua?.is_correct ?? false,
         answered: !!ua,
+        isTest: testQuestionSet.has(q.id),
       };
     });
+
+    const scoreFor = (predicate: (a: typeof answersData[number]) => boolean) => {
+      const set = answersData.filter(predicate);
+      const correct = set.filter((a) => a.isCorrect).length;
+      return {
+        total: set.length,
+        answered: set.filter((a) => a.answered).length,
+        correct,
+        score: set.length ? Math.round((correct / set.length) * 100) : 0,
+      };
+    };
+    const testScore = scoreFor((a) => a.isTest);
+    const learningScore = scoreFor((a) => !a.isTest);
 
     const lessonProgress = (lessons ?? []).map((l) => {
       const p = (progress ?? []).find((r) => r.lesson_id === l.id);
@@ -112,6 +134,9 @@ export async function GET(
       progressPercentage: lessonProgress.length > 0 ? Math.round((completedLessons / lessonProgress.length) * 100) : 0,
       lessons: lessonProgress,
       answers: answersData,
+      hasTest: partition.hasTest,
+      testScore,
+      learningScore,
     });
   } catch (error) {
     console.error('Error fetching course result detail:', error);

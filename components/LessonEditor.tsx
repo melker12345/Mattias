@@ -16,7 +16,7 @@ interface Question {
 interface Lesson {
   id: string;
   title: string;
-  type: 'video' | 'image' | 'text' | 'question';
+  type: 'video' | 'image' | 'text' | 'question' | 'test_intro';
   content?: string;
   videoUrl?: string;
   imageUrl?: string;
@@ -227,6 +227,26 @@ export default function LessonEditor({ lesson, onClose, onSave }: LessonEditorPr
           </div>
         );
 
+      case 'test_intro':
+        return (
+          <div>
+            <div className="mb-3 rounded-lg bg-primary-50 border border-primary-100 p-3 text-sm text-primary-800">
+              Frågor som ligger <strong>efter</strong> denna markör räknas som provet.
+            </div>
+            <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
+              Instruktioner till deltagaren (valfritt)
+            </label>
+            <textarea
+              id="content"
+              value={formData.content}
+              onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+              rows={4}
+              className="input-field"
+              placeholder="T.ex. Provet består av flera frågor..."
+            />
+          </div>
+        );
+
       case 'question':
         return (
           <div className="space-y-4">
@@ -300,6 +320,8 @@ export default function LessonEditor({ lesson, onClose, onSave }: LessonEditorPr
         return 'Text';
       case 'question':
         return 'Fråga';
+      case 'test_intro':
+        return 'Kunskapstest (provstart)';
       default:
         return type;
     }

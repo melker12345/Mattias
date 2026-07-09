@@ -23,7 +23,15 @@ export interface LearnCourse {
   id: string;
   title: string;
   description: string;
+  passingScore?: number;
   lessons: LearnLesson[];
+}
+
+export interface LearningScore {
+  total: number;
+  correct: number;
+  answered: number;
+  score: number;
 }
 
 export interface LessonProgress {
@@ -61,4 +69,6 @@ export interface CompletionData {
   answers: CompletionAnswer[];
   userEmail: string;
   completed: boolean;
+  hasTest?: boolean;
+  learningScore?: LearningScore;
 }
