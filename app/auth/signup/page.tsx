@@ -94,6 +94,8 @@ function SignUpPageInner() {
     setSuccess('')
 
     const token = searchParams.get('token')
+    // Generic "join company" link token (see /join/[token]).
+    const companyToken = searchParams.get('companyToken')
 
     try {
       const response = await fetch('/api/auth/register', {
@@ -108,6 +110,7 @@ function SignUpPageInner() {
           phone: data.phone,
           password: data.password,
           invitationToken: token,
+          companyInviteToken: companyToken,
         }),
       })
 
@@ -116,7 +119,7 @@ function SignUpPageInner() {
       if (!response.ok) {
         setError(result.message || 'Ett fel uppstod vid registrering')
       } else {
-        if (token) {
+        if (token || companyToken) {
           setSuccess('Kontot skapades framgångsrikt! Du är nu ansluten till företaget. Du kan logga in.')
         } else {
           setSuccess('Kontot skapades framgångsrikt! Du kan nu logga in.')

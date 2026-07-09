@@ -15,6 +15,31 @@ export function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isVisible, setIsVisible] = useState(true)
   const [lastScrollY, setLastScrollY] = useState(0)
+  // Authoritative role from the DB profile (user_metadata can be stale and
+  // doesn't reflect the ADMIN_EMAIL override), so the company/admin links show
+  // up reliably.
+  const [role, setRole] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!user?.id) {
+      setRole(null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/profile')
+        if (!res.ok) return
+        const data = await res.json()
+        if (!cancelled) setRole(data.role ?? null)
+      } catch {
+        /* leave role null */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
 
   const navigation = [
     { name: 'Hem', href: '/' },
@@ -136,7 +161,21 @@ export function Navigation() {
                             </Link>
                           )}
                         </Menu.Item>
-                        {user.user_metadata?.role === 'ADMIN' && (
+                        {role === 'COMPANY_ADMIN' && (
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                href="/dashboard/company"
+                                className={`${
+                                  active ? 'bg-white/10 text-white' : 'text-white'
+                                } block px-4 py-3 text-sm font-open-sans transition-colors duration-200`}
+                              >
+                                Företagsdashboard
+                              </Link>
+                            )}
+                          </Menu.Item>
+                        )}
+                        {role === 'ADMIN' && (
                           <Menu.Item>
                             {({ active }) => (
                               <Link
@@ -227,7 +266,23 @@ export function Navigation() {
               {/* Mobile menu items for logged in users */}
               {user && (
                 <div className="pt-4 space-y-3 border-t border-white/20">
-                  {user.user_metadata?.role === 'ADMIN' && (
+                  <Disclosure.Button
+                    as={Link}
+                    href="/dashboard"
+                    className="block w-full px-4 py-3 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans text-center bg-white/20 text-white hover:bg-white hover:text-primary-700 border border-white/30"
+                  >
+                    Dashboard
+                  </Disclosure.Button>
+                  {role === 'COMPANY_ADMIN' && (
+                    <Disclosure.Button
+                      as={Link}
+                      href="/dashboard/company"
+                      className="block w-full px-4 py-3 rounded-lg text-base font-medium transition-colors duration-200 font-open-sans text-center bg-white/20 text-white hover:bg-white hover:text-primary-700 border border-white/30"
+                    >
+                      Företagsdashboard
+                    </Disclosure.Button>
+                  )}
+                  {role === 'ADMIN' && (
                     <Disclosure.Button
                       as={Link}
                       href="/admin"
