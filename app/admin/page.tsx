@@ -13,6 +13,7 @@ import { AdminUsersTab } from './components/AdminUsersTab';
 import { AdminCompaniesTab } from './components/AdminCompaniesTab';
 import { AdminCourseResultsTab } from './components/AdminCourseResultsTab';
 import { CourseResultDetailModal } from './components/CourseResultDetailModal';
+import { DeleteCourseModal } from './components/DeleteCourseModal';
 import { useAdminData } from './hooks/useAdminData';
 import type { AdminTab, AdminCourse, AdminBundle, CourseResult } from '@/lib/types/admin';
 
@@ -42,6 +43,9 @@ export default function AdminDashboard() {
 
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [selectedResult, setSelectedResult] = useState<CourseResult | null>(null);
+
+  const [courseToDelete, setCourseToDelete] = useState<AdminCourse | null>(null);
+  const [isDeletingCourse, setIsDeletingCourse] = useState(false);
 
   const handleCreateCourse = () => {
     setEditingCourse(null);
@@ -103,20 +107,28 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDeleteCourse = async (courseId: string) => {
-    if (!confirm('Är du säker på att du vill ta bort denna kurs?')) return;
+  const handleDeleteCourse = (courseId: string) => {
+    const course = courses.find((c) => c.id === courseId);
+    if (course) setCourseToDelete(course);
+  };
 
+  const confirmDeleteCourse = async () => {
+    if (!courseToDelete) return;
     try {
-      const response = await fetch(`/api/admin/courses/${courseId}`, { method: 'DELETE' });
+      setIsDeletingCourse(true);
+      const response = await fetch(`/api/admin/courses/${courseToDelete.id}`, { method: 'DELETE' });
       if (response.ok) {
+        setCourseToDelete(null);
         await refreshResource('courses');
       } else {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({}));
         alert(error.message || 'Ett fel uppstod');
       }
     } catch (error) {
       console.error('Error deleting course:', error);
       alert('Ett fel uppstod vid borttagning av kurs');
+    } finally {
+      setIsDeletingCourse(false);
     }
   };
 
@@ -266,6 +278,13 @@ export default function AdminDashboard() {
       <CourseResultDetailModal
         result={selectedResult}
         onClose={() => setSelectedResult(null)}
+      />
+
+      <DeleteCourseModal
+        course={courseToDelete}
+        onClose={() => !isDeletingCourse && setCourseToDelete(null)}
+        onConfirm={confirmDeleteCourse}
+        isDeleting={isDeletingCourse}
       />
     </div>
   );
