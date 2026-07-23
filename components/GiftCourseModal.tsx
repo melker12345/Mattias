@@ -8,6 +8,7 @@ import {
   AcademicCapIcon,
   UserIcon
 } from '@heroicons/react/24/outline';
+import { categoryLabel } from '@/lib/categories';
 
 interface Course {
   id: string;
@@ -369,7 +370,7 @@ export default function GiftCourseModal({ isOpen, onClose, onSuccess }: GiftCour
                                   </h4>
                                   <div className="flex items-center space-x-2 mt-1">
                                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                                      {course.category}
+                                      {categoryLabel(course.category)}
                                     </span>
                                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                                       course.price === 0 
@@ -407,7 +408,7 @@ export default function GiftCourseModal({ isOpen, onClose, onSuccess }: GiftCour
                       <p className="text-sm font-semibold text-blue-800 mb-1">{selectedCourse.title}</p>
                       <div className="flex items-center space-x-3 text-xs">
                         <span className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-700">
-                          {selectedCourse.category}
+                          {categoryLabel(selectedCourse.category)}
                         </span>
                         <span className={`inline-flex items-center px-2 py-1 rounded-full font-medium ${
                           selectedCourse.price === 0 

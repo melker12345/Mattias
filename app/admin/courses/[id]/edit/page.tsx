@@ -20,6 +20,7 @@ import {
 import Link from 'next/link';
 import AddContentModal from '@/components/AddContentModal';
 import LessonEditor from '@/components/LessonEditor';
+import { categoryLabel } from '@/lib/categories';
 
 interface Course {
   id: string;
@@ -269,7 +270,7 @@ export default function CourseEditorPage({ params }: { params: { id: string } })
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Kategori</label>
-              <p className="text-gray-900">{course.category}</p>
+              <p className="text-gray-900">{categoryLabel(course.category)}</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Pris</label>

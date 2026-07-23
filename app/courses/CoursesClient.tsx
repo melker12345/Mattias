@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon, FunnelIcon, AcademicCapIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { CourseCard } from '@/components/CourseCard';
 import { useCart } from '@/contexts/CartContext';
+import { COURSE_CATEGORIES } from '@/lib/categories';
 
 export interface Course {
   id: string;
@@ -92,9 +93,7 @@ function BundleCard({ bundle }: { bundle: Bundle }) {
 
 const categories = [
   { id: 'all', name: 'Alla kategorier' },
-  { id: 'arbete-pa-vag', name: 'Arbete på Väg' },
-  { id: 'sakerhet-miljo', name: 'Säkerhet & Miljö' },
-  { id: 'kompetensutveckling', name: 'Kompetensutveckling' },
+  ...COURSE_CATEGORIES,
 ];
 
 export function CoursesClient({ initialCourses, initialBundles = [] }: { initialCourses: Course[]; initialBundles?: Bundle[] }) {

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSupabaseAuth } from '@/app/providers';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/contexts/CartContext';
+import { categoryLabel } from '@/lib/categories';
 import { motion } from 'framer-motion';
 import { 
   ClockIcon, 
@@ -244,7 +245,7 @@ export default function CourseDetailPage({ params }: { params: { id: string } })
                     {course.enrolledUsers} registrerade
                   </div>
                   <div className="px-3 py-1 bg-primary-100 text-primary-800 rounded-full text-xs font-medium">
-                    {course.category}
+                    {categoryLabel(course.category)}
                   </div>
                 </div>
 

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { CourseResult, CourseResultStatus } from '@/lib/types/admin';
 import { formatDate } from '@/lib/types/admin';
+import { categoryLabel } from '@/lib/categories';
 
 interface AdminCourseResultsTabProps {
   results: CourseResult[];
@@ -132,7 +133,7 @@ export function AdminCourseResultsTab({ results, onViewResult }: AdminCourseResu
                     </td>
                     <td className="px-4 py-4">
                       <div className="text-sm text-gray-900">{r.course.title}</div>
-                      <div className="text-xs text-gray-500">{r.course.category}</div>
+                      <div className="text-xs text-gray-500">{categoryLabel(r.course.category)}</div>
                     </td>
                     <td className="px-4 py-4 w-48">
                       <ProgressBar value={r.progressPercentage} />

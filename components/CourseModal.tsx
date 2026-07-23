@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import { COURSE_CATEGORIES } from '@/lib/categories';
 
 export interface Course {
   id?: string;
@@ -24,11 +25,7 @@ interface CourseModalProps {
   isSaving: boolean;
 }
 
-const categories = [
-  { id: 'arbete-pa-vag', name: 'Arbete på Väg' },
-  { id: 'sakerhet-miljo', name: 'Säkerhet & Miljö' },
-  { id: 'kompetensutveckling', name: 'Kompetensutveckling' },
-];
+const categories = COURSE_CATEGORIES;
 
 export default function CourseModal({ isOpen, onClose, course, onSave, isSaving }: CourseModalProps) {
   const [formData, setFormData] = useState<Course>({

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { ClockIcon, StarIcon, ArrowRightIcon } from '@heroicons/react/24/outline'
+import { categoryLabel } from '@/lib/categories'
 
 interface CourseCardProps {
   course: {
@@ -49,7 +50,7 @@ export function CourseCard({ course, onAddToCart }: CourseCardProps) {
         
         {/* Category badge */}
         <div className={`absolute top-4 left-4 px-4 py-2 rounded-full text-sm font-bold bg-white/95 text-gray-800 shadow-lg`}>
-          {course.category}
+          {categoryLabel(course.category)}
         </div>
         
         {/* Price badge */}

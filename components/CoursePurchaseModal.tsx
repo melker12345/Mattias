@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { categoryLabel } from '@/lib/categories'
 
 interface Course {
   id: string
@@ -330,7 +331,7 @@ export default function CoursePurchaseModal({
                             <p className="text-xs text-mn-dark-blue-green mt-1 font-open-sans">{course.description}</p>
                             <div className="flex items-center mt-2 space-x-4 text-xs text-mn-dark-blue-green font-open-sans">
                               <span>{course.duration} min</span>
-                              <span>{course.category}</span>
+                              <span>{categoryLabel(course.category)}</span>
                             </div>
                           </div>
                           <div className="ml-4">
