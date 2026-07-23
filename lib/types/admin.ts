@@ -28,6 +28,14 @@ export interface CourseResultAnswer {
   selectedIndex: number;
   isCorrect: boolean;
   answered: boolean;
+  isTest?: boolean;
+}
+
+export interface CourseResultQuestionSetScore {
+  total: number;
+  answered: number;
+  correct: number;
+  score: number;
 }
 
 export interface CourseResultDetail {
@@ -45,6 +53,11 @@ export interface CourseResultDetail {
   progressPercentage: number;
   lessons: Array<{ id: string; title: string; order: number; completed: boolean; completedAt: string | null }>;
   answers: CourseResultAnswer[];
+  hasTest?: boolean;
+  testScore?: CourseResultQuestionSetScore;
+  learningScore?: CourseResultQuestionSetScore;
+  certificate?: { id: string; certificateNumber: string; issuedAt: string } | null;
+  identityComplete?: boolean;
 }
 
 export interface AdminCourse {

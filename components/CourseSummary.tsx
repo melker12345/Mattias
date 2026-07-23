@@ -31,6 +31,8 @@ interface CourseSummaryProps {
   timeTaken?: number; // in minutes
   answers: Answer[];
   userEmail: string;
+  hasTest?: boolean;
+  learningScore?: { total: number; correct: number; answered: number; score: number };
   onSubmitForReview: () => void;
   onRetakeCourse: () => void;
   isSubmitting: boolean;
@@ -49,6 +51,8 @@ export default function CourseSummary({
   timeTaken,
   answers,
   userEmail,
+  hasTest = false,
+  learningScore,
   onSubmitForReview,
   onRetakeCourse,
   isSubmitting,
@@ -56,6 +60,7 @@ export default function CourseSummary({
   isRetaking = false
 }: CourseSummaryProps) {
   const [showDetailedResults, setShowDetailedResults] = useState(false);
+  const assessmentNoun = hasTest ? 'provet' : 'kursen';
 
   const formatTime = (minutes: number) => {
     if (minutes < 60) {
@@ -80,20 +85,37 @@ export default function CourseSummary({
               )}
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              {passed ? 'Grattis! Du har klarat kursen!' : 'Kursen inte klarad'}
+              {passed
+                ? hasTest
+                  ? 'Grattis! Du har klarat provet!'
+                  : 'Grattis! Du har klarat kursen!'
+                : hasTest
+                  ? 'Provet inte klarat'
+                  : 'Kursen inte klarad'}
             </h1>
             <p className="text-lg text-gray-600 mb-4">{courseTitle}</p>
-            
+
+            {hasTest && <p className="text-sm font-medium text-gray-500 -mt-2 mb-3">Provresultat</p>}
+
             {/* Score Display */}
             <div className={`inline-flex items-center px-6 py-3 rounded-full text-2xl font-bold ${
               passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
             }`}>
               {finalScore}% ({correctAnswers}/{totalQuestions} rätt)
             </div>
-            
+
             <p className="text-sm text-gray-600 mt-2">
               Krävs för godkänt: {passingScore}%
             </p>
+
+            {hasTest && learningScore && learningScore.total > 0 && (
+              <p className="text-sm text-gray-600 mt-3">
+                Övningsfrågor under kursen:{' '}
+                <span className="font-semibold text-gray-800">
+                  {learningScore.score}% ({learningScore.correct}/{learningScore.total} rätt)
+                </span>
+              </p>
+            )}
           </div>
 
           {/* Stats */}
@@ -131,35 +153,35 @@ export default function CourseSummary({
           <div className="px-6 py-6">
             {passed ? (
               <div className="space-y-4">
-                {hasAlreadySubmitted ? (
+                {hasAlreadySubmitted && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-center">
                       <DocumentTextIcon className="w-5 h-5 text-blue-600 mr-2" />
                       <p className="text-blue-800 font-medium">
-                        Du har redan skickat in denna kurs för granskning.
+                        Du har redan skickat in denna kurs för granskning. Gjorde du om provet kan du skicka in ditt uppdaterade resultat.
                       </p>
                     </div>
                   </div>
-                ) : (
-                  <button
-                    onClick={onSubmitForReview}
-                    disabled={isSubmitting}
-                    className="w-full bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center font-medium"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                        Skickar in för granskning...
-                      </>
-                    ) : (
-                      <>
-                        <DocumentTextIcon className="w-5 h-5 mr-2" />
-                        Skicka in för granskning
-                      </>
-                    )}
-                  </button>
                 )}
-                
+
+                <button
+                  onClick={onSubmitForReview}
+                  disabled={isSubmitting}
+                  className="w-full bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center font-medium"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                      Skickar in för granskning...
+                    </>
+                  ) : (
+                    <>
+                      <DocumentTextIcon className="w-5 h-5 mr-2" />
+                      {hasAlreadySubmitted ? 'Skicka in uppdaterat resultat' : 'Skicka in för granskning'}
+                    </>
+                  )}
+                </button>
+
                 <p className="text-sm text-gray-600 text-center">
                   Genom att skicka in för granskning kommer dina svar och resultat att granskas av en administratör.
                 </p>
@@ -174,18 +196,18 @@ export default function CourseSummary({
                   {isRetaking ? (
                     <>
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      Återställer kursen...
+                      {hasTest ? 'Återställer provet...' : 'Återställer kursen...'}
                     </>
                   ) : (
                     <>
                       <ArrowPathIcon className="w-5 h-5 mr-2" />
-                      Gör om kursen
+                      {hasTest ? 'Gör om provet' : 'Gör om kursen'}
                     </>
                   )}
                 </button>
-                
+
                 <p className="text-sm text-gray-600 text-center">
-                  Du behöver minst {passingScore}% för att klara kursen. Försök igen!
+                  Du behöver minst {passingScore}% för att klara {assessmentNoun}. Försök igen!
                 </p>
               </div>
             )}

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 import { decryptPersonnummer, encryptPersonnummer, normalisePersonnummer } from '@/lib/encryption'
+import { verifyCompanyInviteToken } from '@/lib/company-invite-token'
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Namnet måste vara minst 2 tecken'),
@@ -11,6 +12,10 @@ const registerSchema = z.object({
   phone: z.string().optional(),
   password: z.string().min(6, 'Lösenordet måste vara minst 6 tecken'),
   invitationToken: z.string().nullable().optional(),
+  // Stateless "join company" link token (see lib/company-invite-token). Unlike
+  // invitationToken this is not tied to a specific email and carries no identity
+  // cross-check — the invitee supplies their own details.
+  companyInviteToken: z.string().nullable().optional(),
 })
 
 function normalisePhone(phone: string): string {
@@ -20,7 +25,23 @@ function normalisePhone(phone: string): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, email, personnummer, phone, password, invitationToken } = registerSchema.parse(body)
+    const { name, email, personnummer, phone, password, invitationToken, companyInviteToken } = registerSchema.parse(body)
+
+    // Generic shareable join link → company to attach the new account to.
+    // Only consulted when there is no per-person invitation.
+    let joinCompanyId: string | null = null
+    if (!invitationToken && companyInviteToken) {
+      const verified = verifyCompanyInviteToken(companyInviteToken)
+      if (!verified) {
+        return NextResponse.json({ message: 'Inbjudningslänken är ogiltig eller har gått ut' }, { status: 400 })
+      }
+      const admin = createAdminClient()
+      const { data: company } = await admin.from('companies').select('id').eq('id', verified.companyId).maybeSingle()
+      if (!company) {
+        return NextResponse.json({ message: 'Företaget finns inte längre' }, { status: 400 })
+      }
+      joinCompanyId = company.id
+    }
 
     // If invitation token is provided, validate it before creating the auth user
     let invitation: any = null
@@ -106,7 +127,7 @@ export async function POST(request: NextRequest) {
 
     const adminEmail = process.env.ADMIN_EMAIL
     const isAdminEmail = adminEmail && email === adminEmail
-    const role = isAdminEmail ? 'ADMIN' : invitation ? 'EMPLOYEE' : 'INDIVIDUAL'
+    const role = isAdminEmail ? 'ADMIN' : (invitation || joinCompanyId) ? 'EMPLOYEE' : 'INDIVIDUAL'
     const displayName = invitation?.name ?? name
 
     // Create Supabase Auth user — Supabase handles password hashing
@@ -153,7 +174,7 @@ export async function POST(request: NextRequest) {
       role,
       phone: phone ?? null,
       identity_verified: identityVerified,
-      company_id: invitation ? invitation.company_id : null,
+      company_id: invitation ? invitation.company_id : joinCompanyId,
       personnummer_encrypted: personnummer
         ? encryptPersonnummer(normalisePersonnummer(personnummer))
         : null,
@@ -180,7 +201,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        message: invitation
+        message: (invitation || joinCompanyId)
           ? 'Användare skapad och ansluten till företaget framgångsrikt'
           : 'Användare skapad framgångsrikt',
         user: { id: user!.id, email: user!.email, name: user!.name, role: user!.role },

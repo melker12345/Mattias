@@ -69,3 +69,24 @@ export function normalisePersonnummer(raw: string): string {
   }
   throw new Error('Invalid personnummer format')
 }
+
+/** True if the input can be parsed as a Swedish personnummer. */
+export function isValidPersonnummer(raw: string): boolean {
+  try {
+    normalisePersonnummer(raw)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Mask a normalised (12-digit) personnummer for display: show the birthdate,
+ * hide the last four digits — e.g. "19900101-••••". Never returns the full
+ * number.
+ */
+export function maskPersonnummer(normalised: string): string {
+  const digits = normalised.replace(/[-\s]/g, '')
+  if (digits.length !== 12) return '••••••••-••••'
+  return `${digits.slice(0, 8)}-••••`
+}

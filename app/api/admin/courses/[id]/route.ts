@@ -72,9 +72,14 @@ export async function DELETE(
     if (isNextResponse(adminResult)) return adminResult;
 
     const admin = createAdminClient();
-    const { count } = await admin.from('enrollments').select('*', { count: 'exact', head: true }).eq('course_id', params.id);
-    if (count && count > 0) return NextResponse.json({ message: 'Kan inte ta bort kurs som har registrerade användare' }, { status: 400 });
-    await admin.from('courses').delete().eq('id', params.id);
+    // All course_id foreign keys are ON DELETE CASCADE (enrollments, lessons,
+    // certificates, purchases, etc.), so deleting the course cleans up related
+    // rows automatically — even when users are registered to it.
+    const { error } = await admin.from('courses').delete().eq('id', params.id);
+    if (error) {
+      console.error('Error deleting course:', error);
+      return NextResponse.json({ message: 'Ett fel uppstod vid borttagning av kurs' }, { status: 500 });
+    }
     return NextResponse.json({ message: 'Kurs borttagen framgångsrikt' });
   } catch (error) {
     console.error('Error deleting course:', error);

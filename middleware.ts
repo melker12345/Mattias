@@ -12,7 +12,9 @@ const PUBLIC_ROUTES = [
   '/auth/forgot-password',
   '/auth/reset-password',
   '/register/company',
+  '/join',
   '/api/auth',
+  '/api/join',
   '/api/webhooks',
 ]
 

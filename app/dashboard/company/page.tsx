@@ -21,6 +21,7 @@ export default function CompanyDashboard() {
     removingEmployee,
     companyId,
     refreshEmployees,
+    refreshEmployeeDetails,
     toggleEmployeeDetails,
     removeEmployee,
   } = useCompanyEmployees(user);
@@ -33,6 +34,31 @@ export default function CompanyDashboard() {
 
   const openCoursePurchaseModal = (employeeId?: string, employeeName?: string) => {
     setCoursePurchaseModal({ isOpen: true, employeeId, employeeName });
+  };
+
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteLinkLoading, setInviteLinkLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const generateInviteLink = async () => {
+    if (!companyId) return;
+    setInviteLinkLoading(true);
+    try {
+      const res = await fetch(`/api/companies/${companyId}/invite-link`, { cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setInviteLink(data.url);
+        try {
+          await navigator.clipboard.writeText(data.url);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2500);
+        } catch {
+          /* clipboard may be blocked — the link is still shown for manual copy */
+        }
+      }
+    } finally {
+      setInviteLinkLoading(false);
+    }
   };
 
   if (isLoading) {
@@ -88,16 +114,48 @@ export default function CompanyDashboard() {
               Bjud in anställd
             </Link>
             <button
+              onClick={generateInviteLink}
+              disabled={inviteLinkLoading || !companyId}
+              className="btn-secondary inline-flex items-center"
+            >
+              {inviteLinkLoading ? 'Skapar länk…' : 'Dela inbjudningslänk'}
+            </button>
+            <button
               onClick={refreshEmployees}
               disabled={isLoading}
               className="btn-secondary inline-flex items-center"
             >
               Uppdatera
             </button>
-            <Link href="/dashboard/company/courses" className="btn-secondary inline-flex items-center">
-              Hantera kurser
-            </Link>
           </div>
+
+          {inviteLink && (
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm font-medium text-blue-900 mb-2">
+                Dela den här länken via sms eller mejl. Den som öppnar den kan skapa ett konto (eller logga in) och
+                gå med i företaget.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  readOnly
+                  value={inviteLink}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="flex-1 min-w-0 input-field bg-white text-sm"
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText(inviteLink);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2500);
+                  }}
+                  className="btn-primary shrink-0"
+                >
+                  {copied ? 'Kopierad!' : 'Kopiera'}
+                </button>
+              </div>
+              <p className="text-xs text-blue-700 mt-2">Länken är giltig i 30 dagar.</p>
+            </div>
+          )}
         </div>
 
         <EmployeeList
@@ -106,9 +164,14 @@ export default function CompanyDashboard() {
           employeeDetails={employeeDetails}
           loadingDetails={loadingDetails}
           removingEmployee={removingEmployee}
+          companyId={companyId ?? null}
           onToggleDetails={toggleEmployeeDetails}
           onRemoveEmployee={removeEmployee}
           onPurchaseForEmployee={openCoursePurchaseModal}
+          onEmployeeUpdated={() => {
+            refreshEmployees();
+            if (expandedEmployee) refreshEmployeeDetails(expandedEmployee);
+          }}
         />
       </div>
 

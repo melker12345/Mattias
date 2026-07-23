@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     const admin = createAdminClient();
     const { data: enrollments } = await admin.from('enrollments')
-      .select('enrolled_at, course:courses(id, title, description)')
+      .select('enrolled_at, completed_at, passed, course:courses(id, title, description)')
       .eq('user_id', user.id).order('enrolled_at', { ascending: false });
 
     const enrollmentList = enrollments ?? [];
@@ -22,13 +22,20 @@ export async function GET(request: NextRequest) {
     });
 
     // Batch: fetch all lessons for the enrolled courses and all of this user's progress in one query each.
+    // We track lesson type so the 'test_intro' divider (a gateway screen, never
+    // "completed") is excluded from progress totals.
     const { data: allLessons } = courseIds.length
-      ? await admin.from('lessons').select('id, course_id').in('course_id', courseIds)
+      ? await admin.from('lessons').select('id, course_id, type').in('course_id', courseIds)
       : { data: [] };
 
     const lessonIdsByCourse = new Map<string, string[]>();
     const courseIdByLesson = new Map<string, string>();
+    const courseHasTest = new Map<string, boolean>();
     for (const lesson of allLessons ?? []) {
+      if (lesson.type === 'test_intro') {
+        courseHasTest.set(lesson.course_id, true);
+        continue; // the divider is not a countable lesson
+      }
       courseIdByLesson.set(lesson.id, lesson.course_id);
       const list = lessonIdsByCourse.get(lesson.course_id);
       if (list) list.push(lesson.id);
@@ -54,12 +61,16 @@ export async function GET(request: NextRequest) {
       const course = enrollment.course as unknown as { id: string; title: string; description: string };
       const lessonIds = lessonIdsByCourse.get(course.id) ?? [];
       const progressRecords = progressByCourse.get(course.id) ?? [];
+      const hasTest = courseHasTest.get(course.id) ?? false;
 
       const totalLessons = lessonIds.length;
       const completedLessons = progressRecords.filter(p => p.completed).length;
       const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
-      const status: 'in-progress' | 'completed' | 'not-started' =
-        completedLessons === 0 ? 'not-started' : completedLessons === totalLessons ? 'completed' : 'in-progress';
+      // A course with a graded test is "completed" only when the test is passed.
+      // Without a test we keep the legacy rule: all lessons completed = done.
+      const status: 'in-progress' | 'completed' | 'not-started' = hasTest
+        ? (enrollment.passed ? 'completed' : completedLessons === 0 ? 'not-started' : 'in-progress')
+        : (completedLessons === 0 ? 'not-started' : completedLessons === totalLessons ? 'completed' : 'in-progress');
       const lastProgress = progressRecords
         .filter(p => p.completed_at)
         .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())[0];

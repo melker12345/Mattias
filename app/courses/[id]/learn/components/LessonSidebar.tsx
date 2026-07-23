@@ -11,6 +11,14 @@ interface LessonSidebarProps {
   onSelectLesson: (index: number) => void;
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  video: 'Video',
+  image: 'Bild',
+  text: 'Text',
+  question: 'Fråga',
+  test_intro: 'Kunskapstest',
+};
+
 export function LessonSidebar({
   lessons,
   currentLessonIndex,
@@ -44,7 +52,7 @@ export function LessonSidebar({
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-xs sm:text-sm truncate">{lesson.title}</p>
-                    <p className="text-xs text-gray-500">{lesson.type}</p>
+                    <p className="text-xs text-gray-500">{TYPE_LABELS[lesson.type] ?? lesson.type}</p>
                   </div>
                 </div>
               </div>

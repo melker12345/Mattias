@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { XMarkIcon, PlayIcon, PhotoIcon, DocumentTextIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, PlayIcon, PhotoIcon, DocumentTextIcon, QuestionMarkCircleIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
 
 interface AddContentModalProps {
   isOpen: boolean;
@@ -38,6 +38,13 @@ const contentTypes = [
     description: 'Lägg till en quizfråga',
     icon: QuestionMarkCircleIcon,
     color: 'bg-orange-100 text-orange-600'
+  },
+  {
+    id: 'test_intro',
+    name: 'Kunskapstest (provstart)',
+    description: 'Markera var provet börjar. Frågor efter denna räknas som prov.',
+    icon: AcademicCapIcon,
+    color: 'bg-primary-100 text-primary-600'
   }
 ];
 
@@ -175,6 +182,27 @@ export default function AddContentModal({ isOpen, onClose, onAdd }: AddContentMo
               className="input-field"
               placeholder="Skriv ditt innehåll här..."
               required
+            />
+          </div>
+        );
+
+      case 'test_intro':
+        return (
+          <div>
+            <div className="mb-3 rounded-lg bg-primary-50 border border-primary-100 p-3 text-sm text-primary-800">
+              Allt innehåll <strong>efter</strong> denna markör räknas som provet. Frågor före den är
+              övningsfrågor och påverkar inte om deltagaren blir godkänd.
+            </div>
+            <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
+              Instruktioner till deltagaren (valfritt)
+            </label>
+            <textarea
+              id="content"
+              value={formData.content}
+              onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+              rows={4}
+              className="input-field"
+              placeholder="T.ex. Provet består av flera frågor. Du måste svara på alla för att skicka in..."
             />
           </div>
         );

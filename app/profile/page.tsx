@@ -20,6 +20,16 @@ interface UserProfile {
   email: string;
   role: string;
   createdAt: string;
+  phone?: string | null;
+  identity?: {
+    name: string | null;
+    nameLocked: boolean;
+    hasPersonnummer: boolean;
+    personnummerMasked: string | null;
+    personnummerLocked: boolean;
+    identityVerified: boolean;
+    complete: boolean;
+  };
   company?: {
     id: string;
     name: string;
@@ -61,6 +71,13 @@ export default function ProfilePage() {
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // Identity form (name/personnummer/phone).
+  const [idName, setIdName] = useState('');
+  const [idPersonnummer, setIdPersonnummer] = useState('');
+  const [idPhone, setIdPhone] = useState('');
+  const [savingIdentity, setSavingIdentity] = useState(false);
+  const [identityMsg, setIdentityMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
   useEffect(() => {
     if (!user && !loading) {
       router.push('/auth/signin');
@@ -76,11 +93,41 @@ export default function ProfilePage() {
       if (response.ok) {
         const data = await response.json();
         setProfile(data);
+        setIdName(data.identity?.name ?? data.name ?? '');
+        setIdPhone(data.phone ?? '');
+        setIdPersonnummer('');
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveIdentity = async () => {
+    setSavingIdentity(true);
+    setIdentityMsg(null);
+    try {
+      const payload: Record<string, string> = { phone: idPhone };
+      if (!profile?.identity?.nameLocked) payload.name = idName;
+      if (!profile?.identity?.personnummerLocked && idPersonnummer.trim()) payload.personnummer = idPersonnummer;
+
+      const response = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setIdentityMsg({ type: 'err', text: data.message || 'Kunde inte spara' });
+        return;
+      }
+      setIdentityMsg({ type: 'ok', text: data.message || 'Sparat' });
+      await fetchProfile();
+    } catch {
+      setIdentityMsg({ type: 'err', text: 'Kunde inte spara' });
+    } finally {
+      setSavingIdentity(false);
     }
   };
 
@@ -253,6 +300,96 @@ export default function ProfilePage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Identity / ID06 details */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+          <div className="px-6 py-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-1 flex items-center">
+              <ShieldCheckIcon className="w-6 h-6 mr-2 text-primary-600" />
+              Uppgifter för certifikat &amp; ID06
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Dessa uppgifter kopplas till dina kurser och certifikat. Namn och personnummer kan bara anges en
+              gång — för att ändra dem behöver du kontakta support. Certifikatet binds till dessa uppgifter.
+            </p>
+
+            {profile.identity && !profile.identity.complete && (
+              <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+                Fyll i ditt namn och personnummer innan du börjar en kurs — det krävs för att kunna få ett certifikat.
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Namn {profile.identity?.nameLocked && <span className="text-xs text-gray-400">(låst)</span>}
+                </label>
+                {profile.identity?.nameLocked ? (
+                  <p className="text-gray-900">{profile.identity.name}</p>
+                ) : (
+                  <input
+                    type="text"
+                    value={idName}
+                    onChange={(e) => setIdName(e.target.value)}
+                    className="input-field"
+                    placeholder="För- och efternamn"
+                  />
+                )}
+              </div>
+
+              {/* Personnummer */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Personnummer {profile.identity?.personnummerLocked && <span className="text-xs text-gray-400">(låst)</span>}
+                </label>
+                {profile.identity?.personnummerLocked ? (
+                  <p className="text-gray-900">{profile.identity.personnummerMasked}</p>
+                ) : (
+                  <input
+                    type="text"
+                    value={idPersonnummer}
+                    onChange={(e) => setIdPersonnummer(e.target.value)}
+                    className="input-field"
+                    placeholder="ÅÅÅÅMMDD-XXXX"
+                  />
+                )}
+              </div>
+
+              {/* Phone (always editable) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
+                <input
+                  type="tel"
+                  value={idPhone}
+                  onChange={(e) => setIdPhone(e.target.value)}
+                  className="input-field"
+                  placeholder="07X-XXX XX XX"
+                />
+              </div>
+
+              <div className="flex items-end">
+                {profile.identity?.identityVerified && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">
+                    <ShieldCheckIcon className="w-4 h-4 mr-1" /> Verifierad av företag
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {identityMsg && (
+              <p className={`mt-3 text-sm ${identityMsg.type === 'ok' ? 'text-green-700' : 'text-red-600'}`}>
+                {identityMsg.text}
+              </p>
+            )}
+
+            <div className="mt-4">
+              <button onClick={handleSaveIdentity} disabled={savingIdentity} className="btn-primary disabled:opacity-50">
+                {savingIdentity ? 'Sparar…' : 'Spara uppgifter'}
+              </button>
+            </div>
           </div>
         </div>
 

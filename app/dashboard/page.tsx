@@ -36,9 +36,28 @@ export default function UserDashboard() {
     fetchUserCourses();
   }, []);
 
+  // Company admins manage everything from /dashboard/company; they don't have a
+  // personal course list here, so send them there.
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/profile');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && data.role === 'COMPANY_ADMIN') router.replace('/dashboard/company');
+      } catch {
+        /* stay on the individual dashboard */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, router]);
+
   const fetchUserCourses = async () => {
     try {
-      const response = await fetch('/api/user/courses');
+      // Always read live so admin edits (new lessons, renamed courses) show up.
+      const response = await fetch('/api/user/courses', { cache: 'no-store' });
       
       if (response.ok) {
         const courses = await response.json();

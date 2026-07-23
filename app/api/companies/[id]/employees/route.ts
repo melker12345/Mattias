@@ -22,7 +22,7 @@ export async function GET(
 
     const { data: employees } = await admin
       .from('users')
-      .select('id, name, email, identity_verified, id06_eligible, created_at, updated_at')
+      .select('id, name, email, identity_verified, id06_eligible, personnummer_encrypted, created_at, updated_at')
       .eq('company_id', companyId)
       .eq('role', 'EMPLOYEE')
       .order('created_at', { ascending: false })
@@ -48,7 +48,14 @@ export async function GET(
         certificates: userCerts.length,
         lastActivity: employee.updated_at ? new Date(employee.updated_at).toLocaleDateString('sv-SE') : 'Aldrig',
         createdAt: employee.created_at,
-        status: employee.identity_verified ? 'VERIFIED' : 'PENDING_VERIFICATION',
+        hasPersonnummer: !!employee.personnummer_encrypted,
+        // Reflects identity state, not login state:
+        //  VERIFIED   – company-vouched / verified identity
+        //  NEEDS_INFO – no personnummer on file yet (can't start courses / get certs)
+        //  UNVERIFIED – details on file but not yet verified
+        status: employee.identity_verified
+          ? 'VERIFIED'
+          : employee.personnummer_encrypted ? 'UNVERIFIED' : 'NEEDS_INFO',
       }
     })
 

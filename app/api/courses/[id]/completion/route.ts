@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isNextResponse } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { recalculateAndPersistCourseScore, computeFinalScore } from '@/lib/course-progress';
+import { recalculateAndPersistCourseScore, computeFinalScore, getCoursePartition, getLearningScore } from '@/lib/course-progress';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,24 +27,31 @@ export async function GET(
 
     const course = enrollment.course as { id: string; title: string; passing_score: number };
 
-    const { data: lessonRows } = await admin.from('lessons').select('id').eq('course_id', courseId);
-    const lessonIds = (lessonRows ?? []).map(l => l.id);
-    const { data: allQuestions } = await admin.from('questions').select('id, question, options, correct_answer').in('lesson_id', lessonIds);
-    const questionIds = (allQuestions ?? []).map(q => q.id);
-    const { data: userAnswers } = questionIds.length
-      ? await admin.from('answers').select('question_id, answer, is_correct').eq('user_id', user.id).in('question_id', questionIds)
+    // The graded assessment is the TEST partition (all questions for a course
+    // with no test divider). Completion + the result screen are driven by it.
+    const partition = await getCoursePartition(courseId, admin);
+    const testQuestionIds = partition.testQuestionIds;
+
+    const { data: testQuestions } = testQuestionIds.length
+      ? await admin.from('questions').select('id, question, options, correct_answer').in('id', testQuestionIds)
+      : { data: [] as { id: string; question: string; options: string; correct_answer: string }[] };
+
+    const { data: userAnswers } = testQuestionIds.length
+      ? await admin.from('answers').select('question_id, answer, is_correct').eq('user_id', user.id).in('question_id', testQuestionIds)
       : { data: [] };
 
-    const totalQuestions = (allQuestions ?? []).length;
+    const totalQuestions = (testQuestions ?? []).length;
     const answeredQuestions = (userAnswers ?? []).length;
     const correctAnswers = (userAnswers ?? []).filter(a => a.is_correct).length;
     const passingScore = course.passing_score;
 
+    const learningScore = await getLearningScore(user.id, courseId, admin, partition);
+
     const { finalScore, passed } = computeFinalScore(totalQuestions, correctAnswers, passingScore);
 
-    // Check if all questions are answered (course is completed)
+    // Completed once every TEST question has been answered.
     const isCompleted = totalQuestions > 0 && answeredQuestions === totalQuestions;
-    
+
     if (!isCompleted) {
       return NextResponse.json({
         completed: false,
@@ -61,7 +68,7 @@ export async function GET(
       await recalculateAndPersistCourseScore(user.id, courseId);
     }
 
-    const answersData = (allQuestions ?? []).map(question => {
+    const answersData = (testQuestions ?? []).map(question => {
       const userAnswer = (userAnswers ?? []).find(a => a.question_id === question.id);
       const options = JSON.parse(question.options);
       return {
@@ -92,6 +99,13 @@ export async function GET(
       timeTaken,
       answers: answersData,
       userEmail: user.email,
+      hasTest: partition.hasTest,
+      learningScore: {
+        total: learningScore.total,
+        correct: learningScore.correct,
+        answered: learningScore.answered,
+        score: learningScore.score,
+      },
     });
 
   } catch (error) {

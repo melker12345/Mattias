@@ -8,13 +8,16 @@ import { LearnHeader } from './components/LearnHeader';
 import { LessonSidebar } from './components/LessonSidebar';
 import { LessonContent } from './components/LessonContent';
 import { LessonNavigation } from './components/LessonNavigation';
+import { TestIntro } from './components/TestIntro';
+import { TestRunner } from './components/TestRunner';
 
 export default function CourseLearningPage({ params }: { params: { id: string } }) {
-  const { user } = useSupabaseAuth();
+  const { user, loading: authLoading } = useSupabaseAuth();
   const router = useRouter();
-  const learn = useCourseLearn(params.id, user);
+  const learn = useCourseLearn(params.id, user, authLoading);
 
-  if (learn.loading) {
+  // Still resolving auth or fetching the course.
+  if (authLoading || learn.access === 'loading' || (learn.access === 'ok' && learn.loading)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-600"></div>
@@ -22,19 +25,68 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
     );
   }
 
-  if (!learn.course) {
+  // Not signed in — send them to sign in and back here afterwards.
+  if (learn.access === 'unauthenticated') {
+    const callbackUrl = encodeURIComponent(`/courses/${params.id}/learn`);
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Kurs hittades inte</h1>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            Tillbaka till dashboard
-          </button>
-        </div>
-      </div>
+      <LearnAccessNotice
+        title="Logga in för att fortsätta"
+        message="Du behöver vara inloggad för att gå kursen. Logga in så tar vi dig tillbaka hit."
+        primaryLabel="Logga in"
+        onPrimary={() => router.push(`/auth/signin?callbackUrl=${callbackUrl}`)}
+      />
+    );
+  }
+
+  // Signed in but not enrolled — professional paywall, not a dead spinner.
+  if (learn.access === 'forbidden') {
+    return (
+      <LearnAccessNotice
+        title="Du har inte tillgång till den här kursen"
+        message="Den här kursen ligger bakom en betalvägg. Registrera dig för kursen för att få tillgång till allt innehåll."
+        primaryLabel="Till kurssidan"
+        onPrimary={() => router.push(`/courses/${params.id}`)}
+        secondaryLabel="Mina kurser"
+        onSecondary={() => router.push('/dashboard')}
+      />
+    );
+  }
+
+  // Enrolled but hasn't filled in the identity required before a course starts.
+  if (learn.access === 'needs_identity') {
+    return (
+      <LearnAccessNotice
+        title="Komplettera dina uppgifter först"
+        message="Innan du börjar kursen behöver du fylla i ditt namn och personnummer på din profil. Certifikatet kopplas till dessa uppgifter."
+        primaryLabel="Till min profil"
+        onPrimary={() => router.push('/profile')}
+        secondaryLabel="Tillbaka"
+        onSecondary={() => router.push('/dashboard')}
+      />
+    );
+  }
+
+  if (learn.access === 'notfound' || !learn.course) {
+    return (
+      <LearnAccessNotice
+        title="Kurs hittades inte"
+        message="Kursen du letar efter finns inte eller har tagits bort."
+        primaryLabel="Tillbaka till dashboard"
+        onPrimary={() => router.push('/dashboard')}
+      />
+    );
+  }
+
+  if (learn.access === 'error') {
+    return (
+      <LearnAccessNotice
+        title="Något gick fel"
+        message="Vi kunde inte ladda kursen just nu. Försök igen om en liten stund."
+        primaryLabel="Försök igen"
+        onPrimary={() => window.location.reload()}
+        secondaryLabel="Till dashboard"
+        onSecondary={() => router.push('/dashboard')}
+      />
     );
   }
 
@@ -51,8 +103,10 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
         timeTaken={learn.completionData.timeTaken}
         answers={learn.completionData.answers}
         userEmail={learn.completionData.userEmail}
+        hasTest={learn.completionData.hasTest ?? learn.hasTest}
+        learningScore={learn.completionData.learningScore}
         onSubmitForReview={learn.handleSubmitForReview}
-        onRetakeCourse={learn.handleRetakeCourse}
+        onRetakeCourse={learn.hasTest ? learn.handleRetakeTest : learn.handleRetakeCourse}
         isSubmitting={learn.isSubmitting}
         hasAlreadySubmitted={learn.hasAlreadySubmitted}
         isRetaking={learn.isResetting}
@@ -60,10 +114,32 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
     );
   }
 
+  // Full-screen graded test.
+  if (learn.testMode && learn.course) {
+    return (
+      <TestRunner
+        courseTitle={learn.course.title}
+        questions={learn.testLessons}
+        passingScore={learn.course.passingScore}
+        parseQuestionOptions={learn.parseQuestionOptions}
+        rawQuestionOptions={learn.rawQuestionOptions}
+        isSubmitting={learn.testSubmitting}
+        onSubmit={learn.submitTest}
+        onCancel={learn.exitTest}
+      />
+    );
+  }
+
   const currentLesson = learn.currentLesson;
+  const isTestIntro = currentLesson?.type === 'test_intro';
+  // "Course completed" banner only applies to plain (no-test) courses; for test
+  // courses the result screen is reached via the test. The divider itself never
+  // counts as a completable lesson.
+  const contentLessons = learn.course.lessons.filter((l) => l.type !== 'test_intro');
   const allLessonsCompleted =
-    learn.course.lessons.length > 0 &&
-    learn.course.lessons.every((l) => learn.isLessonCompleted(l.id));
+    !learn.hasTest &&
+    contentLessons.length > 0 &&
+    contentLessons.every((l) => learn.isLessonCompleted(l.id));
   const currentQuestion = currentLesson?.questions?.[0];
   const currentUserAnswer = currentQuestion
     ? learn.userAnswers.find((a) => a.questionId === currentQuestion.id) ?? null
@@ -107,7 +183,22 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
                 </div>
               )}
 
-              {currentLesson && (
+              {currentLesson && isTestIntro && (
+                <TestIntro
+                  title={currentLesson.title}
+                  instructions={currentLesson.content}
+                  questionCount={learn.testLessons.length}
+                  passingScore={learn.course.passingScore}
+                  contentComplete={learn.contentComplete}
+                  testCompleted={learn.testCompleted}
+                  isBusy={learn.testSubmitting || learn.isResetting}
+                  onStart={learn.startTest}
+                  onViewResults={learn.checkCourseCompletion}
+                  onRetake={learn.handleRetakeTest}
+                />
+              )}
+
+              {currentLesson && !isTestIntro && (
                 <>
                   <LessonContent
                     lesson={currentLesson}
@@ -148,6 +239,47 @@ export default function CourseLearningPage({ params }: { params: { id: string } 
               )}
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LearnAccessNotice({
+  title,
+  message,
+  primaryLabel,
+  onPrimary,
+  secondaryLabel,
+  onSecondary,
+}: {
+  title: string;
+  message: string;
+  primaryLabel: string;
+  onPrimary: () => void;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
+}) {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="bg-white rounded-lg shadow-sm p-8 max-w-md w-full text-center">
+        <h1 className="text-2xl font-bold text-gray-900 mb-3">{title}</h1>
+        <p className="text-gray-600 mb-6">{message}</p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <button
+            onClick={onPrimary}
+            className="bg-primary-600 text-white px-6 py-3 rounded-lg hover:bg-primary-700 transition-colors font-medium"
+          >
+            {primaryLabel}
+          </button>
+          {secondaryLabel && onSecondary && (
+            <button
+              onClick={onSecondary}
+              className="bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+            >
+              {secondaryLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>

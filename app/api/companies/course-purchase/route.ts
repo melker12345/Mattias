@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const authResult = await requireAuth()
     if (isNextResponse(authResult)) return authResult
 
-    const { companyId, employeeId, courseIds, purchaseType } = await request.json()
+    const { companyId, employeeId, employeeIds, courseIds, purchaseType } = await request.json()
 
     // Validate input
     if (!companyId || !courseIds || !Array.isArray(courseIds) || courseIds.length === 0) {
@@ -44,22 +44,46 @@ export async function POST(request: NextRequest) {
       total_amount: finalPrice,
     }).select().single()
 
-    const enrollmentRows: { user_id: string; course_id: string; course_purchase_id: string }[] = []
-
-    if (purchaseType === 'individual' && employeeId) {
-      for (const courseId of courseIds) {
-        enrollmentRows.push({ user_id: employeeId, course_id: courseId, course_purchase_id: coursePurchase!.id })
-      }
-    } else if (purchaseType === 'bulk') {
+    // Resolve which employees to enrol:
+    //  - bulk                       → every employee in the company
+    //  - specific employeeIds[]     → those employees (validated to the company)
+    //  - single employeeId (legacy) → that employee
+    let targetUserIds: string[] = []
+    if (purchaseType === 'bulk') {
       const { data: employees } = await admin.from('users').select('id').eq('company_id', companyId).eq('role', 'EMPLOYEE')
-      for (const emp of employees ?? []) {
-        for (const courseId of courseIds) {
-          enrollmentRows.push({ user_id: emp.id, course_id: courseId, course_purchase_id: coursePurchase!.id })
-        }
+      targetUserIds = (employees ?? []).map(e => e.id)
+    } else {
+      const requested: string[] = Array.isArray(employeeIds) && employeeIds.length
+        ? employeeIds
+        : employeeId ? [employeeId] : []
+      if (requested.length) {
+        // Only enrol users that actually belong to this company.
+        const { data: valid } = await admin.from('users').select('id').eq('company_id', companyId).eq('role', 'EMPLOYEE').in('id', requested)
+        targetUserIds = (valid ?? []).map(e => e.id)
       }
     }
 
-    if (enrollmentRows.length > 0) await admin.from('enrollments').insert(enrollmentRows)
+    if (targetUserIds.length === 0) {
+      return NextResponse.json({ error: 'No employees selected' }, { status: 400 })
+    }
+
+    const nowIso = new Date().toISOString()
+    const enrollmentRows = targetUserIds.flatMap(uid =>
+      courseIds.map((courseId: string) => ({
+        user_id: uid,
+        course_id: courseId,
+        course_purchase_id: coursePurchase!.id,
+        is_paid: true,
+        paid_at: nowIso,
+        payment_method: 'company_purchase',
+      }))
+    )
+
+    // Upsert so an employee already enrolled in one of the courses doesn't fail
+    // the whole batch; ignoreDuplicates keeps any existing progress intact.
+    if (enrollmentRows.length > 0) {
+      await admin.from('enrollments').upsert(enrollmentRows, { onConflict: 'user_id,course_id', ignoreDuplicates: true })
+    }
 
     const { data: invoice } = await admin.from('invoices').insert({
       company_id: companyId,
